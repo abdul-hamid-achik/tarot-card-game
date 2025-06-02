@@ -1,0 +1,15 @@
+version: '3'
+
+tasks:
+  setup:
+    desc: Install dependencies
+    cmds:
+      - npm install --ignore-scripts
+  build:
+    desc: Build all packages
+    cmds:
+      - npm run build
+  test:
+    desc: Run tests
+    cmds:
+      - npm test
