@@ -48,9 +48,16 @@ export const IntentEndTurnSchema = z.object({
   playerId: z.string(),
 });
 
+export const IntentDrawSchema = z.object({
+  type: z.literal('draw'),
+  playerId: z.string(),
+  cardId: z.string(),
+});
+
 export const IntentSchema = z.discriminatedUnion('type', [
   IntentPlayCardSchema,
   IntentEndTurnSchema,
+  IntentDrawSchema,
 ]);
 
 export type CardInput = z.infer<typeof CardSchema>;

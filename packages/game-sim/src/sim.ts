@@ -31,14 +31,26 @@ export function applyIntent(state: MatchState, intent: IntentInput): MatchState 
       return { ...state, turn: state.turn + 1 };
     }
     case 'play_card': {
-      // Placeholder: record played card on battlefield per player (immutable update)
-      const bf = (state.battlefield as Record<string, unknown>) || {};
-      const byPlayer = (bf[parsed.playerId] as { played: string[] } | undefined) ?? { played: [] };
+      // Only allow play if card is in hand
+      const hands = (state.hands as Record<string, { hand: string[] }>) || {};
+      const hand = (hands[parsed.playerId]?.hand ?? []);
+      if (!hand.includes(parsed.cardId)) {
+        return state; // reject silently for now
+      }
+      const nextHand = hand.filter((c) => c !== parsed.cardId);
+      const nextHands = { ...hands, [parsed.playerId]: { hand: nextHand } } as Record<string, { hand: string[] }>;
+      const bf = (state.battlefield as Record<string, { played: string[] }>) || {};
+      const byPlayer = bf[parsed.playerId] ?? { played: [] };
       const nextByPlayer = { played: [...byPlayer.played, parsed.cardId] };
-      const nextBattlefield = { ...bf, [parsed.playerId]: nextByPlayer } as Record<string, unknown>;
-      // Access RNG to signal determinism source for future expansions
+      const nextBattlefield = { ...bf, [parsed.playerId]: nextByPlayer } as Record<string, { played: string[] }>;
       void createSeededRandom(state.seed);
-      return { ...state, battlefield: nextBattlefield };
+      return { ...state, hands: nextHands, battlefield: nextBattlefield };
+    }
+    case 'draw': {
+      const hands = (state.hands as Record<string, { hand: string[] }>) || {};
+      const hand = (hands[parsed.playerId]?.hand ?? []);
+      const nextHands = { ...hands, [parsed.playerId]: { hand: [...hand, parsed.cardId] } } as Record<string, { hand: string[] }>;
+      return { ...state, hands: nextHands };
     }
     default: {
       return state;

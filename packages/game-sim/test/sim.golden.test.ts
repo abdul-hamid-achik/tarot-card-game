@@ -15,6 +15,7 @@ describe('Golden master snapshots', () => {
   it('sequence A is stable', () => {
     const out = goldenFor([
       { type: 'end_turn', playerId: 'p1' },
+      { type: 'draw', playerId: 'p2', cardId: 'x' },
       { type: 'play_card', playerId: 'p2', cardId: 'x' },
       { type: 'end_turn', playerId: 'p2' },
     ]);
@@ -22,7 +23,7 @@ describe('Golden master snapshots', () => {
     expect(obj).toEqual({
       battlefield: { p2: { played: ['x'] } },
       fate: { p1: 0, p2: 0 },
-      hands: {},
+      hands: { p2: { hand: [] } },
       matchId: 'm_gold',
       players: ['p1', 'p2'],
       seed: 'seed-9f9f',
