@@ -33,6 +33,7 @@ export interface MatchState {
   players: string[];
   turn: number;
   fate: Record<string, number>; // playerId -> fate value
+  resources?: Record<string, number>; // simple pool for costs
   stacks: Record<string, unknown>;
   battlefield: Record<string, unknown>;
   hands: Record<string, unknown>;

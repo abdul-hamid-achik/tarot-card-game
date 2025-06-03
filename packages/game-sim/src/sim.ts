@@ -17,6 +17,7 @@ export function createInitialState(params: {
     players: params.players,
     turn: 0,
     fate: Object.fromEntries(params.players.map((p) => [p, 0])),
+    resources: Object.fromEntries(params.players.map((p) => [p, 0])),
     stacks: {},
     battlefield: {},
     hands: {},
@@ -28,15 +29,23 @@ export function applyIntent(state: MatchState, intent: IntentInput): MatchState 
   const parsed = IntentSchema.parse(intent);
   switch (parsed.type) {
     case 'end_turn': {
-      return { ...state, turn: state.turn + 1 };
+      // Ramp: +1 resource to the current player (round-robin by turn)
+      const currentPlayerIdx = state.turn % state.players.length;
+      const currentPlayer = state.players[currentPlayerIdx];
+      const resources = { ...(state.resources ?? {}) } as Record<string, number>;
+      resources[currentPlayer] = (resources[currentPlayer] ?? 0) + 1;
+      return { ...state, turn: state.turn + 1, resources };
     }
     case 'play_card': {
-      // Only allow play if card is in hand
+      // Only allow play if card is in hand and has enough resources (cost=1)
       const hands = (state.hands as Record<string, { hand: string[] }>) || {};
       const hand = (hands[parsed.playerId]?.hand ?? []);
-      if (!hand.includes(parsed.cardId)) {
+      const resources = { ...(state.resources ?? {}) } as Record<string, number>;
+      const cost = 1;
+      if (!hand.includes(parsed.cardId) || (resources[parsed.playerId] ?? 0) < cost) {
         return state; // reject silently for now
       }
+      resources[parsed.playerId] = (resources[parsed.playerId] ?? 0) - cost;
       const nextHand = hand.filter((c) => c !== parsed.cardId);
       const nextHands = { ...hands, [parsed.playerId]: { hand: nextHand } } as Record<string, { hand: string[] }>;
       const bf = (state.battlefield as Record<string, { played: string[] }>) || {};
@@ -44,7 +53,7 @@ export function applyIntent(state: MatchState, intent: IntentInput): MatchState 
       const nextByPlayer = { played: [...byPlayer.played, parsed.cardId] };
       const nextBattlefield = { ...bf, [parsed.playerId]: nextByPlayer } as Record<string, { played: string[] }>;
       void createSeededRandom(state.seed);
-      return { ...state, hands: nextHands, battlefield: nextBattlefield };
+      return { ...state, hands: nextHands, battlefield: nextBattlefield, resources };
     }
     case 'draw': {
       const hands = (state.hands as Record<string, { hand: string[] }>) || {};

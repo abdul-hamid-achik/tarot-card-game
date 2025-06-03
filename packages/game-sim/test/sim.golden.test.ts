@@ -21,11 +21,12 @@ describe('Golden master snapshots', () => {
     ]);
     const obj = JSON.parse(out);
     expect(obj).toEqual({
-      battlefield: { p2: { played: ['x'] } },
+      battlefield: {},
       fate: { p1: 0, p2: 0 },
-      hands: { p2: { hand: [] } },
+      hands: { p2: { hand: ['x'] } },
       matchId: 'm_gold',
       players: ['p1', 'p2'],
+      resources: { p1: 1, p2: 1 },
       seed: 'seed-9f9f',
       stacks: {},
       turn: 2,

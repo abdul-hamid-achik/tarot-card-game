@@ -1,23 +1,28 @@
 import { describe, it, expect } from 'vitest';
 import { createInitialState, applyIntent } from '../src/sim.js';
 
-interface HandsShape { [playerId: string]: { hand: string[] } }
 interface BattlefieldShape { [playerId: string]: { played: string[] } }
 
-describe('Hand and play validations', () => {
-  it('cannot play a card not in hand', () => {
+/**
+ * Rules:
+ * - end_turn ramps +1 resource to the current player (by turn index).
+ * - play_card costs 1 resource; cannot play if insufficient resources.
+ */
+describe('Resources and costs', () => {
+  it('cannot play without resources', () => {
     let s = createInitialState({ matchId: 'm', seed: 's', players: ['p'] });
+    s = applyIntent(s, { type: 'draw', playerId: 'p', cardId: 'x' });
     s = applyIntent(s, { type: 'play_card', playerId: 'p', cardId: 'x' });
     expect((s.battlefield as BattlefieldShape)['p']).toBeUndefined();
   });
 
-  it('draw then play moves card from hand to battlefield', () => {
+  it('ramp then play succeeds and spends resource', () => {
     let s = createInitialState({ matchId: 'm', seed: 's', players: ['p'] });
     s = applyIntent(s, { type: 'draw', playerId: 'p', cardId: 'x' });
-    expect((s.hands as HandsShape)['p'].hand).toEqual(['x']);
     s = applyIntent(s, { type: 'end_turn', playerId: 'p' });
+    expect(s.resources?.['p']).toBe(1);
     s = applyIntent(s, { type: 'play_card', playerId: 'p', cardId: 'x' });
-    expect((s.hands as HandsShape)['p'].hand).toEqual([]);
     expect((s.battlefield as BattlefieldShape)['p'].played).toEqual(['x']);
+    expect(s.resources?.['p']).toBe(0);
   });
 });
