@@ -31,6 +31,7 @@ export const MatchStateSchema = z.object({
   players: z.array(z.string()).min(1),
   turn: z.number().int().min(0),
   fate: z.record(z.number().int()),
+  resources: z.record(z.number().int()).optional(),
   stacks: z.record(z.unknown()),
   battlefield: z.record(z.unknown()),
   hands: z.record(z.unknown()),

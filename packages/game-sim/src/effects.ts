@@ -34,16 +34,28 @@ export function parseEffects(effectStrings: string[]): EffectCall[] {
   return effectStrings.map(parseEffect);
 }
 
-export function executeEffect(state: MatchState, effect: EffectCall, seed: string): MatchState {
-  // Placeholder: deterministic no-op execution
+export function executeEffectForPlayer(state: MatchState, effect: EffectCall, playerId: string, seed: string): MatchState {
   void createSeededRandom(seed);
-  return state;
+  switch (effect.name) {
+    case 'gain': {
+      const amount = Number(effect.args[0] ?? 0) || 0;
+      const next = { ...(state.resources ?? {}) } as Record<string, number>;
+      next[playerId] = (next[playerId] ?? 0) + amount;
+      return { ...state, resources: next };
+    }
+    case 'silence': {
+      // Placeholder: no-op until we model units/statuses; validated by parser
+      return state;
+    }
+    default:
+      return state;
+  }
 }
 
-export function executeEffects(state: MatchState, effects: EffectCall[], seed: string): MatchState {
+export function executeEffectsForPlayer(state: MatchState, effects: EffectCall[], playerId: string, seed: string): MatchState {
   let s = state;
   for (const e of effects) {
-    s = executeEffect(s, e, seed);
+    s = executeEffectForPlayer(s, e, playerId, seed);
   }
   return s;
 }
