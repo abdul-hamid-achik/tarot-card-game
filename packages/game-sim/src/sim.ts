@@ -4,6 +4,8 @@ import { IntentSchema, type IntentInput, MatchStateSchema } from './schemas.js';
 
 export interface SimulationResult {
   state: MatchState;
+  winnerId?: string | null;
+  turns?: number;
 }
 
 export function createInitialState(params: {
@@ -67,12 +69,27 @@ export function applyIntent(state: MatchState, intent: IntentInput): MatchState 
   }
 }
 
-export function replay(state: MatchState, intents: IntentInput[]): SimulationResult {
+export function getScore(state: MatchState, playerId: string): number {
+  const bf = state.battlefield as Record<string, { played?: string[] }>;
+  const played = bf[playerId]?.played ?? [];
+  return played.length;
+}
+
+export function checkVictory(state: MatchState, threshold = 3): string | null {
+  for (const p of state.players) {
+    if (getScore(state, p) >= threshold) return p;
+  }
+  return null;
+}
+
+export function replay(state: MatchState, intents: IntentInput[], threshold = 3): SimulationResult {
   let current = state;
   for (const intent of intents) {
     current = applyIntent(current, intent);
+    const winner = checkVictory(current, threshold);
+    if (winner) return { state: current, winnerId: winner };
   }
-  return { state: current };
+  return { state: current, winnerId: checkVictory(current, threshold) };
 }
 
 export interface ReplayStepLog {
