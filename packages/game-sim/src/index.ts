@@ -4,3 +4,4 @@ export * from './schemas.js';
 export * from './sim.js';
 export * from './serialize.js';
 export * from './effects.js';
+export * from './bot.js';
