@@ -43,6 +43,21 @@ export function executeEffectForPlayer(state: MatchState, effect: EffectCall, pl
       next[playerId] = (next[playerId] ?? 0) + amount;
       return { ...state, resources: next };
     }
+    case 'both_discard_random': {
+      const amount = Math.max(0, Number(effect.args[0] ?? 1) || 1);
+      const rng = createSeededRandom(`${seed}:discard`);
+      const hands = (state.hands as Record<string, { hand: string[] }>) || {};
+      const nextHands: Record<string, { hand: string[] }> = { ...hands };
+      for (const p of state.players) {
+        let h = nextHands[p]?.hand ?? [];
+        for (let i = 0; i < amount && h.length > 0; i += 1) {
+          const idx = rng.nextInt(h.length);
+          h = [...h.slice(0, idx), ...h.slice(idx + 1)];
+        }
+        nextHands[p] = { hand: h };
+      }
+      return { ...state, hands: nextHands };
+    }
     case 'silence': {
       // Placeholder: no-op until we model units/statuses; validated by parser
       return state;
