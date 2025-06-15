@@ -4,3 +4,13 @@ node_modules
 .DS_Store
 .env
 coverage
+# Next.js build output
+.next
+**/.next
+apps/*/.next
+apps/*/out
+apps/*/.vercel
+# Logs and test outputs
+*.log
+**/test-results/**
+**/playwright-report/**
