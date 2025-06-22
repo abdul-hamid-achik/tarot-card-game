@@ -3,11 +3,11 @@
   "private": true,
   "type": "module",
   "version": "0.0.0",
-  "workspaces": ["packages/*"],
+  "workspaces": ["packages/*", "apps/*"],
   "engines": {"node": ">=20"},
   "scripts": {
-    "build": "npm run -w @tarot/game-sim build",
-    "test": "npm run -w @tarot/game-sim test",
+    "build": "npm run -w @tarot/game-sim build && npm run -w @tarot/web build",
+    "test": "npm run -w @tarot/game-sim test && echo 'Run web E2E locally with: npm run -w @tarot/web dev & npx -w @tarot/web playwright test'",
     "test:watch": "npm run -w @tarot/game-sim test:watch",
     "lint": "eslint . --ext .ts,.tsx --max-warnings=0",
     "format": "prettier --write ."
