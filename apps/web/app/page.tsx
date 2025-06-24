@@ -34,6 +34,10 @@ export default async function HomePage() {
         <input type="hidden" name="userId" value="demo_user" />
         <button formAction="/api/match/queue" formMethod="post">Queue Match</button>
       </form>
+      <form action="/api/demo/headless" method="post" style={{ marginTop: 8 }}>
+        <input type="hidden" name="seed" value="seed-demo" />
+        <button formAction="/api/demo/headless" formMethod="post">Run Headless Demo</button>
+      </form>
     </main>
   );
 }

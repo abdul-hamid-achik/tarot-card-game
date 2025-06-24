@@ -25,7 +25,11 @@
       {
         "name": "next"
       }
-    ]
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@tarot/game-sim": ["../../packages/game-sim/src/index.ts"]
+    }
   },
   "include": [
     "next-env.d.ts",
