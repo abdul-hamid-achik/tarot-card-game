@@ -28,7 +28,7 @@
     ],
     "baseUrl": ".",
     "paths": {
-      "@tarot/game-sim": ["../../packages/game-sim/src/index.ts"]
+      "@tarot/game-sim": ["../../packages/game-sim/dist/index.js"]
     }
   },
   "include": [

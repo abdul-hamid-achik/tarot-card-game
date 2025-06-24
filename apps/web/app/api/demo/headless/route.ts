@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { runHeadlessMatch } from '@tarot/game-sim';
+import { runHeadlessMatch } from '@tarot/game-sim/dist/index.js';
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
