@@ -13,6 +13,7 @@ async function fetchDecks() {
 }
 
 import { HeadlessDemo } from './components/HeadlessDemo';
+import { SessionInfo } from './components/SessionInfo';
 
 export default async function HomePage() {
   const [cards, decks] = await Promise.all([fetchCards(), fetchDecks()]);
@@ -20,6 +21,7 @@ export default async function HomePage() {
     <main style={{ padding: 24 }}>
       <h1>Tarot TCG</h1>
       <p>Welcome. API health is at <code>/api/health</code>.</p>
+      <SessionInfo />
       <h2>Cards</h2>
       <ul>
         {cards.map((c) => (
