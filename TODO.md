@@ -15,16 +15,17 @@ Progression is structured in tiers; only move to the next tier once the minimal 
 - [x] Action schema via `zod` (intents → state diffs)
 - [x] Deterministic simulator loop (seeded)
 - [x] Replay 100 seeded actions with deterministic equality
-- [ ] Golden-master snapshot harness
-- [ ] Property-based tests on effect DSL (fast-check)
+- [x] Golden-master snapshot harness (timeline helper)
+- [x] Property-based tests on invariants and RNG determinism
 
 ## Tier 3 — Backend API (Next.js)
-- [ ] Next.js app + API routes scaffold
-- [ ] Drizzle + Postgres schema (cards, decks, users)
-- [ ] Auth (OAuth providers) + JWT for game sessions
-- [ ] Redis queue + basic matchmaking endpoint
+- [x] Next.js app + API routes scaffold
+- [x] In-memory matchmaking queue and `/api/match/queue` + `/api/match/start`
+- [x] Auth session stub and Redis ping stub
+- [x] Build wiring in CI (web build part of root build)
+- [ ] Drizzle integration (wire `@tarot/db` into API; real DB later)
 - [ ] WebSocket endpoint for match state
-- [ ] Integration tests (Supertest)
+- [ ] Integration tests (Supertest or Playwright request)
 
 ## Tier 4 — Godot Client
 - [ ] Godot project skeleton + scenes (`GameRoot`, `Board`, `Hand`)
