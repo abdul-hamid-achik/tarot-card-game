@@ -10,6 +10,7 @@
     "test": "playwright test"
   },
   "dependencies": {
+    "@tarot/db": "^0.0.1",
     "@tarot/game-sim": "^0.0.1",
     "next": "^14.2.4",
     "react": "^18.2.0",
