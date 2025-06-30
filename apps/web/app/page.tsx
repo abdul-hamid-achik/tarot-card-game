@@ -14,6 +14,7 @@ async function fetchDecks() {
 
 import { HeadlessDemo } from './components/HeadlessDemo';
 import { SessionInfo } from './components/SessionInfo';
+import { MatchStream } from './components/MatchStream';
 
 export default async function HomePage() {
   const [cards, decks] = await Promise.all([fetchCards(), fetchDecks()]);
@@ -40,6 +41,7 @@ export default async function HomePage() {
       </form>
       {/* Client-enhanced button for demo */}
       <HeadlessDemo />
+      <MatchStream />
     </main>
   );
 }
