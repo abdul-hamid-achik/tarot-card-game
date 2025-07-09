@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[node name="Hand" type="Node2D"]
+
+[node name="Label" type="Label" parent="."]
+text = "Hand"
+position = Vector2(20, 100)
