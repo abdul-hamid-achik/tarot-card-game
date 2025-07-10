@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[node name="CardView" type="Node2D"]
+
+[node name="Label" type="Label" parent="."]
+text = "Card"
+position = Vector2(180, 60)
