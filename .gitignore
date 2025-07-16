@@ -14,3 +14,7 @@ apps/*/.vercel
 *.log
 **/test-results/**
 **/playwright-report/**
+# Godot project artifacts
+clients/godot/project/.godot/
+clients/godot/project/.import/
+clients/godot/export/
