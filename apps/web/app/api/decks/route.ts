@@ -1,15 +1,11 @@
 import { NextResponse } from 'next/server';
+import { getDb } from '@/lib/db';
 
-const MOCK_DECKS = [
-  {
-    id: 'deck_123',
-    ownerId: 'u_abc',
-    cards: ['swords_02', 'cups_05'],
-    majors: ['death_13'],
-    format: 'standard',
-  },
-];
+export const dynamic = 'force-dynamic';
 
 export function GET() {
-  return NextResponse.json({ decks: MOCK_DECKS });
+  const db = getDb();
+  // @ts-expect-error drizzle better-sqlite3 direct query
+  const decks = db.all?.("SELECT id, owner_id as ownerId, format FROM decks") ?? [];
+  return NextResponse.json({ decks });
 }
