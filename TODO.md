@@ -23,13 +23,14 @@ Progression is structured in tiers; only move to the next tier once the minimal 
 - [x] In-memory matchmaking queue and `/api/match/queue` + `/api/match/start`
 - [x] Auth session stub and Redis ping stub
 - [x] Build wiring in CI (web build part of root build)
-- [ ] Drizzle integration (wire `@tarot/db` into API; real DB later)
+- [x] Drizzle integration (in-memory `better-sqlite3`; `/api/cards` + `/api/decks` from DB)
+- [x] SSE match stream stub (WS later)
 - [ ] WebSocket endpoint for match state
-- [ ] Integration tests (Supertest or Playwright request)
+- [ ] Integration tests (broader coverage; Supertest or more Playwright requests)
 
 ## Tier 4 — Godot Client
-- [ ] Godot project skeleton + scenes (`GameRoot`, `Board`, `Hand`)
-- [ ] WebSocket client and local intent queue
+- [x] Godot project skeleton + scenes (`GameRoot`, `Board`, `Hand`, `CardView`)
+- [ ] WebSocket client and local intent queue (SSE demo button exists)
 - [ ] HTML5 export; `/play` route integration
 - [ ] GUT unit tests
 
