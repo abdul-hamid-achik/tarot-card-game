@@ -4,6 +4,7 @@ extends Node2D
 @onready var label: Label = $Label
 @onready var connect_button: Button = $ConnectButton
 @onready var sse := HTTPRequest.new()
+@onready var stream_log: Node = $StreamLog
 
 func _ready() -> void:
 	add_child(http)
@@ -20,5 +21,16 @@ func _on_health_response(result: int, response_code: int, headers: PackedStringA
 		label.text = "Tarot TCG — API ERROR"
 
 func _on_connect_stream() -> void:
-	# SSE is not natively supported; we can still fetch a few lines for demo
+	# SSE is not natively supported; demo: fetch one replay and append steps to StreamLog
+	sse.request_completed.connect(_on_sse)
 	sse.request("http://localhost:3000/api/match/stream?steps=10")
+
+func _on_sse(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
+	if response_code != 200:
+		return
+	var text := body.get_string_from_utf8()
+	for line in text.split("\n"):
+		if line.begins_with("data: "):
+			var payload := line.substr(6, line.length()).strip_edges()
+			if stream_log and stream_log.has_method("append_line"):
+				stream_log.call("append_line", payload)

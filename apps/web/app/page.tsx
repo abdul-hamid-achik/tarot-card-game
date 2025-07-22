@@ -30,9 +30,10 @@ export default async function HomePage() {
         ))}
       </ul>
       <h2>Decks</h2>
+      <p>Total decks: {decks.length}</p>
       <ul>
         {decks.map((d) => (
-          <li key={d.id}>{d.id} — {d.cards.length} cards</li>
+          <li key={d.id}>{d.id} — {('cards' in d && Array.isArray((d as any).cards) ? (d as any).cards.length : 0)} cards</li>
         ))}
       </ul>
       <form action="/api/match/queue" method="post" style={{ marginTop: 16 }}>
