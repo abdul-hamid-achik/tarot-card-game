@@ -9,30 +9,29 @@ Quick start
 Workspaces
 - `packages/game-sim`: Deterministic server-authoritative simulator (TS + Vitest)
 - `packages/db`: Drizzle ORM schema scaffold
-- `apps/web`: Next.js app + API stubs (cards, decks, auth session, redis ping, match queue/start, demo)
+- `apps/web`: Next.js app + API stubs (cards, decks, auth session, redis ping, match queue/start/result, demo stream)
+- `clients/godot`: Godot 4 client scaffold
 
 Endpoints (web)
 - `GET /api/health` – health check
-- `GET /api/cards`, `GET /api/decks` – mock data
-- `POST /api/match/queue` – enqueue matchmaking (in-memory); returns current result if ready
+- `GET /api/cards`, `GET /api/decks` – DB-backed (in-memory sqlite)
+- `POST /api/match/queue` – enqueue matchmaking (in-memory)
+- `GET /api/match/result?userId` – poll match result
 - `POST /api/match/start` – run a seeded headless match and return summary
-- `POST /api/demo/headless` – demo runner for headless match
-- `GET /api/auth/session` – mock session
-- `GET /api/redis/ping` – stub ping
+- `POST /api/admin/seed-deck` – seed a demo deck
+- `GET /api/match/stream` – SSE match step stream (sim replay)
 
 Simulator
-- Deterministic RNG, intents (`draw`, `play_card`, `end_turn`), resources ramp, basic victory check, effects (`gain`, `both_discard_random`, `silence` placeholder)
+- Deterministic RNG, intents, resources ramp, victory check, effects (`gain`, `both_discard_random`, `silence` placeholder)
 - Tests: unit, property, golden timeline, long-run determinism, bot-vs-bot
 
-Scripts
-- `npm run build` – builds sim, db, and web
-- `npm run dev:web` – runs `@tarot/web` Next.js dev server
-- `npm run test` – runs game-sim tests (see web E2E note below)
+Godot
+- Minimal `GameRoot`, `Board`, `Hand`, `CardView`, `StreamLog`, `QueuePoll`
+- Pings `/api/health`, fetches `/api/cards`, demo SSE and queue+poll
 
 E2E (manual)
 - In one terminal: `npm run dev:web`
 - In another: `npx -w @tarot/web playwright test`
 
 Notes
-- This repo uses small, focused commits for clarity.
-- Web imports `@tarot/game-sim` from built `dist` for API routes.
+- Small, focused commits; `TODO.md` maintained as the plan.
