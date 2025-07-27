@@ -16,6 +16,7 @@ import { HeadlessDemo } from './components/HeadlessDemo';
 import { SessionInfo } from './components/SessionInfo';
 import { MatchStream } from './components/MatchStream';
 import { StartMatch } from './components/StartMatch';
+import { ResultPoll } from './components/ResultPoll';
 
 export default async function HomePage() {
   const [cards, decks] = await Promise.all([fetchCards(), fetchDecks()]);
@@ -34,7 +35,7 @@ export default async function HomePage() {
       <p>Total decks: {decks.length}</p>
       <ul>
         {decks.map((d) => (
-          <li key={d.id}>{d.id} — {('cards' in d && Array.isArray((d as any).cards) ? (d as any).cards.length : 0)} cards</li>
+          <li key={d.id}>{d.id}</li>
         ))}
       </ul>
       <form action="/api/match/queue" method="post" style={{ marginTop: 16 }}>
@@ -44,6 +45,7 @@ export default async function HomePage() {
       {/* Client-enhanced button for demo */}
       <HeadlessDemo />
       <StartMatch />
+      <ResultPoll />
       <MatchStream />
     </main>
   );
