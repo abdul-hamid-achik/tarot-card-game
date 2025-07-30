@@ -18,6 +18,7 @@ import { MatchStream } from './components/MatchStream';
 import { StartMatch } from './components/StartMatch';
 import { ResultPoll } from './components/ResultPoll';
 import { SeedDeck } from './components/SeedDeck';
+import { SeedCards } from './components/SeedCards';
 
 export default async function HomePage() {
   const [cards, decks] = await Promise.all([fetchCards(), fetchDecks()]);
@@ -40,6 +41,7 @@ export default async function HomePage() {
         ))}
       </ul>
       <SeedDeck />
+      <SeedCards />
       <form action="/api/match/queue" method="post" style={{ marginTop: 16 }}>
         <input type="hidden" name="userId" value="demo_user" />
         <button formAction="/api/match/queue" formMethod="post">Queue Match</button>

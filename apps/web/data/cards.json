@@ -1,0 +1,4 @@
+[
+  { "id": "wands_01", "name": "ace of wands", "suit": "wands", "cost": 1, "type": "spell", "rarity": "common", "set": "base" },
+  { "id": "cups_03", "name": "three of cups", "suit": "cups", "cost": 3, "type": "spell", "rarity": "common", "set": "base" }
+]
