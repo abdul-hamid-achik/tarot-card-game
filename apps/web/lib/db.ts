@@ -13,6 +13,15 @@ export function getDb() {
   return db;
 }
 
+export function resetDb() {
+  if (!db) return;
+  // @ts-expect-error raw SQL
+  db.run?.("DELETE FROM cards");
+  // @ts-expect-error raw SQL
+  db.run?.("DELETE FROM decks");
+  initDb(db);
+}
+
 function initDb(d: ReturnType<typeof drizzle>) {
   // Minimal schema init and seed (cards, decks tables exist in schema)
   // @ts-expect-error drizzle typed queries (raw SQL)
@@ -27,6 +36,10 @@ function initDb(d: ReturnType<typeof drizzle>) {
     // @ts-expect-error raw SQL
     d.run?.("INSERT INTO cards (id, name, suit, cost, type, rarity, set) VALUES (?, ?, ?, ?, ?, ?, ?)", [
       'swords_02', 'two of swords', 'swords', 2, 'spell', 'common', 'base',
+    ]);
+    // @ts-expect-error raw SQL
+    d.run?.("INSERT INTO decks (id, owner_id, format) VALUES (?, ?, ?)", [
+      'deck_123', 'u_demo', 'standard',
     ]);
   }
 }

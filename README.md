@@ -19,6 +19,8 @@ Endpoints (web)
 - `GET /api/match/result?userId` – poll match result
 - `POST /api/match/start` – run a seeded headless match and return summary
 - `POST /api/admin/seed-deck` – seed a demo deck
+- `POST /api/admin/seed-cards` – seed demo cards from `apps/web/data/cards.json`
+- `POST /api/admin/reset-db` – reset in-memory DB to initial seed
 - `GET /api/match/stream` – SSE match step stream (sim replay)
 
 Simulator
