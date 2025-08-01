@@ -13,3 +13,19 @@ tasks:
     desc: Run tests
     cmds:
       - npm test
+  web:dev:
+    desc: Run web dev server
+    cmds:
+      - npm run dev:web
+  web:seed:deck:
+    desc: Seed a demo deck via API
+    cmds:
+      - curl -s -X POST http://localhost:3000/api/admin/seed-deck || true
+  web:seed:cards:
+    desc: Seed demo cards via API
+    cmds:
+      - curl -s -X POST http://localhost:3000/api/admin/seed-cards || true
+  web:reset:
+    desc: Reset in-memory DB via API
+    cmds:
+      - curl -s -X POST http://localhost:3000/api/admin/reset-db || true
