@@ -17,6 +17,10 @@ tasks:
     desc: Run web dev server
     cmds:
       - npm run dev:web
+  web:e2e:
+    desc: Run Playwright tests (dev server must be running)
+    cmds:
+      - npm run e2e:web
   web:seed:deck:
     desc: Seed a demo deck via API
     cmds:
@@ -29,3 +33,7 @@ tasks:
     desc: Reset in-memory DB via API
     cmds:
       - curl -s -X POST http://localhost:3000/api/admin/reset-db || true
+  ws:dev:
+    desc: Run WebSocket stub server (ws://localhost:8787)
+    cmds:
+      - node packages/ws-stub/dist/index.js
