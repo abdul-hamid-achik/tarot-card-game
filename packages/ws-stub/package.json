@@ -1,0 +1,21 @@
+{
+  "name": "@tarot/ws-stub",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "node --watch dist/index.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "@tarot/game-sim": "^0.0.1",
+    "ws": "^8.18.0"
+  }
+}
