@@ -110,7 +110,7 @@ export interface DeckManifest {
 
 export function loadDeckManifest(deckId: string): DeckManifest | null {
     const repoRoot = getRepoRootFromWebAppCwd(process.cwd());
-    const manifestPath = path.join(repoRoot, 'packages', 'assets', `decks-${deckId}`, 'deck.json');
+    const manifestPath = path.join(repoRoot, 'packages', 'assets', 'decks', deckId, 'deck.json');
     try {
         const text = fs.readFileSync(manifestPath, 'utf8');
         return JSON.parse(text) as DeckManifest;
@@ -121,7 +121,7 @@ export function loadDeckManifest(deckId: string): DeckManifest | null {
 
 function getDeckManifestBaseDir(deckId: string): string {
     const repoRoot = getRepoRootFromWebAppCwd(process.cwd());
-    return path.join(repoRoot, 'packages', 'assets', `decks-${deckId}`);
+    return path.join(repoRoot, 'packages', 'assets', 'decks', deckId);
 }
 
 export function resolveAbsoluteImagePathFromManifest(

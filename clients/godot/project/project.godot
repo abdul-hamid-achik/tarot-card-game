@@ -6,10 +6,15 @@
 ;   [section] ; section goes between []
 ;   param=value ; assign values to parameters
 
+config_version=5
+
 [application]
+
 config/name="Tarot TCG"
 config/version="0.0.1"
 run/main_scene="res://scenes/GameRoot.tscn"
+config/features=PackedStringArray("4.4")
 
 [rendering]
+
 quality/driver/driver_name="GLES3"

@@ -150,12 +150,12 @@ This document outlines the technical design, architecture, and implementation pl
 
 ---
 
-## 13. Monorepo Structure, Taskfile, Docker, and CI/CD
+## 13. Monorepo Structure, npm scripts, Docker, and CI/CD
 
 **See detailed section in the appended infra section** — includes:
 
 * Monorepo with npm workspaces.
-* Taskfile.yml for build/dev/test/export/deploy.
+* npm scripts for build/dev/test/export/deploy.
 * Docker + docker-compose for local stack.
 * GitHub Actions for CI/CD, Godot exports, and Vercel deploy.
 
@@ -171,8 +171,8 @@ This document outlines the technical design, architecture, and implementation pl
 
 ## 15. Local Workflow
 
-* `task setup` → install deps.
-* `task dev:compose` → start full local stack.
+* `npm install` → install deps.
+* `npm run dev:web` → start web app; `npm run docs` for docs.
 * Test via Jest/Vitest/Playwright.
 * Export Godot builds for local/web test.
 
@@ -334,7 +334,7 @@ it('seed 9f9f clears boss in 9±1 turns', async () => {
 * pr template fields
 * admin preview env, l10n pipeline
 * godot asset updates + cache busting
-* taskfile shortcuts and a mini incident playbook
+* npm script shortcuts and a mini incident playbook
 
 
 ---
