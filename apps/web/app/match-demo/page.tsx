@@ -38,11 +38,14 @@ export default function MatchDemoPage() {
     };
 
     return (
-        <div className="p-4 grid gap-3">
-            <h1>Match Demo</h1>
+        <div className="p-2 md:p-4 grid gap-4">
+            <div className="flex items-end justify-between">
+                <h1 className="text-2xl font-bold tracking-wide text-amber-200">Match Demo</h1>
+                <span className="text-xs text-muted-foreground">Scripted stream of 10 steps</span>
+            </div>
             {!state && <div>Loading…</div>}
             {state && (
-                <div className="grid gap-2">
+                <div className="grid gap-3">
                     <div>
                         <strong>Match:</strong> {state.matchId} | <strong>Seed:</strong> {state.seed}
                     </div>
@@ -55,13 +58,15 @@ export default function MatchDemoPage() {
                     <div>
                         <strong>Fate:</strong> {players.map((p) => `${p}:${state.fate[p] ?? 0}`).join('  ')}
                     </div>
-                    <div>
+                    <div className="flex items-center gap-3">
                         <Button onClick={startStream}>Play 10 scripted steps</Button>
                     </div>
                     {!!lastStep && (
-                        <pre className="bg-black text-green-400 p-2 rounded-md">
-                            {JSON.stringify(lastStep, null, 2)}
-                        </pre>
+                        <div className="rounded-lg border border-amber-900/30 bg-black/40">
+                            <pre className="p-3 text-xs text-green-400">
+                                {JSON.stringify(lastStep, null, 2)}
+                            </pre>
+                        </div>
                     )}
                 </div>
             )}

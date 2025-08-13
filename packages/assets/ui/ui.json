@@ -1,0 +1,41 @@
+{
+  "generatedAt": "2025-08-13T22:47:37.195Z",
+  "backgrounds": [
+    "Sprites/TableBackground.png",
+    "Sprites/TableBackground2.png",
+    "Sprites/TableBackground3.png",
+    "Sprites/TableBackground4.png",
+    "Sprites/TableBackground5.png"
+  ],
+  "spritesheets": [
+    "Sprites/CardGameUI.png",
+    "Sprites/CardGameUI10.png",
+    "Sprites/CardGameUI11.png",
+    "Sprites/CardGameUI12.png",
+    "Sprites/CardGameUI13.png",
+    "Sprites/CardGameUI14.png",
+    "Sprites/CardGameUI15.png",
+    "Sprites/CardGameUI16.png",
+    "Sprites/CardGameUI17.png",
+    "Sprites/CardGameUI18.png",
+    "Sprites/CardGameUI19.png",
+    "Sprites/CardGameUI2.png",
+    "Sprites/CardGameUI20.png",
+    "Sprites/CardGameUI21.png",
+    "Sprites/CardGameUI22.png",
+    "Sprites/CardGameUI23.png",
+    "Sprites/CardGameUI24.png",
+    "Sprites/CardGameUI25.png",
+    "Sprites/CardGameUI26.png",
+    "Sprites/CardGameUI27.png",
+    "Sprites/CardGameUI28.png",
+    "Sprites/CardGameUI29.png",
+    "Sprites/CardGameUI3.png",
+    "Sprites/CardGameUI4.png",
+    "Sprites/CardGameUI5.png",
+    "Sprites/CardGameUI6.png",
+    "Sprites/CardGameUI7.png",
+    "Sprites/CardGameUI8.png",
+    "Sprites/CardGameUI9.png"
+  ]
+}

@@ -1,0 +1,131 @@
+{
+  "themeId": "pixel-pack",
+  "displayName": "Pixel Pack",
+  "backgrounds": [
+    "backgrounds/table_bg_01.png",
+    "backgrounds/table_bg_02.png",
+    "backgrounds/table_bg_03.png",
+    "backgrounds/table_bg_04.png",
+    "backgrounds/table_bg_05.png"
+  ],
+  "sheets": [
+    {
+      "id": "card_ui_01",
+      "file": "sheets/card_ui_01.png"
+    },
+    {
+      "id": "card_ui_02",
+      "file": "sheets/card_ui_02.png"
+    },
+    {
+      "id": "card_ui_03",
+      "file": "sheets/card_ui_03.png"
+    },
+    {
+      "id": "card_ui_04",
+      "file": "sheets/card_ui_04.png"
+    },
+    {
+      "id": "card_ui_05",
+      "file": "sheets/card_ui_05.png"
+    },
+    {
+      "id": "card_ui_06",
+      "file": "sheets/card_ui_06.png"
+    },
+    {
+      "id": "card_ui_07",
+      "file": "sheets/card_ui_07.png"
+    },
+    {
+      "id": "card_ui_08",
+      "file": "sheets/card_ui_08.png"
+    },
+    {
+      "id": "card_ui_09",
+      "file": "sheets/card_ui_09.png"
+    },
+    {
+      "id": "card_ui_10",
+      "file": "sheets/card_ui_10.png"
+    },
+    {
+      "id": "card_ui_11",
+      "file": "sheets/card_ui_11.png"
+    },
+    {
+      "id": "card_ui_12",
+      "file": "sheets/card_ui_12.png"
+    },
+    {
+      "id": "card_ui_13",
+      "file": "sheets/card_ui_13.png"
+    },
+    {
+      "id": "card_ui_14",
+      "file": "sheets/card_ui_14.png"
+    },
+    {
+      "id": "card_ui_15",
+      "file": "sheets/card_ui_15.png"
+    },
+    {
+      "id": "card_ui_16",
+      "file": "sheets/card_ui_16.png"
+    },
+    {
+      "id": "card_ui_17",
+      "file": "sheets/card_ui_17.png"
+    },
+    {
+      "id": "card_ui_18",
+      "file": "sheets/card_ui_18.png"
+    },
+    {
+      "id": "card_ui_19",
+      "file": "sheets/card_ui_19.png"
+    },
+    {
+      "id": "card_ui_20",
+      "file": "sheets/card_ui_20.png"
+    },
+    {
+      "id": "card_ui_21",
+      "file": "sheets/card_ui_21.png"
+    },
+    {
+      "id": "card_ui_22",
+      "file": "sheets/card_ui_22.png"
+    },
+    {
+      "id": "card_ui_23",
+      "file": "sheets/card_ui_23.png"
+    },
+    {
+      "id": "card_ui_24",
+      "file": "sheets/card_ui_24.png"
+    },
+    {
+      "id": "card_ui_25",
+      "file": "sheets/card_ui_25.png"
+    },
+    {
+      "id": "card_ui_26",
+      "file": "sheets/card_ui_26.png"
+    },
+    {
+      "id": "card_ui_27",
+      "file": "sheets/card_ui_27.png"
+    },
+    {
+      "id": "card_ui_28",
+      "file": "sheets/card_ui_28.png"
+    },
+    {
+      "id": "card_ui_29",
+      "file": "sheets/card_ui_29.png"
+    }
+  ],
+  "defaultBackground": "backgrounds/table_bg_01.png",
+  "defaultSheet": "card_ui_01"
+}

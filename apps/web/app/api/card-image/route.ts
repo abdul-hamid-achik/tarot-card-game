@@ -15,16 +15,21 @@ export async function GET(req: Request) {
 
     // Deck demo uses manifest indirection; currently links to decks/B flat files.
     let abs: string | null = null;
-    if (deck === 'classic') {
-        abs = resolveAbsoluteImagePathForDeckB(id);
-    } else if (deck === 'marigold') {
-        abs = resolveAbsoluteImagePathForDeckMarigold(id);
-    } else if (deck) {
-        const manifest = loadDeckManifest(deck);
-        if (!manifest) {
-            return NextResponse.json({ error: 'Unknown deck' }, { status: 404 });
+    // Try manifest-first for any deck id
+    const manifest = loadDeckManifest(deck);
+    if (manifest) {
+        abs = resolveAbsoluteImagePathFromManifest(deck, id);
+    }
+    // Fallbacks for known legacy mappers if manifest did not resolve
+    if (!abs) {
+        if (deck === 'classic') {
+            abs = resolveAbsoluteImagePathForDeckB(id);
+        } else if (deck === 'marigold') {
+            abs = resolveAbsoluteImagePathForDeckMarigold(id);
         }
-        abs = resolveAbsoluteImagePathFromManifest(deck, id) ?? null;
+    }
+    if (!manifest && deck && deck !== 'classic' && deck !== 'marigold') {
+        return NextResponse.json({ error: 'Unknown deck' }, { status: 404 });
     }
     if (!abs) {
         return NextResponse.json({ error: 'Unknown card id' }, { status: 400 });

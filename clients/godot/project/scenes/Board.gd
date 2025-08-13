@@ -3,6 +3,7 @@ extends Node2D
 @onready var label: Label = $Label
 @onready var http := HTTPRequest.new()
 @onready var card_scene: PackedScene = preload("res://scenes/CardView.tscn")
+var deck := "classic"
 
 func _ready() -> void:
 	label.text = "Board (ready)"
@@ -23,4 +24,6 @@ func _on_cards_response(result: int, response_code: int, headers: PackedStringAr
 		inst.position = Vector2(180, y)
 		y += 24
 		inst.set_card_name(card.get("name", "Card"))
+		if inst.has_method("load_card_image"):
+			inst.load_card_image(card.get("id", "major_00"), deck)
 		add_child(inst)
