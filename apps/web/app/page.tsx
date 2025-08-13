@@ -13,6 +13,7 @@ async function fetchDecks() {
 }
 
 import { HeadlessDemo } from './components/HeadlessDemo';
+import { Button } from '@/components/ui/button';
 import { SessionInfo } from './components/SessionInfo';
 import { MatchStream } from './components/MatchStream';
 import { StartMatch } from './components/StartMatch';
@@ -23,28 +24,37 @@ import { SeedCards } from './components/SeedCards';
 export default async function HomePage() {
   const [cards, decks] = await Promise.all([fetchCards(), fetchDecks()]);
   return (
-    <main style={{ padding: 24 }}>
+    <main className="p-6 space-y-4">
       <h1>Tarot TCG</h1>
       <p>Welcome. API health is at <code>/api/health</code>.</p>
       <SessionInfo />
       <h2>Cards</h2>
-      <ul>
+      <ul className="list-disc pl-6">
         {cards.map((c) => (
-          <li key={c.id}>{c.name}</li>
+          <li key={c.id} className="flex items-center gap-2">
+            <img
+              src={`/api/card-image?id=${encodeURIComponent(c.id)}`}
+              alt={c.name}
+              width={48}
+              height={72}
+              className="rounded border border-gray-200 object-cover"
+            />
+            <span>{c.name}</span>
+          </li>
         ))}
       </ul>
       <h2>Decks</h2>
       <p>Total decks: {decks.length}</p>
-      <ul>
+      <ul className="list-disc pl-6">
         {decks.map((d) => (
           <li key={d.id}>{d.id}</li>
         ))}
       </ul>
       <SeedDeck />
       <SeedCards />
-      <form action="/api/match/queue" method="post" style={{ marginTop: 16 }}>
+      <form action="/api/match/queue" method="post" className="mt-4">
         <input type="hidden" name="userId" value="demo_user" />
-        <button formAction="/api/match/queue" formMethod="post">Queue Match</button>
+        <Button formAction="/api/match/queue" formMethod="post">Queue Match</Button>
       </form>
       {/* Client-enhanced button for demo */}
       <HeadlessDemo />

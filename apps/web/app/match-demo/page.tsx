@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 
 type MatchState = {
     matchId: string;
@@ -13,7 +14,7 @@ type MatchState = {
 
 export default function MatchDemoPage() {
     const [state, setState] = useState<MatchState | null>(null);
-    const [lastStep, setLastStep] = useState<any>(null);
+    const [lastStep, setLastStep] = useState<Record<string, unknown> | null>(null);
     const players = state?.players ?? [];
 
     useEffect(() => {
@@ -29,19 +30,19 @@ export default function MatchDemoPage() {
         const es = new EventSource(url);
         es.addEventListener('step', (ev) => {
             try {
-                const step = JSON.parse((ev as MessageEvent).data);
+                const step = JSON.parse((ev as MessageEvent).data) as Record<string, unknown>;
                 setLastStep(step);
-            } catch { }
+            } catch (err) { return; }
         });
         es.addEventListener('done', () => es.close());
     };
 
     return (
-        <div style={{ padding: 16, display: 'grid', gap: 12 }}>
+        <div className="p-4 grid gap-3">
             <h1>Match Demo</h1>
             {!state && <div>Loading…</div>}
             {state && (
-                <div style={{ display: 'grid', gap: 8 }}>
+                <div className="grid gap-2">
                     <div>
                         <strong>Match:</strong> {state.matchId} | <strong>Seed:</strong> {state.seed}
                     </div>
@@ -55,10 +56,10 @@ export default function MatchDemoPage() {
                         <strong>Fate:</strong> {players.map((p) => `${p}:${state.fate[p] ?? 0}`).join('  ')}
                     </div>
                     <div>
-                        <button onClick={startStream}>Play 10 scripted steps</button>
+                        <Button onClick={startStream}>Play 10 scripted steps</Button>
                     </div>
-                    {lastStep && (
-                        <pre style={{ background: '#111', color: '#0f0', padding: 8, borderRadius: 6 }}>
+                    {!!lastStep && (
+                        <pre className="bg-black text-green-400 p-2 rounded-md">
                             {JSON.stringify(lastStep, null, 2)}
                         </pre>
                     )}
@@ -67,5 +68,6 @@ export default function MatchDemoPage() {
         </div>
     );
 }
+
 
 

@@ -1,0 +1,11 @@
+{
+    "deckId": "demo",
+    "displayName": "Demo Deck (linked to decks/B)",
+    "defaultScale": "2x",
+    "back": {},
+    "cards": [],
+    "storage": {
+        "kind": "linked",
+        "source": "../../../decks/B"
+    }
+}

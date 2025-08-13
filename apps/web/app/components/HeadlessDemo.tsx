@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 
 export function HeadlessDemo() {
   const [result, setResult] = useState<{ winnerId: string | null; steps: number } | null>(null);
@@ -24,11 +25,11 @@ export function HeadlessDemo() {
   }
 
   return (
-    <section style={{ marginTop: 16 }}>
-      <button onClick={runDemo} disabled={loading}>
+    <section className="mt-4 space-y-2">
+      <Button onClick={runDemo} disabled={loading}>
         {loading ? 'Running…' : 'Run Headless Demo'}
-      </button>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      </Button>
+      {error && <p className="text-red-600">{error}</p>}
       {result && (
         <p>
           Winner: {result.winnerId ?? 'none'} in {result.steps} steps

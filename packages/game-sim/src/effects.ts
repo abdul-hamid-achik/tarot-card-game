@@ -72,30 +72,6 @@ export function executeEffectForPlayer(state: MatchState, effect: EffectCall, pl
       const nested = { name: chosen, args: [] } as EffectCall;
       return executeEffectForPlayer(state, nested, playerId, `${seed}:branch:${cardId}`);
     }
-    case 'set_fate': {
-      const amount = Number(effect.args[0] ?? 0) || 0;
-      const next = { ...(state.fate ?? {}) } as Record<string, number>;
-      next[playerId] = Math.max(0, Math.min(3, amount));
-      return { ...state, fate: next };
-    }
-    case 'refund_fate': {
-      const amount = Number(effect.args[0] ?? 1) || 1;
-      const next = { ...(state.fate ?? {}) } as Record<string, number>;
-      next[playerId] = Math.min(3, (next[playerId] ?? 0) + amount);
-      return { ...state, fate: next };
-    }
-    case 'cost_fate': {
-      const amount = Number(effect.args[0] ?? 1) || 1;
-      const next = { ...(state.fate ?? {}) } as Record<string, number>;
-      if ((next[playerId] ?? 0) < amount) return state;
-      next[playerId] = (next[playerId] ?? 0) - amount;
-      return { ...state, fate: next };
-    }
-    case 'queue_trigger': {
-      const id = String(effect.args[0] ?? `t_${Date.now()}`);
-      const triggerQueue = [...(state.triggerQueue ?? []), { id, playerId }];
-      return { ...state, triggerQueue };
-    }
     default:
       return state;
   }
