@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CardSchema, DeckSchema, MatchStateSchema, IntentSchema } from '../src/schemas.js';
+import { CardSchema, DeckSchema, MatchStateSchema, IntentSchema, ExtendedIntentSchema } from '../src/schemas.js';
 
 describe('Zod schemas', () => {
   it('validates a minimal card', () => {
@@ -48,5 +48,12 @@ describe('Zod schemas', () => {
     expect(play.type).toBe('play_card');
     const end = IntentSchema.parse({ type: 'end_turn', playerId: 'u_abc' });
     expect(end.type).toBe('end_turn');
+  });
+
+  it('validates extended intents', () => {
+    expect(ExtendedIntentSchema.parse({ type: 'flip_orientation', playerId: 'u_abc', cardId: 'swords_02' }).type).toBe('flip_orientation');
+    expect(ExtendedIntentSchema.parse({ type: 'peek', playerId: 'u_abc', count: 2 }).type).toBe('peek');
+    expect(ExtendedIntentSchema.parse({ type: 'force_draw', playerId: 'u_abc' }).type).toBe('force_draw');
+    expect(ExtendedIntentSchema.parse({ type: 'block_flip', playerId: 'u_abc', targetPlayerId: 'u_xyz', cardId: 'swords_02' }).type).toBe('block_flip');
   });
 });

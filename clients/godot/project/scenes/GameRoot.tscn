@@ -1,4 +1,4 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [node name="GameRoot" type="Node2D"]
 script = ExtResource( 1 )
@@ -16,9 +16,11 @@ position = Vector2(20, 140)
 
 [node name="StreamLog" parent="." instance=ExtResource( 4 )]
 [node name="QueuePoll" parent="." instance=ExtResource( 5 )]
+[node name="WsClient" parent="." instance=ExtResource( 6 )]
 
 [ext_resource type="Script" path="res://scenes/GameRoot.gd" id=1]
 [ext_resource type="PackedScene" path="res://scenes/Board.tscn" id=2]
 [ext_resource type="PackedScene" path="res://scenes/Hand.tscn" id=3]
 [ext_resource type="PackedScene" path="res://scenes/StreamLog.tscn" id=4]
 [ext_resource type="PackedScene" path="res://scenes/QueuePoll.tscn" id=5]
+[ext_resource type="PackedScene" path="res://scenes/WsClient.tscn" id=6]

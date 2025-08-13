@@ -2,6 +2,9 @@ export type CardSuit = 'wands' | 'cups' | 'swords' | 'pentacles' | 'major';
 export type CardType = 'spell' | 'unit' | 'artifact';
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 
+export type TurnPhase = 'draw' | 'main' | 'combat' | 'end';
+export type CardOrientation = 'upright' | 'reversed';
+
 export interface CardEffect {
   effect: string; // e.g., "silence(target,1)"
 }
@@ -37,4 +40,13 @@ export interface MatchState {
   stacks: Record<string, unknown>;
   battlefield: Record<string, unknown>;
   hands: Record<string, unknown>;
+  // Optional fields for extended gameplay rules
+  phase?: TurnPhase;
+  reactionWindow?: { open: boolean; responded: Record<string, boolean>; originPlayerId?: string };
+  triggerQueue?: Array<{ id: string; playerId?: string }>;
+  trials?: Record<string, Record<string, number | boolean>>; // playerId -> trialId -> progress/completion
+  orientations?: Record<string, CardOrientation>; // cardInstanceId -> orientation
+  spread?: Record<string, { pastId?: string; presentId?: string; futureId?: string; consumed?: { past?: boolean; present?: boolean; future?: boolean } }>; // playerId -> spread config
+  decks?: Record<string, { draw: string[]; discard: string[] }>;
+  cardLibrary?: Record<string, CardDefinition>;
 }

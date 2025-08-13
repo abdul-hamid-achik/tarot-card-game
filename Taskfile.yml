@@ -37,3 +37,13 @@ tasks:
     desc: Run WebSocket stub server (ws://localhost:8787)
     cmds:
       - node packages/ws-stub/dist/index.js
+  docs:open:
+    desc: List docs entry points
+    cmds:
+      - echo "Docs index: docs/index.md"
+      - echo "Gameplay: docs/gameplay/overview.md"
+      - echo "Glossary: docs/glossary.md"
+  docs:lint:
+    desc: Basic docs checks (broken links placeholder)
+    cmds:
+      - echo "Run link checks here (placeholder)"

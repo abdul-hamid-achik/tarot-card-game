@@ -37,3 +37,4 @@ E2E (manual)
 
 Notes
 - Small, focused commits; `TODO.md` maintained as the plan.
+ - Docs live in `docs/` — start at `docs/index.md`. Gameplay canon: `GAMEPLAY.md`. Technical plan: `PLAN.md`.

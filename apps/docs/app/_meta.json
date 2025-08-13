@@ -1,0 +1,32 @@
+{
+  "index": {
+    "title": "Home"
+  },
+  "gameplay": {
+    "title": "Gameplay"
+  },
+  "architecture": {
+    "title": "Architecture"
+  },
+  "sim": {
+    "title": "Server Sim"
+  },
+  "api": {
+    "title": "API"
+  },
+  "client": {
+    "title": "Client"
+  },
+  "testing": {
+    "title": "Testing"
+  },
+  "content": {
+    "title": "Content & Balance"
+  },
+  "ops": {
+    "title": "Ops & Observability"
+  },
+  "contributing": {
+    "title": "Contributing"
+  }
+}

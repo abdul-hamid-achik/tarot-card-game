@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "codebase_map": [
+    {
+      "path": "packages/game-sim/src",
+      "responsibility": "Server-authoritative sim: state, RNG, effects, resolution, serialization"
+    },
+    {
+      "path": "packages/game-sim/test",
+      "responsibility": "Determinism, property tests, golden snapshots"
+    }
+  ],
+  "key_docs": [
+    { "path": "GAMEPLAY.md", "summary": "Canonical gameplay spec; see sections 9–12 for detailed rules." },
+    { "path": "PLAN.md", "summary": "Architecture, stack, operations, testing strategy." },
+    { "path": "docs/gameplay/overview.md", "summary": "Quick gameplay intro." },
+    { "path": "docs/gameplay/turn-structure.md", "summary": "Turn phases and reaction windows." },
+    { "path": "docs/gameplay/fate.md", "summary": "Fate banking and costs." },
+    { "path": "docs/gameplay/mulligan-spread.md", "summary": "Mulligan and spread bonuses." },
+    { "path": "docs/glossary.md", "summary": "Common terms and definitions." }
+  ],
+  "invariants": [
+    "At most one response per player per reaction window.",
+    "Deterministic resolution order: non-active player triggers before active.",
+    "Costs never drop below 0.",
+    "Trigger pacing: max 3 per event tick; overflow queues to next tick."
+  ],
+  "preferred_qna_format": [
+    "Question",
+    "Relevant files/sections",
+    "Assumptions",
+    "Answer",
+    "Follow-ups"
+  ]
+}
