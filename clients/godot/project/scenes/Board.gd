@@ -15,6 +15,9 @@ var hand_nodes: Array[Node] = []
 var board_nodes: Array[Node] = []
 
 func _api_origin() -> String:
+	var env := OS.get_environment("TAROT_API_ORIGIN")
+	if env != "":
+		return env
 	if OS.has_feature("web"):
 		var origin: String = str(JavaScriptBridge.eval("location.origin"))
 		if origin != "":

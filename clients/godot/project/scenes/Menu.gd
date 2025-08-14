@@ -19,10 +19,7 @@ func _on_pve() -> void:
 func _on_pvp() -> void:
 	# Load GameBoard scene for PvP
 	var scene: PackedScene = load("res://scenes/GameBoard.tscn")
-	var instance := scene.instantiate()
-	instance.set_meta("game_mode", "pvp")
-	get_tree().root.add_child(instance)
-	queue_free()
+	get_tree().change_scene_to_packed(scene)
 
 func _on_decks() -> void:
 	# Placeholder
@@ -33,6 +30,9 @@ func _on_settings() -> void:
 	print("Settings clicked")
 
 func _api_origin() -> String:
+	var env := OS.get_environment("TAROT_API_ORIGIN")
+	if env != "":
+		return env
 	if OS.has_feature("web"):
 		var origin: String = str(JavaScriptBridge.eval("location.origin"))
 		if origin != "":

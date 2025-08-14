@@ -7,6 +7,9 @@ extends Node2D
 @onready var stream_log: Node = $StreamLog
 
 func _api_origin() -> String:
+	var env := OS.get_environment("TAROT_API_ORIGIN")
+	if env != "":
+		return env
 	if OS.has_feature("web"):
 		var origin: String = str(JavaScriptBridge.eval("location.origin"))
 		if origin != "":

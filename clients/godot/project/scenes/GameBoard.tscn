@@ -148,6 +148,14 @@ anchor_top = 0.55
 anchor_bottom = 1.0
 alignment = 1
 
+[node name="DropZoneIndicator" type="Panel" parent="BoardLayout/CenterArea/PlayerBoard"]
+visible = false
+modulate = Color(1, 1, 1, 0.3)
+custom_minimum_size = Vector2(800, 200)
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
 [node name="PhaseIndicator" type="Panel" parent="BoardLayout/CenterArea"]
 anchor_left = 0.02
 anchor_right = 0.15
@@ -222,6 +230,13 @@ anchor_top = 0.1
 anchor_bottom = 0.9
 alignment = 1
 
+[node name="HandToggleButton" type="Button" parent="BoardLayout/PlayerArea"]
+anchor_left = 0.45
+anchor_right = 0.55
+anchor_top = 0.02
+anchor_bottom = 0.08
+text = "▼ Hide Hand"
+
 [node name="DeckZone" type="Control" parent="BoardLayout/PlayerArea"]
 anchor_left = 0.85
 anchor_right = 0.98
@@ -282,3 +297,45 @@ dialog_text = "Settings Panel (Placeholder)
 • Show Timer: ✓ Enabled
 
 More settings will be added later."
+
+[node name="CardPreview" type="Control" parent="."]
+visible = false
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Background" type="ColorRect" parent="CardPreview"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0, 0, 0, 0.7)
+
+[node name="Panel" type="Panel" parent="CardPreview"]
+anchor_left = 0.35
+anchor_top = 0.2
+anchor_right = 0.65
+anchor_bottom = 0.8
+theme_override_styles/panel = SubResource("1")
+
+[node name="VBox" type="VBoxContainer" parent="CardPreview/Panel"]
+anchor_left = 0.05
+anchor_top = 0.05
+anchor_right = 0.95
+anchor_bottom = 0.95
+
+[node name="CardName" type="Label" parent="CardPreview/Panel/VBox"]
+custom_minimum_size = Vector2(0, 40)
+theme_override_font_sizes/font_size = 24
+text = "Card Name"
+horizontal_alignment = 1
+
+[node name="CardImage" type="TextureRect" parent="CardPreview/Panel/VBox"]
+custom_minimum_size = Vector2(0, 200)
+stretch_mode = 5
+
+[node name="Description" type="RichTextLabel" parent="CardPreview/Panel/VBox"]
+custom_minimum_size = Vector2(0, 150)
+bbcode_enabled = true
+text = "Card description goes here..."
+
+[node name="CloseButton" type="Button" parent="CardPreview/Panel/VBox"]
+text = "Close"

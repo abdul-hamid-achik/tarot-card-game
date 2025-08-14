@@ -36,17 +36,18 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 color = Color(0.05, 0.05, 0.1, 1)
 
-[node name="MapContainer" type="ScrollContainer" parent="."]
+[node name="MapContainer" type="Control" parent="."]
 anchor_left = 0.05
 anchor_top = 0.15
 anchor_right = 0.95
 anchor_bottom = 0.85
+clip_contents = true
 
 [node name="PathsContainer" type="Control" parent="MapContainer"]
-custom_minimum_size = Vector2(1400, 700)
+custom_minimum_size = Vector2(1000, 550)
 
 [node name="NodesContainer" type="Control" parent="MapContainer"]
-custom_minimum_size = Vector2(1400, 700)
+custom_minimum_size = Vector2(1000, 550)
 
 [node name="ChampionPanel" type="Panel" parent="."]
 anchor_left = 0.02

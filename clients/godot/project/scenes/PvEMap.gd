@@ -2,14 +2,14 @@ extends Control
 
 # Node types matching LoR style
 enum NodeType {
-	BATTLE,         # Standard enemy encounter
-	ELITE,          # Harder battle with better rewards
-	BOSS,           # Region boss
-	EVENT,          # Random event (choose outcome)
-	SHOP,           # Buy cards/upgrades
-	REST,           # Heal or upgrade card
-	TREASURE,       # Free reward
-	MYSTERY         # Unknown until revealed
+	BATTLE, # Standard enemy encounter
+	ELITE, # Harder battle with better rewards
+	BOSS, # Region boss
+	EVENT, # Random event (choose outcome)
+	SHOP, # Buy cards/upgrades
+	REST, # Heal or upgrade card
+	TREASURE, # Free reward
+	MYSTERY # Unknown until revealed
 }
 
 # Run state
@@ -18,7 +18,7 @@ var current_node_id := 0
 var completed_nodes := []
 var available_nodes := []
 var run_seed := ""
-var significator := ""  # Major Arcana chosen as champion
+var significator := "" # Major Arcana chosen as champion
 
 # Map generation
 var map_data := {}
@@ -38,9 +38,9 @@ var total_regions := 3
 @onready var shop_popup := $ShopPopup
 
 # Visual settings
-const NODE_SIZE := Vector2(80, 80)
-const MAP_WIDTH := 1200
-const MAP_HEIGHT := 600
+const NODE_SIZE := Vector2(64, 64)
+const MAP_WIDTH := 900
+const MAP_HEIGHT := 500
 const NODES_PER_COLUMN := 3
 const COLUMNS_PER_REGION := 5
 
@@ -48,14 +48,14 @@ const COLUMNS_PER_REGION := 5
 
 # Colors for node types (matching LoR style)
 var node_colors := {
-	NodeType.BATTLE: Color(0.4, 0.6, 0.8),      # Blue
-	NodeType.ELITE: Color(0.8, 0.6, 0.2),       # Gold
-	NodeType.BOSS: Color(0.8, 0.2, 0.2),        # Red
-	NodeType.EVENT: Color(0.6, 0.4, 0.8),       # Purple
-	NodeType.SHOP: Color(0.2, 0.8, 0.4),        # Green
-	NodeType.REST: Color(0.8, 0.8, 0.4),        # Yellow
-	NodeType.TREASURE: Color(0.8, 0.6, 0.8),    # Pink
-	NodeType.MYSTERY: Color(0.5, 0.5, 0.5)      # Gray
+	NodeType.BATTLE: Color(0.4, 0.6, 0.8), # Blue
+	NodeType.ELITE: Color(0.8, 0.6, 0.2), # Gold
+	NodeType.BOSS: Color(0.8, 0.2, 0.2), # Red
+	NodeType.EVENT: Color(0.6, 0.4, 0.8), # Purple
+	NodeType.SHOP: Color(0.2, 0.8, 0.4), # Green
+	NodeType.REST: Color(0.8, 0.8, 0.4), # Yellow
+	NodeType.TREASURE: Color(0.8, 0.6, 0.8), # Pink
+	NodeType.MYSTERY: Color(0.5, 0.5, 0.5) # Gray
 }
 
 func _ready() -> void:
@@ -74,9 +74,9 @@ func _initialize_run() -> void:
 			"max_health": 30,
 			"gold": 100,
 			"completed_battles": 0,
-			"omens": [],  # PvE-specific modifiers
-			"boons": [],  # Temporary buffs
-			"relics": []  # Permanent passives
+			"omens": [], # PvE-specific modifiers
+			"boons": [], # Temporary buffs
+			"relics": [] # Permanent passives
 		}
 		current_node_id = 0
 		completed_nodes = []
@@ -275,10 +275,10 @@ func _create_node_visual(data: Dictionary) -> Control:
 	# Style based on type
 	var style := StyleBoxFlat.new()
 	style.bg_color = node_colors[data["type"]]
-	style.border_width_left = 3
-	style.border_width_right = 3
-	style.border_width_top = 3
-	style.border_width_bottom = 3
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 2
 	
 	if data["completed"]:
 		style.bg_color = style.bg_color.darkened(0.5)
@@ -298,48 +298,78 @@ func _create_node_visual(data: Dictionary) -> Control:
 		node.disabled = true
 		node.modulate = Color(0.7, 0.7, 0.7)
 	
-	style.corner_radius_top_left = 10
-	style.corner_radius_top_right = 10
-	style.corner_radius_bottom_left = 10
-	style.corner_radius_bottom_right = 10
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
 	
 	node.add_theme_stylebox_override("normal", style)
 	node.add_theme_stylebox_override("hover", style)
 	node.add_theme_stylebox_override("pressed", style)
 	
-	# Add icon based on type
-	var icon_label := Label.new()
-	icon_label.anchor_right = 1.0
-	icon_label.anchor_bottom = 1.0
-	icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	icon_label.add_theme_font_size_override("font_size", 24)
+	# Add icon based on type - use TextureRect for pixel art
+	var icon := TextureRect.new()
+	icon.anchor_right = 1.0
+	icon.anchor_bottom = 1.0
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 	
-	match data["type"]:
-		NodeType.BATTLE:
-			icon_label.text = "⚔️"
-		NodeType.ELITE:
-			icon_label.text = "👹"
-		NodeType.BOSS:
-			icon_label.text = "👑"
-		NodeType.EVENT:
-			icon_label.text = "❓"
-		NodeType.SHOP:
-			icon_label.text = "🛒"
-		NodeType.REST:
-			icon_label.text = "🏕️"
-		NodeType.TREASURE:
-			icon_label.text = "💎"
-		NodeType.MYSTERY:
-			icon_label.text = "❔"
+	# Load appropriate pixel art icon
+	var http := HTTPRequest.new()
+	node.add_child(http)
+	var icon_url := _get_icon_url_for_type(data["type"])
+	http.request_completed.connect(_on_icon_loaded.bind(icon))
+	http.request(icon_url)
 	
-	node.add_child(icon_label)
+	node.add_child(icon)
 	
 	# Connect click event
 	if data["available"]:
 		node.pressed.connect(_on_node_clicked.bind(data["id"]))
 	
 	return node
+
+func _get_icon_url_for_type(type: NodeType) -> String:
+	var origin := ""
+	var env := OS.get_environment("TAROT_API_ORIGIN")
+	if env != "":
+		origin = env
+	elif OS.has_feature("web"):
+		var o: String = str(JavaScriptBridge.eval("location.origin"))
+		if o != "":
+			origin = o
+	if origin == "":
+		origin = "http://localhost:3000"
+
+	var sheet_num := ""
+	match type:
+		NodeType.BATTLE:
+			sheet_num = "01" # Sword icon
+		NodeType.ELITE:
+			sheet_num = "05" # Shield icon
+		NodeType.BOSS:
+			sheet_num = "09" # Crown/boss icon
+		NodeType.EVENT:
+			sheet_num = "13" # Question mark
+		NodeType.SHOP:
+			sheet_num = "17" # Coin/shop icon
+		NodeType.REST:
+			sheet_num = "21" # Heart/rest icon
+		NodeType.TREASURE:
+			sheet_num = "25" # Chest icon
+		NodeType.MYSTERY:
+			sheet_num = "29" # Mystery icon
+	
+	return origin + "/api/ui/themes/pixel-pack/sheets/card_ui_" + sheet_num + ".png"
+
+func _on_icon_loaded(_result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray, icon: TextureRect) -> void:
+	if response_code != 200:
+		return
+	var img := Image.new()
+	if img.load_png_from_buffer(body) != OK:
+		return
+	var tex := ImageTexture.create_from_image(img)
+	icon.texture = tex
 
 func _render_paths() -> void:
 	# Clear existing paths
@@ -425,7 +455,7 @@ func _generate_enemy_deck(type: NodeType) -> Array:
 				{"id": "cups_02", "count": 2},
 				{"id": "swords_02", "count": 2},
 				{"id": "pentacles_02", "count": 2},
-				{"id": "major_07", "count": 1}  # Add a Major Arcana
+				{"id": "major_07", "count": 1} # Add a Major Arcana
 			]
 		NodeType.BOSS:
 			# Boss deck with multiple Major Arcana
@@ -434,8 +464,8 @@ func _generate_enemy_deck(type: NodeType) -> Array:
 				{"id": "cups_03", "count": 2},
 				{"id": "swords_03", "count": 2},
 				{"id": "pentacles_03", "count": 2},
-				{"id": "major_13", "count": 1},  # Death
-				{"id": "major_16", "count": 1}   # Tower
+				{"id": "major_13", "count": 1}, # Death
+				{"id": "major_16", "count": 1} # Tower
 			]
 	
 	return deck
