@@ -24,13 +24,13 @@ func _api_origin() -> String:
 func _ready() -> void:
 	label.text = "Board (ready)"
 	add_child(http)
-    http.request(_api_origin() + "/api/cards")
+	http.request(_api_origin() + "/api/cards")
 	http.request_completed.connect(_on_cards_response)
 	# Fetch one background image from packaged UI assets and display it
 	var bg_req := HTTPRequest.new()
 	add_child(bg_req)
 	bg_req.request_completed.connect(_on_bg)
-    bg_req.request(_api_origin() + "/api/ui/themes/pixel-pack/backgrounds/table_bg_04.png")
+	bg_req.request(_api_origin() + "/api/ui/themes/pixel-pack/backgrounds/table_bg_04.png")
 	# Anchor background to the top-left so it fills predictably
 	background.centered = false
 

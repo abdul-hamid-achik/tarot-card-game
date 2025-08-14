@@ -19,5 +19,5 @@ clients/godot/project/.godot/
 clients/godot/project/.import/
 clients/godot/project/*.uid
 clients/godot/project/*.import
-clients/godot/export/
+clients/godot/project/builds/
 apps/web/public/godot/*

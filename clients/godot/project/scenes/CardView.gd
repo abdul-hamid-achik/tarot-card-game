@@ -22,12 +22,12 @@ func load_card_image(card_id: String, deck: String = "classic") -> void:
 	last_card_id = card_id
 	last_deck = deck
 	tried_fallback = false
-    var origin := "http://localhost:3000"
-    if OS.has_feature("web"):
-        var o: String = str(JavaScriptBridge.eval("location.origin"))
-        if o != "":
-            origin = o
-    var url := origin + "/api/card-image?id=" + card_id.uri_encode() + "&deck=" + deck.uri_encode()
+	var origin := "http://localhost:3000"
+	if OS.has_feature("web"):
+		var o: String = str(JavaScriptBridge.eval("location.origin"))
+		if o != "":
+			origin = o
+	var url := origin + "/api/card-image?id=" + card_id.uri_encode() + "&deck=" + deck.uri_encode()
 	# Avoid duplicate connections if called multiple times
 	if not http.request_completed.is_connected(_on_image):
 		http.request_completed.connect(_on_image)
@@ -36,14 +36,14 @@ func load_card_image(card_id: String, deck: String = "classic") -> void:
 func _on_image(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	if response_code != 200:
 		# Fallback once to a known-good image
-        if not tried_fallback:
+		if not tried_fallback:
 			tried_fallback = true
-            var origin := "http://localhost:3000"
-            if OS.has_feature("web"):
-                var o: String = str(JavaScriptBridge.eval("location.origin"))
-                if o != "":
-                    origin = o
-            var url := origin + "/api/card-image?id=" + "major_00".uri_encode() + "&deck=" + last_deck.uri_encode()
+			var origin := "http://localhost:3000"
+			if OS.has_feature("web"):
+				var o: String = str(JavaScriptBridge.eval("location.origin"))
+				if o != "":
+					origin = o
+			var url := origin + "/api/card-image?id=" + "major_00".uri_encode() + "&deck=" + last_deck.uri_encode()
 			http.request(url)
 		return
 	var img := Image.new()

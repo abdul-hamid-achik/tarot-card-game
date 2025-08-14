@@ -5,7 +5,8 @@ export const dynamic = 'force-dynamic';
 
 export function GET() {
   const sqlite = getSqlite();
-  const stmt = sqlite.prepare('SELECT id, name, suit, cost, type, rarity, set FROM cards');
+  // "set" is a SQLite keyword; quote it to use as a column identifier
+  const stmt = sqlite.prepare('SELECT id, name, suit, cost, type, rarity, "set" AS set FROM cards');
   const cards = stmt.all();
   return NextResponse.json({ cards });
 }
