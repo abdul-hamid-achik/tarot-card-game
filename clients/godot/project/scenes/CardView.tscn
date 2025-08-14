@@ -2,6 +2,9 @@
 
 [ext_resource type="Script" path="res://scenes/CardView.gd" id=1]
 
+[sub_resource type="RectangleShape2D" id=1]
+size = Vector2(160, 220)
+
 [node name="CardView" type="Node2D"]
 script = ExtResource( 1 )
 
@@ -11,3 +14,8 @@ position = Vector2(0, 0)
 [node name="Label" type="Label" parent="."]
 text = "Card"
 position = Vector2(180, 60)
+
+[node name="Area2D" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+shape = SubResource( 1 )

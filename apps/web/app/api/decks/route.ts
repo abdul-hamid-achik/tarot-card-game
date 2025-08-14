@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getSqlite } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
 export function GET() {
-  const db = getDb();
-  // @ts-expect-error drizzle better-sqlite3 direct query
-  const decks = db.all?.("SELECT id, owner_id as ownerId, format FROM decks") ?? [];
+  const sqlite = getSqlite();
+  const stmt = sqlite.prepare('SELECT id, owner_id as ownerId, format FROM decks');
+  const decks = stmt.all();
   return NextResponse.json({ decks });
 }

@@ -18,7 +18,13 @@ export async function GET() {
     const root = path.join(repoRoot, 'packages', 'assets', 'ui');
     try {
         const files = fs.existsSync(root) ? list(root) : [];
-        return NextResponse.json({ files });
+        // Try to load root ui.json if present for structured metadata
+        let meta: unknown = null;
+        const uiJson = path.join(root, 'ui.json');
+        if (fs.existsSync(uiJson)) {
+            meta = JSON.parse(fs.readFileSync(uiJson, 'utf-8')) as unknown;
+        }
+        return NextResponse.json({ files, meta });
     } catch {
         return NextResponse.json({ files: [] });
     }

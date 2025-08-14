@@ -17,4 +17,5 @@ config/features=PackedStringArray("4.4")
 
 [rendering]
 
+textures/vram_compression/import_etc2_astc=true
 quality/driver/driver_name="GLES3"

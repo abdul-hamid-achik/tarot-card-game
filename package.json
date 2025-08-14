@@ -19,7 +19,7 @@
     "lint": "eslint . --ext .ts,.tsx --max-warnings=0",
     "format": "prettier --write .",
     "e2e:web": "npx -w @tarot/web playwright test",
-    "export:godot": "godot --headless --path clients/godot/project --export-release Web apps/web/public/godot/index.html",
+    "export:godot": "mkdir -p apps/web/public/godot && godot --headless --path clients/godot/project --export-release Web apps/web/public/godot/index.html",
     "export:godot:clean": "rm -rf apps/web/public/godot/*",
     "export:godot:dev": "npm run export:godot:clean && npm run export:godot && npm run dev:web"
   },
