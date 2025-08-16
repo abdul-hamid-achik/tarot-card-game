@@ -1,6 +1,6 @@
 [gd_scene load_steps=7 format=3 uid="uid://dnndm45pvry6l"]
 
-[ext_resource type="Script" uid="uid://byo3lrxyjfsq7" path="res://scenes/GameRoot.gd" id="1"]
+[ext_resource type="Script" path="res://scenes/GameRoot.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/Board.tscn" id="2"]
 [ext_resource type="PackedScene" path="res://scenes/Hand.tscn" id="3"]
 [ext_resource type="PackedScene" path="res://scenes/StreamLog.tscn" id="4"]
