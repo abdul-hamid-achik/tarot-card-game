@@ -81,6 +81,9 @@
     "buttons": {
       "file": "others/card_ui_buttons.png"
     },
+    "characterProfiles": {
+      "file": "others/card_ui_character_profiles.png"
+    },
     "profiles": {
       "files": [
         "others/card_ui_profile.png",

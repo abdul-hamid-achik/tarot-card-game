@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { getFrame, cssBackgroundStyle, type AtlasGrid } from '@/lib/uiAtlas';
 
 type DeckId = 'classic' | 'marigold' | 'arcana-a' | 'duality-color' | 'duality-mono';
 
@@ -54,6 +55,9 @@ export default function MatchLivePage() {
     const [steps, setSteps] = useState(20);
     const [themeId, setThemeId] = useState('pixel-pack');
     const [themes, setThemes] = useState<string[]>(['pixel-pack']);
+    // Character and enemy profile atlas configs (assumption: 4x4 grid, 128px tiles). Tweak as needed.
+    const characterProfilesGrid: AtlasGrid = { columns: 4, rows: 4, tileWidth: 128, tileHeight: 128 };
+    const characterProfilesUrl = `/api/ui/themes/${encodeURIComponent(themeId)}/others/card_ui_character_profiles.png`;
     const [isStreaming, setIsStreaming] = useState(false);
     const [timeline, setTimeline] = useState<StepEvent[]>([]);
     const [result, setResult] = useState<{ winnerId: string | null; steps: number } | null>(null);

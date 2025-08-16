@@ -1,3 +1,4 @@
+import { getFrame, cssBackgroundStyle, type AtlasGrid } from '@/lib/uiAtlas';
 'use client';
 
 import { useEffect, useState } from 'react';
