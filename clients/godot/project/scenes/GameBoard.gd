@@ -335,11 +335,12 @@ func _arrange_hand(is_player: bool) -> void:
 	if card_count == 0:
 		return
 	
-	var start_x: float = - (card_count - 1) * HAND_CARD_SPACING / 2.0
+    var start_x: float = - (card_count - 1) * HAND_CARD_SPACING / 2.0
 	
 	for i in range(card_count):
 		var card := cards[i]
-		var target_pos := Vector2(start_x + i * HAND_CARD_SPACING, 0)
+        # Place cards within their container; ensure they are mouse-draggable by setting draggable anchor
+        var target_pos := Vector2(start_x + i * HAND_CARD_SPACING, 0)
 		
 		# Animate to position
 		var tween := create_tween()
@@ -349,8 +350,11 @@ func _arrange_hand(is_player: bool) -> void:
 		
 		# Fan cards slightly
 		if is_player:
-			var rotation := (i - card_count / 2.0) * 0.05
-			tween.parallel().tween_property(card, "rotation", rotation, 0.3)
+            var rotation := (i - card_count / 2.0) * 0.05
+            tween.parallel().tween_property(card, "rotation", rotation, 0.3)
+        # Ensure card can receive inputs while inside hand
+        if card.has_method("set_process"):
+            card.set_process(true)
 
 func _arrange_board(is_player: bool) -> void:
 	var container := player_board_container if is_player else opponent_board_container
