@@ -4,11 +4,13 @@ extends Node2D
 @onready var sprite: Sprite2D = $Sprite
 @onready var area: Area2D = $Area2D
 var http: HTTPRequest
+@onready var parent_before_drag: Node = null
 var last_card_id := ""
 var last_deck := "classic"
 var tried_fallback := false
 var is_face_down := false
 var card_data := {}
+var was_top_level := false
 
 # Drag and drop
 var is_dragging := false
@@ -84,13 +86,19 @@ func _unhandled_input(event: InputEvent) -> void:
                 drag_offset = global_position - mb.global_position
                 original_position = position
                 original_parent = get_parent()
-                z_index = 10
+                parent_before_drag = original_parent
+                was_top_level = is_set_as_top_level()
+                set_as_top_level(true)
+                sprite.z_index = 100
+                z_index = 100
                 emit_signal("drag_started")
         else:
             # Mouse released
             if is_dragging:
                 is_dragging = false
                 z_index = 0
+                sprite.z_index = 0
+                set_as_top_level(was_top_level)
                 emit_signal("drag_ended")
                 _check_drop_zone()
 
