@@ -40,8 +40,8 @@ func set_card_back(face_down: bool = true) -> void:
 	is_face_down = face_down
 	if is_face_down:
 		label.text = ""
-		# Load card back image
-		var url := _api_origin() + "/api/ui/themes/pixel-pack/sheets/card_ui_29.png"
+		# Load card back image (use themed placeholder/back)
+		var url := _api_origin() + "/api/ui/themes/pixel-pack/others/card_ui_white_placeholder.png"
 		if not http:
 			http = HTTPRequest.new()
 			add_child(http)
@@ -65,6 +65,11 @@ func _ready() -> void:
 	add_child(http)
 	if not area.input_event.is_connected(_on_area_input):
 		area.input_event.connect(_on_area_input)
+	# Ensure _process runs for dragging updates
+	set_process(true)
+	# Make sure the Area2D participates in input/overlap
+	area.monitoring = true
+	area.input_pickable = true
 
 func load_card_image(card_id: String, deck: String = "classic") -> void:
 	last_card_id = card_id
@@ -102,7 +107,7 @@ func _on_area_input(_vp: Node, event: InputEvent, _shape_idx: int) -> void:
 					drag_offset = global_position - mb.global_position
 					original_position = position
 					original_parent = get_parent()
-					z_index = 10  # Bring to front
+					z_index = 10 # Bring to front
 					emit_signal("drag_started")
 			else:
 				# Stop dragging
@@ -129,7 +134,10 @@ func _check_drop_zone() -> void:
 	if board_area:
 		emit_signal("dropped_on_board")
 	else:
-		# Return to original position
+		# If the card was reparented or moved by game logic during drag, don't snap back
+		if get_parent() != original_parent or get_meta("zone", "") != "player_hand":
+			return
+		# Otherwise return to original position
 		var tween := create_tween()
 		tween.set_trans(Tween.TRANS_CUBIC)
 		tween.set_ease(Tween.EASE_OUT)

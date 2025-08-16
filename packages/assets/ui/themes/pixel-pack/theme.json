@@ -44,88 +44,61 @@
     {
       "id": "card_ui_09",
       "file": "sheets/card_ui_09.png"
-    },
-    {
-      "id": "card_ui_10",
-      "file": "sheets/card_ui_10.png"
-    },
-    {
-      "id": "card_ui_11",
-      "file": "sheets/card_ui_11.png"
-    },
-    {
-      "id": "card_ui_12",
-      "file": "sheets/card_ui_12.png"
-    },
-    {
-      "id": "card_ui_13",
-      "file": "sheets/card_ui_13.png"
-    },
-    {
-      "id": "card_ui_14",
-      "file": "sheets/card_ui_14.png"
-    },
-    {
-      "id": "card_ui_15",
-      "file": "sheets/card_ui_15.png"
-    },
-    {
-      "id": "card_ui_16",
-      "file": "sheets/card_ui_16.png"
-    },
-    {
-      "id": "card_ui_17",
-      "file": "sheets/card_ui_17.png"
-    },
-    {
-      "id": "card_ui_18",
-      "file": "sheets/card_ui_18.png"
-    },
-    {
-      "id": "card_ui_19",
-      "file": "sheets/card_ui_19.png"
-    },
-    {
-      "id": "card_ui_20",
-      "file": "sheets/card_ui_20.png"
-    },
-    {
-      "id": "card_ui_21",
-      "file": "sheets/card_ui_21.png"
-    },
-    {
-      "id": "card_ui_22",
-      "file": "sheets/card_ui_22.png"
-    },
-    {
-      "id": "card_ui_23",
-      "file": "sheets/card_ui_23.png"
-    },
-    {
-      "id": "card_ui_24",
-      "file": "sheets/card_ui_24.png"
-    },
-    {
-      "id": "card_ui_25",
-      "file": "sheets/card_ui_25.png"
-    },
-    {
-      "id": "card_ui_26",
-      "file": "sheets/card_ui_26.png"
-    },
-    {
-      "id": "card_ui_27",
-      "file": "sheets/card_ui_27.png"
-    },
-    {
-      "id": "card_ui_28",
-      "file": "sheets/card_ui_28.png"
-    },
-    {
-      "id": "card_ui_29",
-      "file": "sheets/card_ui_29.png"
     }
   ],
+  "others": [
+    "others/card_ui_banner.png",
+    "others/card_ui_black_front.png",
+    "others/card_ui_buttons.png",
+    "others/card_ui_character_profiles.png",
+    "others/card_ui_coin.png",
+    "others/card_ui_coin_2.png",
+    "others/card_ui_coin_3.png",
+    "others/card_ui_gold_front.png",
+    "others/card_ui_gold_tiles.png",
+    "others/card_ui_icons.png",
+    "others/card_ui_profile.png",
+    "others/card_ui_profile_2.png",
+    "others/card_ui_profile_3.png",
+    "others/card_ui_profile_4.png",
+    "others/card_ui_rusty_tiles.png",
+    "others/card_ui_silver_front.png",
+    "others/card_ui_silver_tiles.png",
+    "others/card_ui_top_borders.png",
+    "others/card_ui_white_placeholder.png",
+    "others/card_ui_white_top_borders.png"
+  ],
+  "atlases": {
+    "fronts": {
+      "black": "others/card_ui_black_front.png",
+      "gold": "others/card_ui_gold_front.png",
+      "silver": "others/card_ui_silver_front.png",
+      "white_placeholder": "others/card_ui_white_placeholder.png"
+    },
+    "icons": {
+      "file": "others/card_ui_icons.png"
+    },
+    "buttons": {
+      "file": "others/card_ui_buttons.png"
+    },
+    "profiles": {
+      "files": [
+        "others/card_ui_profile.png",
+        "others/card_ui_profile_2.png",
+        "others/card_ui_profile_3.png",
+        "others/card_ui_profile_4.png"
+      ]
+    },
+    "tiles": {
+      "gold": "others/card_ui_gold_tiles.png",
+      "silver": "others/card_ui_silver_tiles.png",
+      "rusty": "others/card_ui_rusty_tiles.png"
+    },
+    "borders": {
+      "default": "others/card_ui_top_borders.png",
+      "white": "others/card_ui_white_top_borders.png"
+    }
+  },
   "defaultBackground": "backgrounds/table_bg_01.png",
   "defaultSheet": "card_ui_01"
 }

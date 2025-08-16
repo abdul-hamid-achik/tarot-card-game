@@ -17,7 +17,7 @@ apps/*/.vercel
 # Godot project artifacts
 clients/godot/project/.godot/
 clients/godot/project/.import/
-clients/godot/project/*.uid
-clients/godot/project/*.import
+**/*.uid
+clients/godot/project/**/*.import
 clients/godot/project/builds/
 apps/web/public/godot/*

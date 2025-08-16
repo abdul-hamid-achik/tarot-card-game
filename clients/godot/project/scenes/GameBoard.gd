@@ -30,6 +30,7 @@ var opponent_fate := 1
 @onready var phase_label := $BoardLayout/CenterArea/PhaseIndicator/PhaseLabel
 @onready var turn_label := $BoardLayout/CenterArea/TurnIndicator/TurnLabel
 @onready var end_turn_button := $BoardLayout/PlayerArea/EndTurnButton
+@onready var hand_toggle_button := $BoardLayout/PlayerArea/HandToggleButton
 
 # Deck visuals
 @onready var player_deck := $BoardLayout/PlayerArea/DeckZone/Deck
@@ -102,6 +103,7 @@ func _setup_ui() -> void:
 
 func _connect_signals() -> void:
 	end_turn_button.pressed.connect(_on_end_turn_pressed)
+	hand_toggle_button.pressed.connect(_on_hand_toggle_pressed)
 	http.request_completed.connect(_on_http_response)
 	menu_button.pressed.connect(_on_menu_button_pressed)
 	settings_button.pressed.connect(_on_settings_button_pressed)
@@ -169,6 +171,11 @@ func _start_pve_match() -> void:
 func _on_http_response(_result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	if response_code != 200:
 		print("HTTP request failed: ", response_code)
+		# Fallback: run a local PvE demo so the board is interactive even without the backend
+		if get_meta("game_mode", "pvp") == "pvp":
+			set_meta("game_mode", "pve")
+			_load_initial_cards()
+			_hide_overlay()
 		return
 	
 	var json_str := body.get_string_from_utf8()
@@ -264,6 +271,9 @@ func _draw_card_to_hand(is_player: bool) -> void:
 	# Connect signals for player cards
 	if is_player and card.has_signal("clicked"):
 		card.clicked.connect(_on_card_clicked.bind(card))
+	# Allow drag-to-drop onto board
+	if is_player and card.has_signal("drag_ended"):
+		card.drag_ended.connect(_on_card_drag_ended.bind(card))
 	
 	# Connect preview signal for all cards
 	if card.has_signal("preview_requested"):
@@ -391,6 +401,28 @@ func _advance_phase() -> void:
 	
 	_update_phase_display()
 	_update_turn_display()
+
+func _on_hand_toggle_pressed() -> void:
+	player_hand_container.visible = not player_hand_container.visible
+	hand_toggle_button.text = "▲ Show Hand" if not player_hand_container.visible else "▼ Hide Hand"
+
+func _on_card_drag_ended(card: Node) -> void:
+	# If card dragged over player's board, play it (same as click behavior)
+	if not is_my_turn:
+		return
+	var zone = card.get_meta("zone", "")
+	if zone != "player_hand":
+		return
+	if _is_over_player_board(card):
+		if player_fate >= _get_card_cost(card):
+			_play_card_from_hand(card)
+
+func _is_over_player_board(card: Node) -> bool:
+	# Compare card global position against player board container rect
+	# Note: Works in practice despite Node2D vs Control, since both use viewport coordinates
+	var rect: Rect2 = player_board_container.get_global_rect()
+	var pos: Vector2 = card.global_position
+	return rect.has_point(pos)
 
 func _switch_turn() -> void:
 	is_my_turn = not is_my_turn
@@ -648,7 +680,7 @@ func _input(event: InputEvent) -> void:
 			var panel := card_preview.get_node_or_null("Panel")
 			if panel:
 				var local_pos: Vector2 = panel.get_local_mouse_position()
-				var rect := Rect2(Vector2.ZERO, panel.size)
+				var rect: Rect2 = Rect2(Vector2.ZERO, panel.size)
 				if not rect.has_point(local_pos):
 					_hide_card_preview()
 

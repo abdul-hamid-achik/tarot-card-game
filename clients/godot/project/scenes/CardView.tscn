@@ -16,6 +16,7 @@ text = "Card"
 position = Vector2(180, 60)
 
 [node name="Area2D" type="Area2D" parent="."]
+input_pickable = true
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
 shape = SubResource( 1 )

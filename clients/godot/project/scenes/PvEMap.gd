@@ -350,15 +350,15 @@ func _get_icon_url_for_type(type: NodeType) -> String:
 		NodeType.BOSS:
 			sheet_num = "09" # Crown/boss icon
 		NodeType.EVENT:
-			sheet_num = "13" # Question mark
+			sheet_num = "08" # Adjust to existing sheet set
 		NodeType.SHOP:
-			sheet_num = "17" # Coin/shop icon
+			sheet_num = "07" # Adjust to existing sheet set
 		NodeType.REST:
-			sheet_num = "21" # Heart/rest icon
+			sheet_num = "06" # Adjust to existing sheet set
 		NodeType.TREASURE:
-			sheet_num = "25" # Chest icon
+			sheet_num = "04" # Adjust to existing sheet set
 		NodeType.MYSTERY:
-			sheet_num = "29" # Mystery icon
+			sheet_num = "03" # Adjust to existing sheet set
 	
 	return origin + "/api/ui/themes/pixel-pack/sheets/card_ui_" + sheet_num + ".png"
 

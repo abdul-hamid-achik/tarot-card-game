@@ -123,7 +123,7 @@ export default function MatchLivePage() {
             className="p-4 space-y-4 min-h-screen text-gray-100"
             style={{
                 backgroundColor: '#000',
-                backgroundImage: `url(/api/ui/themes/${encodeURIComponent(themeId)}/backgrounds/table_bg_03.png)`,
+                backgroundImage: `url(/api/ui/themes/${encodeURIComponent(themeId)}/backgrounds/table_bg_01.png)`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
             }}
