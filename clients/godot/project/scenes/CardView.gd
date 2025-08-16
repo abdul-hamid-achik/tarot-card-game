@@ -65,11 +65,34 @@ func _ready() -> void:
 	add_child(http)
 	if not area.input_event.is_connected(_on_area_input):
 		area.input_event.connect(_on_area_input)
+    # Also listen on the Sprite for clicks in case Area2D misses
+    if not sprite.input_event.is_connected(_on_area_input):
+        sprite.input_event.connect(_on_area_input)
 	# Ensure _process runs for dragging updates
 	set_process(true)
 	# Make sure the Area2D participates in input/overlap
 	area.monitoring = true
 	area.input_pickable = true
+
+func _unhandled_input(event: InputEvent) -> void:
+    var mb := event as InputEventMouseButton
+    if mb and mb.button_index == MOUSE_BUTTON_LEFT:
+        if mb.pressed:
+            if can_be_dragged and not is_face_down:
+                # Start dragging even if Area2D didn't capture
+                is_dragging = true
+                drag_offset = global_position - mb.global_position
+                original_position = position
+                original_parent = get_parent()
+                z_index = 10
+                emit_signal("drag_started")
+        else:
+            # Mouse released
+            if is_dragging:
+                is_dragging = false
+                z_index = 0
+                emit_signal("drag_ended")
+                _check_drop_zone()
 
 func load_card_image(card_id: String, deck: String = "classic") -> void:
 	last_card_id = card_id

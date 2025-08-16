@@ -438,29 +438,31 @@ func _switch_turn() -> void:
 			opponent_fate = min(3, opponent_fate + 1)
 			_draw_card_to_hand(false)
 			# Simulate AI turn after delay
-			await get_tree().create_timer(2.0).timeout
-			_simulate_ai_turn()
+            await get_tree().create_timer(1.0).timeout
+            _simulate_ai_turn()
 	
 	_update_fate_display()
 
 func _simulate_ai_turn() -> void:
 	# Simple AI logic for PvE
-	await get_tree().create_timer(1.0).timeout
+    await get_tree().create_timer(0.5).timeout
 	
 	# AI plays a card
 	var hand_cards := opponent_hand_container.get_children()
-	if hand_cards.size() > 0 and opponent_fate > 0:
-		var card := hand_cards[0]
-		opponent_hand_container.remove_child(card)
-		opponent_board_container.add_child(card)
-		card.set_card_back(false)
-		card.load_card_image("major_" + str(randi() % 22).pad_zeros(2), deck_name)
-		opponent_fate -= 1
-		_update_fate_display()
-		_arrange_hand(false)
-		_arrange_board(false)
+    if hand_cards.size() > 0 and opponent_fate > 0:
+        var card := hand_cards[0]
+        if card and card.has_method("set_card_back"):
+            opponent_hand_container.remove_child(card)
+            opponent_board_container.add_child(card)
+            card.set_card_back(false)
+            if card.has_method("load_card_image"):
+                card.load_card_image("major_" + str(randi() % 22).pad_zeros(2), deck_name)
+            opponent_fate -= 1
+            _update_fate_display()
+            _arrange_hand(false)
+            _arrange_board(false)
 	
-	await get_tree().create_timer(1.0).timeout
+    await get_tree().create_timer(0.5).timeout
 	_advance_phase()
 
 func _update_health_display() -> void:
