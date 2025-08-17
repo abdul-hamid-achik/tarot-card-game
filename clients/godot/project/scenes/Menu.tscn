@@ -25,4 +25,10 @@ text = "Decks"
 [node name="SettingsButton" type="Button" parent="VBoxContainer"]
 text = "Settings"
 
+[node name="CollectionButton" type="Button" parent="VBoxContainer"]
+text = "Collection"
+
+[node name="DeckSelectButton" type="Button" parent="VBoxContainer"]
+text = "Deck Selection"
+
 

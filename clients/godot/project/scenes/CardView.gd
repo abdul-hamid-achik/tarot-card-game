@@ -18,6 +18,10 @@ var drag_offset := Vector2.ZERO
 var original_position := Vector2.ZERO
 var original_parent: Node = null
 var can_be_dragged := true
+var dwell_timer := 0.0
+const DWELL_THRESHOLD := 0.15
+var hover_scale := 0.5
+var drag_scale := 1.0
 
 signal clicked
 signal preview_requested
@@ -75,6 +79,8 @@ func _ready() -> void:
 	# Make sure the Area2D participates in input/overlap
 	area.monitoring = true
 	area.input_pickable = true
+	# initial scale for in-hand state
+	scale = Vector2(hover_scale, hover_scale)
 
 func _unhandled_input(event: InputEvent) -> void:
 	var mb := event as InputEventMouseButton
@@ -82,6 +88,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if mb.pressed:
 			if can_be_dragged and not is_face_down:
 				# Start dragging even if Area2D didn't capture
+				dwell_timer = 0.0
 				is_dragging = true
 				drag_offset = global_position - mb.global_position
 				original_position = position
@@ -157,7 +164,15 @@ func _on_area_input(_vp: Node, event: InputEvent, _shape_idx: int) -> void:
 
 func _process(_delta: float) -> void:
 	if is_dragging:
-		global_position = get_global_mouse_position() + drag_offset
+		# dwell prevention window before moving fully
+		dwell_timer += _delta
+		if dwell_timer >= DWELL_THRESHOLD:
+			global_position = get_global_mouse_position() + drag_offset
+			scale = Vector2(drag_scale, drag_scale)
+	else:
+		# subtle hover scaling when not dragging
+		# scale lerp back to hover
+		scale = scale.lerp(Vector2(hover_scale, hover_scale), min(1.0, _delta * 10.0))
 		
 func _check_drop_zone() -> void:
 	# Check if dropped on a valid board zone

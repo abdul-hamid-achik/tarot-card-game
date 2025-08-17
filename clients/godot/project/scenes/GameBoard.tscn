@@ -50,6 +50,16 @@ text = "Tarot TCG"
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="TurnTimer" type="Label" parent="TopBar"]
+anchor_left = 0.7
+anchor_right = 0.85
+anchor_top = 0.15
+anchor_bottom = 0.85
+visible = false
+text = "30"
+horizontal_alignment = 1
+vertical_alignment = 1
+
 [node name="BoardLayout" type="Control" parent="."]
 anchor_top = 0.06
 anchor_right = 1.0
@@ -75,6 +85,14 @@ anchor_right = 0.9
 anchor_top = 0.05
 anchor_bottom = 0.4
 stretch_mode = 5
+
+[node name="NameLabel" type="Label" parent="BoardLayout/OpponentArea/OpponentInfo"]
+anchor_left = 0.1
+anchor_right = 0.9
+anchor_top = 0.35
+anchor_bottom = 0.45
+text = "Opponent"
+horizontal_alignment = 1
 
 [node name="HealthLabel" type="Label" parent="BoardLayout/OpponentArea/OpponentInfo"]
 anchor_left = 0.1
@@ -180,6 +198,21 @@ text = "Main"
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="OracleEye" type="ColorRect" parent="BoardLayout/CenterArea"]
+anchor_left = 0.48
+anchor_right = 0.52
+anchor_top = 0.45
+anchor_bottom = 0.55
+color = Color(0.2, 0.4, 0.9, 0.8)
+mouse_filter = 2
+
+[node name="SpellStack" type="HBoxContainer" parent="BoardLayout/CenterArea"]
+anchor_left = 0.3
+anchor_right = 0.7
+anchor_top = 0.35
+anchor_bottom = 0.65
+mouse_filter = 2
+
 [node name="TurnIndicator" type="Panel" parent="BoardLayout/CenterArea"]
 anchor_left = 0.85
 anchor_right = 0.98
@@ -214,6 +247,14 @@ anchor_right = 0.9
 anchor_top = 0.05
 anchor_bottom = 0.4
 stretch_mode = 5
+
+[node name="NameLabel" type="Label" parent="BoardLayout/PlayerArea/PlayerInfo"]
+anchor_left = 0.1
+anchor_right = 0.9
+anchor_top = 0.35
+anchor_bottom = 0.45
+text = "Player"
+horizontal_alignment = 1
 
 [node name="HealthLabel" type="Label" parent="BoardLayout/PlayerArea/PlayerInfo"]
 anchor_left = 0.1

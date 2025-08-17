@@ -29,6 +29,7 @@ var opponent_fate := 1
 @onready var opponent_fate_label := $BoardLayout/OpponentArea/OpponentInfo/FateLabel
 @onready var phase_label := $BoardLayout/CenterArea/PhaseIndicator/PhaseLabel
 @onready var turn_label := $BoardLayout/CenterArea/TurnIndicator/TurnLabel
+@onready var turn_timer_label := $TopBar/TurnTimer
 @onready var end_turn_button := $BoardLayout/PlayerArea/EndTurnButton
 @onready var hand_toggle_button := $BoardLayout/PlayerArea/HandToggleButton
 
@@ -53,6 +54,7 @@ var card_scene := preload("res://scenes/CardView.tscn")
 var ws_client: WebSocketPeer
 var match_id := ""
 var deck_name := "classic"
+var ws_url := ""
 
 # PvP networking helpers
 var ws_joined := false
@@ -63,6 +65,12 @@ var first_state_received := false
 
 # Simple matchmaking overlay
 var match_overlay: Control
+var cancel_queue_button: Button
+var connection_overlay: Control
+var connection_status: Label
+var connection_retry_button: Button
+var reaction_overlay: Control
+var reaction_label: Label
 
 # Card positioning
 const HAND_CARD_SPACING := 120
@@ -70,8 +78,40 @@ const BOARD_CARD_SPACING := 140
 const MAX_HAND_CARDS := 7
 const MAX_BOARD_CARDS := 5
 
+# Turn timer
+const TURN_TIME_SECONDS := 75
+const TURN_TIMER_WARN_AT := 30
+var turn_time_left := TURN_TIME_SECONDS
+var turn_timer := Timer.new()
+
+# Reconnect handling
+var reconnect_attempts := 0
+var reconnect_timer := Timer.new()
+var is_reconnecting := false
+
+# Reaction window (stub)
+var reaction_window_open := false
+var reaction_timer := Timer.new()
+var reaction_time_left := 0
+
 func _ready() -> void:
 	add_child(http)
+	add_child(turn_timer)
+	turn_timer.one_shot = false
+	turn_timer.wait_time = 1.0
+	if not turn_timer.timeout.is_connected(_on_turn_tick):
+		turn_timer.timeout.connect(_on_turn_tick)
+	# Reconnect timer
+	add_child(reconnect_timer)
+	reconnect_timer.one_shot = true
+	if not reconnect_timer.timeout.is_connected(_attempt_reconnect):
+		reconnect_timer.timeout.connect(_attempt_reconnect)
+	# Reaction timer
+	add_child(reaction_timer)
+	reaction_timer.one_shot = false
+	reaction_timer.wait_time = 0.2
+	if not reaction_timer.timeout.is_connected(_on_reaction_tick):
+		reaction_timer.timeout.connect(_on_reaction_tick)
 	_setup_ui()
 	_connect_signals()
 	_initialize_game_state()
@@ -85,7 +125,10 @@ func _ready() -> void:
 		# This is a PvE battle from the map
 		_start_pve_match()
 	else:
-		# Regular PvP match
+		# Regular PvP match; honor selected deck
+		var conf_deck := ProjectSettings.get_setting("tarot/player_deck", "")
+		if str(conf_deck) != "":
+			deck_name = str(conf_deck)
 		_start_pvp_match()
 		_ensure_match_overlay()
 		_set_overlay_text("Searching for opponent…")
@@ -115,6 +158,7 @@ func _initialize_game_state() -> void:
 	current_phase = "draw"
 	player_fate = 1
 	opponent_fate = 1
+	_reset_turn_timer()
 
 func _api_origin() -> String:
 	var env := OS.get_environment("TAROT_API_ORIGIN")
@@ -205,8 +249,11 @@ func _setup_websocket() -> void:
 		url = origin.replace("https://", "wss://") + "/api/ws"
 	elif origin.begins_with("http://"):
 		url = origin.replace("http://", "ws://") + "/api/ws"
+	ws_url = url
 	ws_client.connect_to_url(url)
 	ws_joined = false
+	reconnect_attempts = 0
+	is_reconnecting = false
 
 func _poll_match_result() -> void:
 	# Repeatedly poll the backend for a queued match result
@@ -321,11 +368,24 @@ func _send(action: Dictionary) -> void:
 		return
 	if ws_client.get_ready_state() != WebSocketPeer.STATE_OPEN:
 		return
+	if not _validate_action(action):
+		return
 	if match_id != "":
 		action["matchId"] = match_id
 	if current_player_id != "":
 		action["playerId"] = current_player_id
 	ws_client.send_text(JSON.stringify(action))
+
+func _validate_action(action: Dictionary) -> bool:
+	# Basic client-side guardrails. Extend with real validations.
+	var t := str(action.get("type", ""))
+	match t:
+		"play_card":
+			return action.has("cardId")
+		"end_turn":
+			return is_my_turn
+		_:
+			return true
 
 func _arrange_hand(is_player: bool) -> void:
 	var container := player_hand_container if is_player else opponent_hand_container
@@ -389,6 +449,7 @@ func _on_end_turn_pressed() -> void:
 	# Advance phase only in PvE; PvP waits for server
 	if get_meta("game_mode", "pvp") == "pve":
 		_advance_phase()
+	_reset_turn_timer()
 
 func _advance_phase() -> void:
 	match current_phase:
@@ -446,6 +507,7 @@ func _switch_turn() -> void:
             _simulate_ai_turn()
 	
 	_update_fate_display()
+	_reset_turn_timer()
 
 func _simulate_ai_turn() -> void:
 	# Simple AI logic for PvE
@@ -486,13 +548,48 @@ func _update_turn_display() -> void:
 		turn_label.modulate = Color.GREEN
 	else:
 		turn_label.modulate = Color.RED
+	_update_turn_timer_visibility()
+
+func _reset_turn_timer() -> void:
+	turn_time_left = TURN_TIME_SECONDS
+	if is_my_turn:
+		turn_timer.start()
+	else:
+		turn_timer.stop()
+	_update_turn_timer_visibility()
+	_render_turn_timer()
+
+func _on_turn_tick() -> void:
+	if not is_my_turn:
+		return
+	turn_time_left = max(0, turn_time_left - 1)
+	_render_turn_timer()
+	if turn_time_left == 0:
+		_on_end_turn_pressed()
+
+func _render_turn_timer() -> void:
+	if turn_timer_label:
+		turn_timer_label.text = str(turn_time_left)
+		if turn_time_left <= TURN_TIMER_WARN_AT:
+			turn_timer_label.visible = true
+		else:
+			turn_timer_label.visible = false
+
+func _update_turn_timer_visibility() -> void:
+	if not turn_timer_label:
+		return
+	turn_timer_label.visible = is_my_turn and turn_time_left <= TURN_TIMER_WARN_AT
 
 func _process(_delta: float) -> void:
 	if ws_client:
 		ws_client.poll()
+		# Reconnect detection
+		var st := ws_client.get_ready_state()
+		if st == WebSocketPeer.STATE_CLOSED and not is_reconnecting and match_id != "":
+			_start_reconnect()
+			return
 		
-		var state := ws_client.get_ready_state()
-		if state == WebSocketPeer.STATE_OPEN:
+		if st == WebSocketPeer.STATE_OPEN:
 			if not ws_joined and match_id != "":
 				var join_payload := {
 					"type": "join_match",
@@ -507,6 +604,167 @@ func _process(_delta: float) -> void:
 				var packet := ws_client.get_packet().get_string_from_utf8()
 				_handle_websocket_message(packet)
 
+func _start_reconnect() -> void:
+	is_reconnecting = true
+	reconnect_attempts = 0
+	_schedule_next_reconnect()
+	_ensure_connection_overlay()
+	_set_connection_status("Connection lost. Reconnecting…")
+	_show_connection_overlay()
+
+func _schedule_next_reconnect() -> void:
+	var delay := min(10.0, 0.5 * pow(1.8, reconnect_attempts))
+	reconnect_timer.wait_time = delay
+	reconnect_timer.start()
+
+func _attempt_reconnect() -> void:
+	if not is_reconnecting:
+		return
+	reconnect_attempts += 1
+	ws_client = WebSocketPeer.new()
+	if ws_url != "":
+		ws_client.connect_to_url(ws_url)
+	# If still not open, schedule another attempt
+	var st := ws_client.get_ready_state()
+	if st != WebSocketPeer.STATE_OPEN:
+		_schedule_next_reconnect()
+	else:
+		is_reconnecting = false
+		ws_joined = false
+		_set_connection_status("Reconnected. Syncing state…")
+		_hide_connection_overlay()
+
+func _open_reaction_window(event_desc := "Board change") -> void:
+	_ensure_reaction_overlay()
+	reaction_window_open = true
+	reaction_time_left = 10
+	reaction_label.text = "Reaction Window: " + event_desc + " (" + str(reaction_time_left) + ")"
+	_show_reaction_overlay()
+	reaction_timer.start()
+
+func _close_reaction_window() -> void:
+	reaction_window_open = false
+	_hide_reaction_overlay()
+	reaction_timer.stop()
+
+func _on_reaction_tick() -> void:
+	if not reaction_window_open:
+		return
+	reaction_time_left = max(0, reaction_time_left - 1)
+	if reaction_label:
+		reaction_label.text = "Reaction Window (" + str(reaction_time_left) + ")"
+	if reaction_time_left == 0:
+		_close_reaction_window()
+
+func _ensure_connection_overlay() -> void:
+	if connection_overlay:
+		return
+	var overlay := Control.new()
+	overlay.name = "ConnectionOverlay"
+	overlay.anchor_left = 0
+	overlay.anchor_top = 0
+	overlay.anchor_right = 1
+	overlay.anchor_bottom = 1
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var panel := Panel.new()
+	panel.name = "Panel"
+	panel.custom_minimum_size = Vector2(420, 140)
+	panel.anchor_left = 0.5
+	panel.anchor_top = 0.1
+	panel.anchor_right = 0.5
+	panel.anchor_bottom = 0.1
+	panel.offset_left = -210
+	panel.offset_top = 0
+	panel.offset_right = 210
+	panel.offset_bottom = 140
+	var label := Label.new()
+	label.name = "Label"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.anchor_left = 0
+	label.anchor_top = 0
+	label.anchor_right = 1
+	label.anchor_bottom = 0.6
+	label.text = ""
+	panel.add_child(label)
+	var retry := Button.new()
+	retry.name = "Retry"
+	retry.text = "Retry now"
+	retry.anchor_left = 0.35
+	retry.anchor_top = 0.7
+	retry.anchor_right = 0.65
+	retry.anchor_bottom = 0.9
+	panel.add_child(retry)
+	overlay.add_child(panel)
+	add_child(overlay)
+	connection_overlay = overlay
+	connection_status = label
+	connection_retry_button = retry
+	if not connection_retry_button.pressed.is_connected(_retry_now):
+		connection_retry_button.pressed.connect(_retry_now)
+
+func _set_connection_status(text: String) -> void:
+	_ensure_connection_overlay()
+	if connection_status:
+		connection_status.text = text
+
+func _show_connection_overlay() -> void:
+	if connection_overlay:
+		connection_overlay.visible = true
+
+func _hide_connection_overlay() -> void:
+	if connection_overlay:
+		connection_overlay.visible = false
+
+func _retry_now() -> void:
+	if is_reconnecting:
+		reconnect_timer.stop()
+		_attempt_reconnect()
+
+func _ensure_reaction_overlay() -> void:
+	if reaction_overlay:
+		return
+	var overlay := Control.new()
+	overlay.name = "ReactionOverlay"
+	overlay.anchor_left = 0
+	overlay.anchor_top = 0
+	overlay.anchor_right = 1
+	overlay.anchor_bottom = 1
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var panel := Panel.new()
+	panel.name = "Panel"
+	panel.custom_minimum_size = Vector2(420, 120)
+	panel.anchor_left = 0.5
+	panel.anchor_top = 0.2
+	panel.anchor_right = 0.5
+	panel.anchor_bottom = 0.2
+	panel.offset_left = -210
+	panel.offset_top = 0
+	panel.offset_right = 210
+	panel.offset_bottom = 120
+	var label := Label.new()
+	label.name = "Label"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.anchor_left = 0
+	label.anchor_top = 0
+	label.anchor_right = 1
+	label.anchor_bottom = 1
+	label.text = ""
+	panel.add_child(label)
+	overlay.add_child(panel)
+	add_child(overlay)
+	reaction_overlay = overlay
+	reaction_label = label
+
+func _show_reaction_overlay() -> void:
+	if reaction_overlay:
+		reaction_overlay.visible = true
+
+func _hide_reaction_overlay() -> void:
+	if reaction_overlay:
+		reaction_overlay.visible = false
+
 func _handle_websocket_message(message: String) -> void:
 	var data = JSON.parse_string(message)
 	if not data:
@@ -518,12 +776,14 @@ func _handle_websocket_message(message: String) -> void:
 			if not first_state_received:
 				first_state_received = true
 				_hide_overlay()
+				_hide_connection_overlay()
 		"card_played":
 			_handle_opponent_card_played(data)
 		"turn_ended":
 			_handle_turn_ended(data)
 		"game_over":
 			_handle_game_over(data)
+			_show_pvp_result(data)
 
 func _update_game_state(state: Dictionary) -> void:
 	# Server-authoritative update; tolerate partial payloads
@@ -583,6 +843,7 @@ func _handle_opponent_card_played(data: Dictionary) -> void:
 	# Prefer full state from server
 	if data.has("state"):
 		_update_game_state(data["state"])
+		_open_reaction_window("Opponent played a card")
 		return
 	# Fallback: animate opponent moving one card from hand to board
 	var hand_cards := opponent_hand_container.get_children()
@@ -594,6 +855,7 @@ func _handle_opponent_card_played(data: Dictionary) -> void:
 			card.set_card_back(false)
 		_arrange_hand(false)
 		_arrange_board(false)
+		_open_reaction_window("Opponent played a card")
 
 func _handle_turn_ended(data: Dictionary) -> void:
 	if data.has("currentPlayerId"):
@@ -605,6 +867,7 @@ func _handle_turn_ended(data: Dictionary) -> void:
 		current_phase = str(data.get("phase"))
 		_update_phase_display()
 	_update_turn_display()
+	_open_reaction_window("Turn changed")
 
 
 func _handle_game_over(data: Dictionary) -> void:
@@ -615,6 +878,16 @@ func _handle_game_over(data: Dictionary) -> void:
 	# If this is a PvE battle, return to map
 	if get_meta("return_to_map", false):
 		_return_to_pve_map(winner == current_player_id)
+
+func _show_pvp_result(data: Dictionary) -> void:
+	if get_meta("return_to_map", false):
+		return
+	var scene := load("res://scenes/PVPResult.tscn")
+	var inst: Node = scene.instantiate()
+	var winner := str(data.get("winner", ""))
+	if inst.has_method("set_result"):
+		inst.call_deferred("set_result", winner, current_player_id)
+	get_tree().change_scene_to_packed(scene)
 
 func _on_menu_button_pressed() -> void:
 	# Show confirmation dialog
@@ -789,9 +1062,21 @@ func _ensure_match_overlay() -> void:
 	label.anchor_bottom = 1
 	label.text = ""
 	panel.add_child(label)
+	# Cancel button
+	var cancel := Button.new()
+	cancel.name = "Cancel"
+	cancel.text = "Cancel"
+	cancel.anchor_left = 0.35
+	cancel.anchor_top = 0.8
+	cancel.anchor_right = 0.65
+	cancel.anchor_bottom = 0.95
+	panel.add_child(cancel)
 	overlay.add_child(panel)
 	add_child(overlay)
 	match_overlay = overlay
+	cancel_queue_button = cancel
+	if not cancel_queue_button.pressed.is_connected(_cancel_queue):
+		cancel_queue_button.pressed.connect(_cancel_queue)
 
 func _set_overlay_text(text: String) -> void:
 	_ensure_match_overlay()
@@ -805,3 +1090,8 @@ func _set_overlay_text(text: String) -> void:
 func _hide_overlay() -> void:
 	if match_overlay:
 		match_overlay.visible = false
+
+func _cancel_queue() -> void:
+	# Simple cancel: go back to menu
+	var menu_scene := load("res://scenes/Menu.tscn")
+	get_tree().change_scene_to_packed(menu_scene)

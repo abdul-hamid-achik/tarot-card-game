@@ -81,10 +81,14 @@ func _initialize_run() -> void:
 		current_node_id = 0
 		completed_nodes = []
 		run_seed = "run_" + str(Time.get_unix_time_from_system())
+		# Apply preselected significator if passed via metadata
+		if has_meta("significator"):
+			current_run["significator"] = str(get_meta("significator"))
+			current_run["deck"] = _get_starter_deck()
 
 func _get_starter_deck() -> Array:
-	# Return basic starter deck based on chosen significator
-	return [
+	# Return basic starter deck and include chosen significator as champion card
+	var base := [
 		{"id": "wands_01", "count": 2},
 		{"id": "wands_02", "count": 2},
 		{"id": "cups_01", "count": 2},
@@ -94,6 +98,9 @@ func _get_starter_deck() -> Array:
 		{"id": "pentacles_01", "count": 2},
 		{"id": "pentacles_02", "count": 2}
 	]
+	if current_run.has("significator") and str(current_run["significator"]) != "":
+		base.append({"id": str(current_run["significator"]), "count": 1})
+	return base
 
 func _generate_map() -> void:
 	map_data.clear()
@@ -435,6 +442,22 @@ func _start_battle(node_id: int) -> void:
 	get_tree().root.add_child(instance)
 	queue_free()
 
+func _weighted_card_choices(count: int, rng: RandomNumberGenerator) -> Array:
+	# Simple rarity weights: Common 70, Uncommon 25, Rare 5
+	var commons := ["wands_03", "cups_03", "swords_03", "pentacles_03"]
+	var uncommons := ["wands_04", "cups_04", "swords_04", "pentacles_04"]
+	var rares := ["major_02", "major_03", "major_04"]
+	var out := []
+	for i in range(count):
+		var roll := rng.randi_range(1, 100)
+		if roll <= 5:
+			out.append(rares[rng.randi() % rares.size()])
+		elif roll <= 30:
+			out.append(uncommons[rng.randi() % uncommons.size()])
+		else:
+			out.append(commons[rng.randi() % commons.size()])
+	return out
+
 func _generate_enemy_deck(type: NodeType) -> Array:
 	# Generate enemy deck based on node type
 	var deck := []
@@ -471,12 +494,33 @@ func _generate_enemy_deck(type: NodeType) -> Array:
 	return deck
 
 func _show_event(node_id: int) -> void:
+	# Hook up accept/decline to simple example outcomes
+	if not event_popup.confirmed.is_connected(_on_event_accept):
+		event_popup.confirmed.connect(_on_event_accept.bind(node_id))
+	if not event_popup.canceled.is_connected(_on_event_decline):
+		event_popup.canceled.connect(_on_event_decline)
 	event_popup.popup_centered()
-	# TODO: Load event data and choices
+
+func _on_event_accept(node_id: int) -> void:
+	# Accept reading: -50 gold, add omen
+	current_run["gold"] = max(0, current_run["gold"] - 50)
+	current_run["omens"].append("fortune_reading")
+	_complete_node(node_id)
+
+func _on_event_decline() -> void:
+	# No effect
+	pass
 
 func _show_shop(node_id: int) -> void:
+	# Minimal shop: confirm to remove a card (cost 75g)
+	if not shop_popup.confirmed.is_connected(_on_shop_confirm):
+		shop_popup.confirmed.connect(_on_shop_confirm.bind(node_id))
 	shop_popup.popup_centered()
-	# TODO: Generate shop inventory
+
+func _on_shop_confirm(node_id: int) -> void:
+	if current_run["gold"] >= 75:
+		current_run["gold"] -= 75
+	_complete_node(node_id)
 
 func _show_rest_site(node_id: int) -> void:
 	# Simple heal option for now
@@ -486,12 +530,8 @@ func _show_rest_site(node_id: int) -> void:
 func _collect_treasure(node_id: int) -> void:
 	var rewards = map_data[node_id]["rewards"]
 	current_run["gold"] += rewards.get("gold", 0)
-	
-	# Show rewards popup
-	rewards_popup.popup_centered()
-	# TODO: Display rewards
-	
-	_complete_node(node_id)
+	# Show simple 3-card choice
+	_show_card_choice(["wands_03", "cups_03", "swords_03"], node_id)
 
 func _complete_node(node_id: int) -> void:
 	completed_nodes.append(node_id)
@@ -523,8 +563,8 @@ func _advance_to_next_region() -> void:
 
 func _complete_run() -> void:
 	# Show victory screen
-	print("Run Complete!")
-	# TODO: Show rewards and stats
+	var scene := load("res://scenes/RunVictory.tscn")
+	get_tree().change_scene_to_packed(scene)
 
 func _update_ui() -> void:
 	# Update champion/significator panel
@@ -532,17 +572,25 @@ func _update_ui() -> void:
 		champion_panel.get_node("HealthLabel").text = str(current_run["health"]) + "/" + str(current_run["max_health"])
 		champion_panel.get_node("GoldLabel").text = "Gold: " + str(current_run["gold"])
 		champion_panel.get_node("RegionLabel").text = "Region " + str(current_region) + "/" + str(total_regions)
+		var name_label := champion_panel.get_node_or_null("NameLabel")
+		if name_label and current_run.has("significator"):
+			var sig := str(current_run["significator"])
+			var name := ""
+			if sig == "major_00":
+				name = "The Fool"
+			elif sig == "major_01":
+				name = "The Magician"
+			if name != "":
+				name_label.text = name
 
 func _on_return_from_battle(won: bool, rewards: Dictionary) -> void:
 	if won:
 		# Apply rewards
 		current_run["gold"] += rewards.get("gold", 0)
-		
-		# Add cards to deck
-		for card_id in rewards.get("cards", []):
-			_add_card_to_deck(card_id)
-		
-		_complete_node(current_node_id)
+		var rng := RandomNumberGenerator.new()
+		rng.randomize()
+		var choices := _weighted_card_choices(3, rng)
+		_show_card_choice(choices, current_node_id)
 	else:
 		# Handle defeat
 		current_run["health"] -= 5
@@ -558,6 +606,35 @@ func _add_card_to_deck(card_id: String) -> void:
 	current_run["deck"].append({"id": card_id, "count": 1})
 
 func _end_run() -> void:
-	# Return to menu
-	var menu_scene := load("res://scenes/Menu.tscn")
-	get_tree().change_scene_to_packed(menu_scene)
+	var scene := load("res://scenes/RunDefeat.tscn")
+	get_tree().change_scene_to_packed(scene)
+
+func _show_card_choice(ids: Array, node_id: int) -> void:
+	rewards_popup.popup_centered()
+	var c1 := rewards_popup.get_node_or_null("RewardsChoices/Choice1") as Button
+	var c2 := rewards_popup.get_node_or_null("RewardsChoices/Choice2") as Button
+	var c3 := rewards_popup.get_node_or_null("RewardsChoices/Choice3") as Button
+	if c1:
+		c1.text = str(ids[0])
+		c1.modulate = _rarity_color(ids[0])
+		c1.pressed.connect(_on_pick_reward.bind(ids[0], node_id), CONNECT_ONE_SHOT)
+	if c2:
+		c2.text = str(ids[1])
+		c2.modulate = _rarity_color(ids[1])
+		c2.pressed.connect(_on_pick_reward.bind(ids[1], node_id), CONNECT_ONE_SHOT)
+	if c3:
+		c3.text = str(ids[2])
+		c3.modulate = _rarity_color(ids[2])
+		c3.pressed.connect(_on_pick_reward.bind(ids[2], node_id), CONNECT_ONE_SHOT)
+
+func _on_pick_reward(card_id: String, node_id: int) -> void:
+	_add_card_to_deck(card_id)
+	rewards_popup.hide()
+	_complete_node(node_id)
+
+func _rarity_color(card_id: String) -> Color:
+	if card_id.begins_with("major_"):
+		return Color(0.9, 0.8, 0.3)
+	if card_id.ends_with("_04"):
+		return Color(0.6, 0.9, 0.6)
+	return Color(0.8, 0.8, 0.8)
