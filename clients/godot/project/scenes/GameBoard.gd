@@ -93,6 +93,7 @@ var is_reconnecting := false
 var reaction_window_open := false
 var reaction_timer := Timer.new()
 var reaction_time_left := 0
+var reaction_desc := ""
 
 func _ready() -> void:
 	add_child(http)
@@ -637,6 +638,7 @@ func _attempt_reconnect() -> void:
 func _open_reaction_window(event_desc := "Board change") -> void:
 	_ensure_reaction_overlay()
 	reaction_window_open = true
+	reaction_desc = event_desc
 	reaction_time_left = 10
 	reaction_label.text = "Reaction Window: " + event_desc + " (" + str(reaction_time_left) + ")"
 	_show_reaction_overlay()
@@ -652,7 +654,7 @@ func _on_reaction_tick() -> void:
 		return
 	reaction_time_left = max(0, reaction_time_left - 1)
 	if reaction_label:
-		reaction_label.text = "Reaction Window (" + str(reaction_time_left) + ")"
+		reaction_label.text = "Reaction Window: " + reaction_desc + " (" + str(reaction_time_left) + ")"
 	if reaction_time_left == 0:
 		_close_reaction_window()
 
@@ -752,10 +754,26 @@ func _ensure_reaction_overlay() -> void:
 	label.anchor_bottom = 1
 	label.text = ""
 	panel.add_child(label)
+	var row := HBoxContainer.new()
+	row.anchor_left = 0
+	row.anchor_top = 0.8
+	row.anchor_right = 1
+	row.anchor_bottom = 1
+	var respond := Button.new()
+	respond.text = "Respond"
+	var passb := Button.new()
+	passb.text = "Pass"
+	row.add_child(respond)
+	row.add_child(passb)
+	panel.add_child(row)
 	overlay.add_child(panel)
 	add_child(overlay)
 	reaction_overlay = overlay
 	reaction_label = label
+	if not respond.pressed.is_connected(_on_react):
+		respond.pressed.connect(_on_react)
+	if not passb.pressed.is_connected(_on_pass):
+		passb.pressed.connect(_on_pass)
 
 func _show_reaction_overlay() -> void:
 	if reaction_overlay:
@@ -764,6 +782,20 @@ func _show_reaction_overlay() -> void:
 func _hide_reaction_overlay() -> void:
 	if reaction_overlay:
 		reaction_overlay.visible = false
+
+func _on_react() -> void:
+	_send_reaction("respond")
+	_close_reaction_window()
+
+func _on_pass() -> void:
+	_send_reaction("pass")
+	_close_reaction_window()
+
+func _send_reaction(action: String) -> void:
+	_send({
+		"type": "reaction",
+		"action": action
+	})
 
 func _handle_websocket_message(message: String) -> void:
 	var data = JSON.parse_string(message)
@@ -784,6 +816,14 @@ func _handle_websocket_message(message: String) -> void:
 		"game_over":
 			_handle_game_over(data)
 			_show_pvp_result(data)
+		"reaction_window":
+			# Server-driven reaction window with optional duration
+			var desc := str(data.get("event", "Reaction"))
+			var dur := int(data.get("duration", 10))
+			_open_reaction_window(desc)
+			reaction_time_left = dur
+		"reaction_close":
+			_close_reaction_window()
 
 func _update_game_state(state: Dictionary) -> void:
 	# Server-authoritative update; tolerate partial payloads
@@ -882,11 +922,18 @@ func _handle_game_over(data: Dictionary) -> void:
 func _show_pvp_result(data: Dictionary) -> void:
 	if get_meta("return_to_map", false):
 		return
-	var scene := load("res://scenes/PVPResult.tscn")
-	var inst: Node = scene.instantiate()
 	var winner := str(data.get("winner", ""))
-	if inst.has_method("set_result"):
-		inst.call_deferred("set_result", winner, current_player_id)
+	var rewards := data.get("rewards", {})
+	var gold := 0
+	if rewards is Dictionary and rewards.has("gold"):
+		gold = int(rewards.get("gold"))
+	var current_gold := int(ProjectSettings.get_setting("tarot/gold", 0))
+	ProjectSettings.set_setting("tarot/gold", current_gold + gold)
+	ProjectSettings.set_setting("tarot/pvp_last_winner", winner)
+	ProjectSettings.set_setting("tarot/pvp_last_me", current_player_id)
+	ProjectSettings.set_setting("tarot/pvp_last_gold", gold)
+	ProjectSettings.save()
+	var scene := load("res://scenes/PVPResult.tscn")
 	get_tree().change_scene_to_packed(scene)
 
 func _on_menu_button_pressed() -> void:
