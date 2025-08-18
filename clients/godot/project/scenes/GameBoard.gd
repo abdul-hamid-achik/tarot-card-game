@@ -71,6 +71,11 @@ var connection_status: Label
 var connection_retry_button: Button
 var reaction_overlay: Control
 var reaction_label: Label
+var target_lines_node: Node2D
+var damage_previews_node: Node2D
+var target_valid := true
+var last_validated_idx := -1
+var last_validation_cooldown := 0.0
 
 # Card positioning
 const HAND_CARD_SPACING := 120
@@ -88,6 +93,7 @@ var turn_timer := Timer.new()
 var reconnect_attempts := 0
 var reconnect_timer := Timer.new()
 var is_reconnecting := false
+const MAX_RECONNECT_ATTEMPTS := 6
 
 # Reaction window (stub)
 var reaction_window_open := false
@@ -144,6 +150,24 @@ func _setup_ui() -> void:
 	# Setup deck visuals
 	player_deck.modulate = Color(0.7, 0.7, 1.0)
 	opponent_deck.modulate = Color(1.0, 0.7, 0.7)
+	# Draw attack lanes
+	var lanes := get_node_or_null("BoardLayout/CenterArea/AttackLanes") as Node2D
+	if lanes:
+		var y1 := 0.2
+		var y2 := 0.8
+		for i in range(6):
+			var line := Line2D.new()
+			var x := 0.2 + i * (0.6 / 5.0)
+			line.default_color = Color(0.2, 0.4, 0.9, 0.3)
+			line.width = 2
+			# Convert normalized coords to rect
+			var rect := get_viewport_rect()
+			line.add_point(Vector2(rect.size.x * x, rect.size.y * (0.3 + y1 * 0.4)))
+			line.add_point(Vector2(rect.size.x * x, rect.size.y * (0.3 + y2 * 0.4)))
+			lanes.add_child(line)
+	# Cache effect layers
+	target_lines_node = get_node_or_null("BoardLayout/CenterArea/TargetLines") as Node2D
+	damage_previews_node = get_node_or_null("BoardLayout/CenterArea/DamagePreviews") as Node2D
 
 func _connect_signals() -> void:
 	end_turn_button.pressed.connect(_on_end_turn_pressed)
@@ -322,6 +346,8 @@ func _draw_card_to_hand(is_player: bool) -> void:
 	# Allow drag-to-drop onto board
 	if is_player and card.has_signal("drag_ended"):
 		card.drag_ended.connect(_on_card_drag_ended.bind(card))
+	if is_player and card.has_signal("drag_moved"):
+		card.drag_moved.connect(_on_card_drag_moved.bind(card))
 	
 	# Connect preview signal for all cards
 	if card.has_signal("preview_requested"):
@@ -482,6 +508,91 @@ func _on_card_drag_ended(card: Node) -> void:
 	if _is_over_player_board(card):
 		if player_fate >= _get_card_cost(card):
 			_play_card_from_hand(card)
+	# Clear visuals
+	_clear_target_lines()
+	_clear_damage_previews()
+
+func _on_card_drag_moved(card: Node) -> void:
+	if not target_lines_node:
+		return
+	_clear_target_lines()
+	# Draw a single target line to nearest opponent board slot center
+	var best_i := _nearest_child_index(opponent_board_container, card.global_position)
+	if best_i != -1:
+		var child := opponent_board_container.get_child(best_i)
+		var dst := (child as Node2D).get_global_position() if child is Node2D else null
+		if dst != null:
+			var line := Line2D.new()
+			line.default_color = Color(0.1, 0.6, 1.0, 0.7)
+			line.width = 3
+			line.add_point(card.global_position)
+			line.add_point(dst)
+			target_lines_node.add_child(line)
+			_show_damage_preview(dst, 2)
+			_request_target_validation(best_i)
+
+func _nearest_child_index(container: Node, from: Vector2) -> int:
+	var best_i := -1
+	var best_d := INF
+	for i in range(container.get_child_count()):
+		var child := container.get_child(i)
+		if child is Node2D:
+			var p := (child as Node2D).get_global_position()
+			var d := from.distance_to(p)
+			if d < best_d:
+				best_d = d
+				best_i = i
+	return best_i
+
+func _show_damage_preview(at: Vector2, amount: int) -> void:
+	if not damage_previews_node:
+		return
+	_clear_damage_previews()
+	var lbl := Label.new()
+	lbl.text = "-" + str(amount)
+	lbl.modulate = Color(1, 0.2, 0.2)
+	lbl.position = at
+	damage_previews_node.add_child(lbl)
+	var tween := create_tween()
+	tween.tween_property(lbl, "position:y", at.y - 20, 0.5)
+	tween.parallel().tween_property(lbl, "modulate:a", 0.0, 0.5)
+	tween.finished.connect(lbl.queue_free)
+
+func _clear_target_lines() -> void:
+	if not target_lines_node:
+		return
+	for c in target_lines_node.get_children():
+		c.queue_free()
+	_tint_target_lines(true)
+	last_validated_idx = -1
+
+func _clear_damage_previews() -> void:
+	if not damage_previews_node:
+		return
+	for c in damage_previews_node.get_children():
+		c.queue_free()
+
+func _request_target_validation(index: int) -> void:
+	if ws_client == null or ws_client.get_ready_state() != WebSocketPeer.STATE_OPEN:
+		return
+	if last_validated_idx == index and last_validation_cooldown > 0.0:
+		return
+	last_validated_idx = index
+	last_validation_cooldown = 0.1
+	var payload := {
+		"type": "validate_target",
+		"index": index,
+		"matchId": match_id,
+		"playerId": current_player_id
+	}
+	ws_client.send_text(JSON.stringify(payload))
+
+func _tint_target_lines(valid: bool) -> void:
+	if not target_lines_node:
+		return
+	for c in target_lines_node.get_children():
+		if c is Line2D:
+			(c as Line2D).default_color = valid?Color(0.1, 0.9, 0.3, 0.8): Color(0.9, 0.2, 0.2, 0.8)
 
 func _is_over_player_board(card: Node) -> bool:
 	# Compare card global position against player board container rect
@@ -604,6 +715,8 @@ func _process(_delta: float) -> void:
 			while ws_client.get_available_packet_count():
 				var packet := ws_client.get_packet().get_string_from_utf8()
 				_handle_websocket_message(packet)
+	# Throttle for target validate
+	last_validation_cooldown = max(0.0, last_validation_cooldown - _delta)
 
 func _start_reconnect() -> void:
 	is_reconnecting = true
@@ -628,12 +741,33 @@ func _attempt_reconnect() -> void:
 	# If still not open, schedule another attempt
 	var st := ws_client.get_ready_state()
 	if st != WebSocketPeer.STATE_OPEN:
-		_schedule_next_reconnect()
+		if reconnect_attempts >= MAX_RECONNECT_ATTEMPTS:
+			_set_connection_status("Reconnect failed. You may forfeit or retry.")
+			_ensure_connection_overlay()
+			# Add Forfeit button lazily
+			var panel := connection_overlay.get_node_or_null("Panel")
+			if panel and not panel.has_node("Forfeit"):
+				var forfeit := Button.new()
+				forfeit.name = "Forfeit"
+				forfeit.text = "Forfeit Match"
+				forfeit.anchor_left = 0.35
+				forfeit.anchor_top = 0.5
+				forfeit.anchor_right = 0.65
+				forfeit.anchor_bottom = 0.62
+				panel.add_child(forfeit)
+				forfeit.pressed.connect(_on_forfeit)
+		else:
+			_schedule_next_reconnect()
 	else:
 		is_reconnecting = false
 		ws_joined = false
 		_set_connection_status("Reconnected. Syncing state…")
 		_hide_connection_overlay()
+
+func _on_forfeit() -> void:
+	# Return to menu and optionally notify server next time via flag
+	var menu_scene := load("res://scenes/Menu.tscn")
+	get_tree().change_scene_to_packed(menu_scene)
 
 func _open_reaction_window(event_desc := "Board change") -> void:
 	_ensure_reaction_overlay()
@@ -824,6 +958,11 @@ func _handle_websocket_message(message: String) -> void:
 			reaction_time_left = dur
 		"reaction_close":
 			_close_reaction_window()
+		"target_valid":
+			var idx := int(data.get("index", -1))
+			if idx == last_validated_idx or last_validated_idx == -1:
+				target_valid = bool(data.get("valid", true))
+				_tint_target_lines(target_valid)
 
 func _update_game_state(state: Dictionary) -> void:
 	# Server-authoritative update; tolerate partial payloads
@@ -933,8 +1072,19 @@ func _show_pvp_result(data: Dictionary) -> void:
 	ProjectSettings.set_setting("tarot/pvp_last_me", current_player_id)
 	ProjectSettings.set_setting("tarot/pvp_last_gold", gold)
 	ProjectSettings.save()
-	var scene := load("res://scenes/PVPResult.tscn")
-	get_tree().change_scene_to_packed(scene)
+	# Show rewards screen first if present, then result
+	if rewards is Dictionary and (rewards.has("gold") or rewards.has("cards")):
+		var rscene := load("res://scenes/PVPRewards.tscn")
+		var inst := rscene.instantiate()
+		if inst and inst.has_method("set_rewards"):
+			inst.call_deferred("set_rewards", rewards, winner, current_player_id)
+		get_tree().change_scene_to_packed(rscene)
+	else:
+		var scene := load("res://scenes/PVPResult.tscn")
+		var inst2 := scene.instantiate()
+		if inst2 and inst2.has_method("set_result"):
+			inst2.call_deferred("set_result", winner, current_player_id)
+		get_tree().change_scene_to_packed(scene)
 
 func _on_menu_button_pressed() -> void:
 	# Show confirmation dialog

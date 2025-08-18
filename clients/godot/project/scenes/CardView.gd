@@ -28,6 +28,7 @@ signal preview_requested
 signal drag_started
 signal drag_ended
 signal dropped_on_board
+signal drag_moved
 
 func _api_origin() -> String:
 	var env := OS.get_environment("TAROT_API_ORIGIN")
@@ -169,6 +170,7 @@ func _process(_delta: float) -> void:
 		if dwell_timer >= DWELL_THRESHOLD:
 			global_position = get_global_mouse_position() + drag_offset
 			scale = Vector2(drag_scale, drag_scale)
+			emit_signal("drag_moved")
 	else:
 		# subtle hover scaling when not dragging
 		# scale lerp back to hover

@@ -92,6 +92,13 @@ anchor_right = 0.95
 anchor_bottom = 0.9
 text = "Region 1/3"
 
+[node name="TrialsLabel" type="Label" parent="ChampionPanel"]
+anchor_left = 0.65
+anchor_top = 0.7
+anchor_right = 0.95
+anchor_bottom = 0.9
+text = "Trials 0/3"
+
 [node name="RunInfo" type="Panel" parent="."]
 anchor_left = 0.75
 anchor_top = 0.02
@@ -135,6 +142,10 @@ text = "Menu"
 custom_minimum_size = Vector2(100, 40)
 text = "Save Run"
 
+[node name="DeckButton" type="Button" parent="NavigationButtons"]
+custom_minimum_size = Vector2(100, 40)
+text = "Deck"
+
 [node name="RewardsPopup" type="AcceptDialog" parent="."]
 title = "Victory!"
 size = Vector2i(600, 400)
@@ -158,6 +169,13 @@ modulate = Color(0.8, 0.8, 0.8)
 [node name="Choice3" type="Button" parent="RewardsPopup/RewardsChoices"]
 text = "Choice 3"
 modulate = Color(0.8, 0.8, 0.8)
+
+[node name="Skip" type="Button" parent="RewardsPopup"]
+anchor_left = 0.4
+anchor_top = 0.82
+anchor_right = 0.6
+anchor_bottom = 0.88
+text = "Skip"
 
 [node name="EventPopup" type="ConfirmationDialog" parent="."]
 title = "Mysterious Encounter"
@@ -184,6 +202,51 @@ Cards for Sale:
 Upgrades:
 • Remove a card - 75g
 • Upgrade a card - 100g"
+
+[node name="ShopUI" type="VBoxContainer" parent="ShopPopup"]
+anchor_left = 0.05
+anchor_top = 0.15
+anchor_right = 0.95
+anchor_bottom = 0.9
+
+[node name="GoldLabel" type="Label" parent="ShopPopup/ShopUI"]
+text = "Gold: 0"
+
+[node name="CardsRow" type="HBoxContainer" parent="ShopPopup/ShopUI"]
+
+[node name="Buy1" type="Button" parent="ShopPopup/ShopUI/CardsRow"]
+text = "Buy 1"
+
+[node name="Buy2" type="Button" parent="ShopPopup/ShopUI/CardsRow"]
+text = "Buy 2"
+
+[node name="Buy3" type="Button" parent="ShopPopup/ShopUI/CardsRow"]
+text = "Buy 3"
+
+[node name="ActionsRow" type="HBoxContainer" parent="ShopPopup/ShopUI"]
+
+[node name="Remove" type="Button" parent="ShopPopup/ShopUI/ActionsRow"]
+text = "Remove (-75g)"
+
+[node name="Upgrade" type="Button" parent="ShopPopup/ShopUI/ActionsRow"]
+text = "Upgrade (-100g)"
+
+[node name="RestPopup" type="AcceptDialog" parent="."]
+title = "Rest Site"
+size = Vector2i(500, 260)
+dialog_text = "Rest options"
+
+[node name="RestUI" type="HBoxContainer" parent="RestPopup"]
+anchor_left = 0.2
+anchor_top = 0.5
+anchor_right = 0.8
+anchor_bottom = 0.9
+
+[node name="HealButton" type="Button" parent="RestPopup/RestUI"]
+text = "+10 HP"
+
+[node name="UpgradeButton" type="Button" parent="RestPopup/RestUI"]
+text = "Upgrade Card"
 
 [node name="Legend" type="Panel" parent="."]
 anchor_left = 0.02

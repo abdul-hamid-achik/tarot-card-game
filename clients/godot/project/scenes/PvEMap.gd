@@ -26,6 +26,7 @@ var node_positions := {}
 var connections := []
 var current_region := 1
 var total_regions := 3
+var trials_completed := 0
 
 # UI References
 @onready var map_container := $MapContainer
@@ -36,6 +37,7 @@ var total_regions := 3
 @onready var rewards_popup := $RewardsPopup
 @onready var event_popup := $EventPopup
 @onready var shop_popup := $ShopPopup
+@onready var rest_popup := $RestPopup
 
 # Visual settings
 const NODE_SIZE := Vector2(64, 64)
@@ -59,10 +61,42 @@ var node_colors := {
 }
 
 func _ready() -> void:
-	_initialize_run()
-	_generate_map()
-	_render_map()
-	_update_ui()
+	if not _resume_if_available():
+		_initialize_run()
+		_generate_map()
+		_render_map()
+		_update_ui()
+	# Wire save/back
+	var save_btn := get_node_or_null("SaveButton") as Button
+	var back_btn := get_node_or_null("BackButton") as Button
+	var deck_btn := get_node_or_null("DeckButton") as Button
+	if save_btn and not save_btn.pressed.is_connected(_save_run):
+		save_btn.pressed.connect(_save_run)
+	if back_btn and not back_btn.pressed.is_connected(_back_to_menu):
+		back_btn.pressed.connect(_back_to_menu)
+	if deck_btn and not deck_btn.pressed.is_connected(_show_deck):
+		deck_btn.pressed.connect(_show_deck)
+
+func _show_deck() -> void:
+	var dlg := AcceptDialog.new()
+	dlg.title = "Current Deck"
+	dlg.size = Vector2i(500, 600)
+	var list := RichTextLabel.new()
+	list.bbcode_enabled = true
+	list.anchor_left = 0.05
+	list.anchor_top = 0.05
+	list.anchor_right = 0.95
+	list.anchor_bottom = 0.95
+	var lines := []
+	var sorted := current_run["deck"].duplicate()
+	sorted.sort_custom(func(a, b):
+		return str(a["id"]) < str(b["id"]))
+	for entry in sorted:
+		lines.append("[b]" + str(entry["id"]) + "[/b] x" + str(entry["count"]))
+	list.text = "\n".join(lines)
+	dlg.add_child(list)
+	add_child(dlg)
+	dlg.popup_centered()
 
 func _initialize_run() -> void:
 	# Check if continuing a run
@@ -76,7 +110,9 @@ func _initialize_run() -> void:
 			"completed_battles": 0,
 			"omens": [], # PvE-specific modifiers
 			"boons": [], # Temporary buffs
-			"relics": [] # Permanent passives
+			"relics": [], # Permanent passives
+			"shop_remove_cost": 75,
+			"shop_upgrade_cost": 100
 		}
 		current_node_id = 0
 		completed_nodes = []
@@ -513,8 +549,7 @@ func _on_event_decline() -> void:
 
 func _show_shop(node_id: int) -> void:
 	# Minimal shop: confirm to remove a card (cost 75g)
-	if not shop_popup.confirmed.is_connected(_on_shop_confirm):
-		shop_popup.confirmed.connect(_on_shop_confirm.bind(node_id))
+	_setup_shop_ui(node_id)
 	shop_popup.popup_centered()
 
 func _on_shop_confirm(node_id: int) -> void:
@@ -523,9 +558,8 @@ func _on_shop_confirm(node_id: int) -> void:
 	_complete_node(node_id)
 
 func _show_rest_site(node_id: int) -> void:
-	# Simple heal option for now
-	current_run["health"] = min(current_run["health"] + 10, current_run["max_health"])
-	_complete_node(node_id)
+	_setup_rest_ui(node_id)
+	rest_popup.popup_centered()
 
 func _collect_treasure(node_id: int) -> void:
 	var rewards = map_data[node_id]["rewards"]
@@ -536,6 +570,10 @@ func _collect_treasure(node_id: int) -> void:
 func _complete_node(node_id: int) -> void:
 	completed_nodes.append(node_id)
 	current_node_id = node_id
+	if map_data.has(node_id):
+		var t := map_data[node_id]["type"]
+		if t == NodeType.BATTLE or t == NodeType.ELITE:
+			trials_completed = min(3, trials_completed + 1)
 	_update_available_nodes()
 	_render_map()
 	_update_ui()
@@ -543,6 +581,8 @@ func _complete_node(node_id: int) -> void:
 	# Check if region complete
 	if map_data[node_id]["type"] == NodeType.BOSS:
 		_advance_to_next_region()
+	if trials_completed >= 3:
+		_complete_run()
 
 func _update_available_nodes() -> void:
 	available_nodes.clear()
@@ -572,6 +612,9 @@ func _update_ui() -> void:
 		champion_panel.get_node("HealthLabel").text = str(current_run["health"]) + "/" + str(current_run["max_health"])
 		champion_panel.get_node("GoldLabel").text = "Gold: " + str(current_run["gold"])
 		champion_panel.get_node("RegionLabel").text = "Region " + str(current_region) + "/" + str(total_regions)
+		var trials := champion_panel.get_node_or_null("TrialsLabel")
+		if trials:
+			trials.text = "Trials " + str(trials_completed) + "/3"
 		var name_label := champion_panel.get_node_or_null("NameLabel")
 		if name_label and current_run.has("significator"):
 			var sig := str(current_run["significator"])
@@ -614,21 +657,31 @@ func _show_card_choice(ids: Array, node_id: int) -> void:
 	var c1 := rewards_popup.get_node_or_null("RewardsChoices/Choice1") as Button
 	var c2 := rewards_popup.get_node_or_null("RewardsChoices/Choice2") as Button
 	var c3 := rewards_popup.get_node_or_null("RewardsChoices/Choice3") as Button
+	var skip := rewards_popup.get_node_or_null("Skip") as Button
 	if c1:
 		c1.text = str(ids[0])
 		c1.modulate = _rarity_color(ids[0])
+		c1.hint_tooltip = _card_hint(ids[0])
 		c1.pressed.connect(_on_pick_reward.bind(ids[0], node_id), CONNECT_ONE_SHOT)
 	if c2:
 		c2.text = str(ids[1])
 		c2.modulate = _rarity_color(ids[1])
+		c2.hint_tooltip = _card_hint(ids[1])
 		c2.pressed.connect(_on_pick_reward.bind(ids[1], node_id), CONNECT_ONE_SHOT)
 	if c3:
 		c3.text = str(ids[2])
 		c3.modulate = _rarity_color(ids[2])
+		c3.hint_tooltip = _card_hint(ids[2])
 		c3.pressed.connect(_on_pick_reward.bind(ids[2], node_id), CONNECT_ONE_SHOT)
+	if skip and not skip.pressed.is_connected(_on_skip_reward.bind(node_id)):
+		skip.pressed.connect(_on_skip_reward.bind(node_id))
 
 func _on_pick_reward(card_id: String, node_id: int) -> void:
 	_add_card_to_deck(card_id)
+	rewards_popup.hide()
+	_complete_node(node_id)
+
+func _on_skip_reward(node_id: int) -> void:
 	rewards_popup.hide()
 	_complete_node(node_id)
 
@@ -638,3 +691,178 @@ func _rarity_color(card_id: String) -> Color:
 	if card_id.ends_with("_04"):
 		return Color(0.6, 0.9, 0.6)
 	return Color(0.8, 0.8, 0.8)
+
+func _rarity_name(card_id: String) -> String:
+	if card_id.begins_with("major_"):
+		return "Rare"
+	if card_id.ends_with("_04"):
+		return "Uncommon"
+	return "Common"
+
+func _card_hint(card_id: String) -> String:
+	var rarity := _rarity_name(card_id)
+	var descs := {
+		"wands_03": "Deal light damage.",
+		"cups_03": "Heal a small amount.",
+		"swords_03": "Piercing strike.",
+		"pentacles_03": "Gain resources.",
+		"wands_04": "Stronger attack.",
+		"cups_04": "Bigger heal.",
+		"swords_04": "Cleave two targets.",
+		"pentacles_04": "Greater gain.",
+		"major_02": "High-impact effect.",
+		"major_03": "High-impact effect.",
+		"major_04": "High-impact effect."
+	}
+	var d := descs.get(card_id, "A mysterious card.")
+	return rarity + "\n" + d
+
+func _save_run() -> void:
+	var payload := {
+		"run": current_run,
+		"current_node_id": current_node_id,
+		"completed_nodes": completed_nodes,
+		"current_region": current_region,
+		"trials_completed": trials_completed,
+		"run_seed": run_seed
+	}
+	ProjectSettings.set_setting("tarot/pve_run", JSON.stringify(payload))
+	ProjectSettings.save()
+
+func _resume_if_available() -> bool:
+	var raw := str(ProjectSettings.get_setting("tarot/pve_run", ""))
+	if raw == "":
+		return false
+	var data = JSON.parse_string(raw)
+	if not (data is Dictionary):
+		return false
+	if data.has("run"):
+		current_run = data["run"]
+	current_node_id = int(data.get("current_node_id", 0))
+	completed_nodes = data.get("completed_nodes", [])
+	current_region = int(data.get("current_region", 1))
+	trials_completed = int(data.get("trials_completed", 0))
+	run_seed = str(data.get("run_seed", "run_" + str(Time.get_unix_time_from_system())))
+	_generate_map()
+	_render_map()
+	_update_ui()
+	return true
+
+func _back_to_menu() -> void:
+	var menu := load("res://scenes/Menu.tscn")
+	get_tree().change_scene_to_packed(menu)
+
+func _setup_shop_ui(node_id: int) -> void:
+	var gold_label := shop_popup.get_node_or_null("ShopUI/GoldLabel") as Label
+	if gold_label:
+		gold_label.text = "Gold: " + str(current_run["gold"])
+	# Generate 3 choices
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var choices := _weighted_card_choices(3, rng)
+	for i in range(3):
+		var path := "ShopUI/CardsRow/Buy" + str(i + 1)
+		var btn := shop_popup.get_node_or_null(path) as Button
+		if btn:
+			var id := str(choices[i])
+			btn.text = id + " (" + str(current_run.get("shop_upgrade_cost", 100)) + "g)"
+			btn.modulate = _rarity_color(id)
+			btn.pressed.connect(_on_shop_buy.bind(id), CONNECT_ONE_SHOT)
+	# Remove / Upgrade
+	var rem := shop_popup.get_node_or_null("ShopUI/ActionsRow/Remove") as Button
+	var upg := shop_popup.get_node_or_null("ShopUI/ActionsRow/Upgrade") as Button
+	if rem and not rem.pressed.is_connected(_on_shop_remove):
+		rem.pressed.connect(_on_shop_remove)
+	if upg and not upg.pressed.is_connected(_on_shop_upgrade):
+		upg.pressed.connect(_on_shop_upgrade)
+	# Close handlers
+	if not shop_popup.confirmed.is_connected(_on_shop_close):
+		shop_popup.confirmed.connect(_on_shop_close)
+
+
+func _on_shop_buy(card_id: String) -> void:
+	var cost := int(current_run.get("shop_upgrade_cost", 100))
+	if current_run["gold"] < cost:
+		return
+	current_run["gold"] -= cost
+	_add_card_to_deck(card_id)
+	_update_ui()
+
+
+func _on_shop_remove() -> void:
+	var rcost := int(current_run.get("shop_remove_cost", 75))
+	if current_run["gold"] < rcost:
+		return
+	current_run["gold"] -= rcost
+	_select_card_from_deck("Remove a card", func(idx, entry):
+		if entry["count"] > 0:
+			entry["count"] -= 1
+			if entry["count"] == 0:
+				current_run["deck"].remove_at(idx)
+		_update_ui()
+	)
+	_update_ui()
+
+func _on_shop_upgrade() -> void:
+	if current_run["gold"] < 100:
+		return
+	current_run["gold"] -= 100
+	_select_card_from_deck("Upgrade a card", func(idx, entry):
+		if entry["id"].ends_with("_03"):
+			entry["id"] = entry["id"].substr(0, entry["id"].length() - 3) + "_04"
+		_update_ui()
+	)
+	_update_ui()
+
+func _on_shop_close() -> void:
+	shop_popup.hide()
+
+func _setup_rest_ui(node_id: int) -> void:
+	var heal := rest_popup.get_node_or_null("RestUI/HealButton") as Button
+	var upg := rest_popup.get_node_or_null("RestUI/UpgradeButton") as Button
+	if heal and not heal.pressed.is_connected(_on_rest_heal.bind(node_id)):
+		heal.pressed.connect(_on_rest_heal.bind(node_id))
+	if upg and not upg.pressed.is_connected(_on_rest_upgrade.bind(node_id)):
+		upg.pressed.connect(_on_rest_upgrade.bind(node_id))
+
+func _on_rest_heal(node_id: int) -> void:
+	current_run["health"] = min(current_run["health"] + 10, current_run["max_health"])
+	trials_completed = min(3, trials_completed) # no change
+	_update_ui()
+	rest_popup.hide()
+	_complete_node(node_id)
+
+func _on_rest_upgrade(node_id: int) -> void:
+	_select_card_from_deck("Upgrade a card", func(idx, entry):
+		if entry["id"].ends_with("_03"):
+			entry["id"] = entry["id"].substr(0, entry["id"].length() - 3) + "_04"
+		else:
+			current_run["boons"].append("well_restored")
+		_update_ui()
+	)
+	_update_ui()
+	rest_popup.hide()
+	_complete_node(node_id)
+
+func _select_card_from_deck(title: String, callback: Callable) -> void:
+	var dlg := AcceptDialog.new()
+	dlg.title = title
+	dlg.size = Vector2i(500, 600)
+	var list := VBoxContainer.new()
+	list.anchor_left = 0.05
+	list.anchor_top = 0.05
+	list.anchor_right = 0.95
+	list.anchor_bottom = 0.95
+	for i in range(current_run["deck"].size()):
+		var entry = current_run["deck"][i]
+		var btn := Button.new()
+		btn.text = str(entry["id"]) + " x" + str(entry["count"])
+		btn.modulate = _rarity_color(str(entry["id"]))
+		btn.pressed.connect(func():
+			callback.call(i, entry)
+			dlg.queue_free()
+		)
+		list.add_child(btn)
+	dlg.add_child(list)
+	add_child(dlg)
+	dlg.popup_centered()
