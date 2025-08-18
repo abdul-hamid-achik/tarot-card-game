@@ -133,13 +133,13 @@ func _create_deck_card(deck_id: String) -> Control:
 	# Progress bar
 	var progress := ProgressBar.new()
 	progress.custom_minimum_size = Vector2(0, 20)
-	var completion := deck_progress.get(deck_id, {}).get("completion", 0.0)
+	var completion: float = deck_progress.get(deck_id, {}).get("completion", 0.0) as float
 	progress.value = completion
 	vbox.add_child(progress)
 	
 	# Completion label
 	var comp_label := Label.new()
-	var cards_unlocked := deck_progress.get(deck_id, {}).get("cards_unlocked", 0)
+	var cards_unlocked: int = deck_progress.get(deck_id, {}).get("cards_unlocked", 0) as int
 	comp_label.text = "%d/78 Cards" % cards_unlocked
 	comp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	comp_label.add_theme_font_size_override("font_size", 12)
@@ -168,7 +168,7 @@ func _update_deck_info_panel() -> void:
 		return
 	
 	deck_info_panel.visible = true
-	var deck_data := deck_database.get(selected_deck, {})
+	var deck_data: Dictionary = deck_database.get(selected_deck, {}) as Dictionary
 	
 	if deck_name_label:
 		deck_name_label.text = deck_data.get("name", "Unknown Deck")
@@ -177,9 +177,9 @@ func _update_deck_info_panel() -> void:
 	if deck_theme_label:
 		deck_theme_label.text = "Theme: " + deck_data.get("theme", "Classic")
 	
-	var progress_data := deck_progress.get(selected_deck, {})
-	var cards_unlocked := progress_data.get("cards_unlocked", 0)
-	var completion := progress_data.get("completion", 0.0)
+	var progress_data: Dictionary = deck_progress.get(selected_deck, {}) as Dictionary
+	var cards_unlocked: int = progress_data.get("cards_unlocked", 0) as int
+	var completion: float = progress_data.get("completion", 0.0) as float
 	
 	if completion_label:
 		completion_label.text = "Completion: %d/78 Cards (%.1f%%)" % [cards_unlocked, completion]
@@ -198,8 +198,8 @@ func _populate_gallery() -> void:
 	for child in gallery_grid.get_children():
 		child.queue_free()
 	
-	var progress_data := deck_progress.get(selected_deck, {})
-	var unlocked_cards := progress_data.get("unlocked_list", [])
+	var progress_data: Dictionary = deck_progress.get(selected_deck, {}) as Dictionary
+	var unlocked_cards: Array = progress_data.get("unlocked_list", []) as Array
 	
 	# Major Arcana section (0-21)
 	for i in range(22):
@@ -233,8 +233,8 @@ func _get_filtered_decks() -> Array:
 	var result := []
 	for deck_id in deck_database:
 		var should_include := false
-		var is_owned := owned_decks.has(deck_id) and owned_decks[deck_id]
-		var completion := deck_progress.get(deck_id, {}).get("completion", 0.0)
+		var is_owned: bool = owned_decks.has(deck_id) and owned_decks[deck_id]
+		var completion: float = deck_progress.get(deck_id, {}).get("completion", 0.0) as float
 		
 		match filter_mode:
 			"all":
@@ -255,20 +255,20 @@ func _sort_decks(deck_list: Array) -> Array:
 	match sort_mode:
 		"progress":
 			deck_list.sort_custom(func(a, b):
-				var prog_a := deck_progress.get(a, {}).get("completion", 0.0)
-				var prog_b := deck_progress.get(b, {}).get("completion", 0.0)
+				var prog_a: float = deck_progress.get(a, {}).get("completion", 0.0) as float
+				var prog_b: float = deck_progress.get(b, {}).get("completion", 0.0) as float
 				return prog_a > prog_b
 			)
 		"artist":
 			deck_list.sort_custom(func(a, b):
-				var artist_a := deck_database.get(a, {}).get("artist", "")
-				var artist_b := deck_database.get(b, {}).get("artist", "")
+				var artist_a: String = deck_database.get(a, {}).get("artist", "") as String
+				var artist_b: String = deck_database.get(b, {}).get("artist", "") as String
 				return artist_a < artist_b
 			)
 		"release":
 			deck_list.sort_custom(func(a, b):
-				var date_a := deck_database.get(a, {}).get("release_date", "")
-				var date_b := deck_database.get(b, {}).get("release_date", "")
+				var date_a: String = deck_database.get(a, {}).get("release_date", "") as String
+				var date_b: String = deck_database.get(b, {}).get("release_date", "") as String
 				return date_a > date_b
 			)
 	return deck_list
@@ -299,7 +299,7 @@ func unlock_cards_for_deck(deck_id: String, card_ids: Array) -> void:
 	if not deck_progress.has(deck_id):
 		deck_progress[deck_id] = {"cards_unlocked": 0, "completion": 0.0, "unlocked_list": []}
 	
-	var progress_data := deck_progress[deck_id]
+	var progress_data: Dictionary = deck_progress[deck_id] as Dictionary
 	var unlocked_list: Array = progress_data.get("unlocked_list", [])
 	
 	for card_id in card_ids:

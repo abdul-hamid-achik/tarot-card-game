@@ -58,10 +58,10 @@ func _ready() -> void:
 
 func _load_owned_cards() -> void:
 	# Load cards from collection
-	var deck_progress = ProjectSettings.get_setting("tarot/deck_progress", {})
+	var deck_progress: Dictionary = ProjectSettings.get_setting("tarot/deck_progress", {}) as Dictionary
 	for deck_id in deck_progress:
-		var progress_data = deck_progress[deck_id]
-		var unlocked_list = progress_data.get("unlocked_list", [])
+		var progress_data: Dictionary = deck_progress[deck_id] as Dictionary
+		var unlocked_list: Array = progress_data.get("unlocked_list", []) as Array
 		for card_id in unlocked_list:
 			available_cards[card_id] = true
 
@@ -115,7 +115,7 @@ func _populate_collection() -> void:
 		child.queue_free()
 	
 	# Add available cards
-	var sorted_cards := available_cards.keys()
+	var sorted_cards: Array = available_cards.keys()
 	sorted_cards.sort()
 	
 	for card_id in sorted_cards:
@@ -220,7 +220,7 @@ func _add_card_to_slot(card_id: String, slot: Panel) -> void:
 	_populate_collection()  # Refresh to update counters
 
 func _remove_card_from_slot(slot: Panel) -> void:
-	var card_id := slot.get_meta("card_id")
+	var card_id: String = slot.get_meta("card_id") as String
 	if card_id == "":
 		return
 	
@@ -284,7 +284,7 @@ func _update_statistics() -> void:
 	deck_stats["pentacles_count"] = 0
 	
 	for slot_name in current_deck:
-		var card_id := current_deck[slot_name]
+		var card_id: String = current_deck[slot_name] as String
 		if card_id.begins_with("major_"):
 			deck_stats["major_count"] += 1
 		elif card_id.begins_with("wands_"):
@@ -316,17 +316,17 @@ func _update_statistics() -> void:
 
 func _calculate_synergy() -> void:
 	# Simple synergy calculation based on suit balance
-	var total_minor := deck_stats["total_cards"] - deck_stats["major_count"]
+	var total_minor: int = deck_stats["total_cards"] - deck_stats["major_count"]
 	if total_minor == 0:
 		deck_stats["synergy_score"] = 0.0
 		return
 	
 	var balance_score := 100.0
 	var suits := ["wands_count", "cups_count", "swords_count", "pentacles_count"]
-	var ideal_per_suit := total_minor / 4.0
+	var ideal_per_suit: float = total_minor / 4.0
 	
 	for suit in suits:
-		var diff := abs(deck_stats[suit] - ideal_per_suit)
+		var diff: float = abs(deck_stats[suit] - ideal_per_suit)
 		balance_score -= diff * 5
 	
 	deck_stats["synergy_score"] = max(0, balance_score)
@@ -364,7 +364,7 @@ func _validate_deck() -> bool:
 
 func _auto_complete_deck() -> void:
 	# Auto-fill deck to minimum cards
-	var needed := MIN_CARDS - deck_stats["total_cards"]
+	var needed: int = MIN_CARDS - deck_stats["total_cards"]
 	if needed <= 0:
 		return
 	
@@ -401,7 +401,7 @@ func _save_deck() -> void:
 		deck_array.append(current_deck[slot_name])
 	
 	# Save to user decks
-	var user_decks = ProjectSettings.get_setting("tarot/user_decks", {})
+	var user_decks: Dictionary = ProjectSettings.get_setting("tarot/user_decks", {}) as Dictionary
 	user_decks[deck_name] = {
 		"cards": deck_array,
 		"base_art": base_deck_art,

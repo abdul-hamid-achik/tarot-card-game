@@ -23,9 +23,10 @@ var major_arcana_charge := 0
 var major_arcana_max_charge := 100
 var fate_generation_per_turn := 1
 var card_orientations := {} # card_id -> "upright" or "reversed"
-var mulligan_cards := []  # Cards for opening reading
-var channeling_card := null  # Currently channeling card
+var mulligan_cards: Array = []  # Cards for opening reading
+var channeling_card: Node = null  # Currently channeling card
 var channeling_turns := 0
+var current_run := {}  # PvE run data
 var suit_styles := {
 	"wands": {"style": "aggressive", "effect": "burn", "damage_bonus": 2},
 	"cups": {"style": "defensive", "effect": "heal", "heal_amount": 2},
@@ -49,6 +50,22 @@ var suit_styles := {
 @onready var turn_timer_label := $TopBar/TurnTimer
 @onready var end_turn_button := $BoardLayout/PlayerArea/EndTurnButton
 @onready var hand_toggle_button := $BoardLayout/PlayerArea/HandToggleButton
+
+# Fate action buttons
+@onready var flip_button := $BoardLayout/PlayerArea/FateActions/FlipButton
+@onready var peek_button := $BoardLayout/PlayerArea/FateActions/PeekButton
+@onready var force_draw_button := $BoardLayout/PlayerArea/FateActions/ForceDrawButton
+@onready var block_flip_button := $BoardLayout/PlayerArea/FateActions/BlockFlipButton
+@onready var divine_button := $BoardLayout/PlayerArea/FateActions/DivineButton
+
+# Spread slots
+@onready var past_slot := $BoardLayout/PlayerArea/SpreadSlots/PastSlot
+@onready var present_slot := $BoardLayout/PlayerArea/SpreadSlots/PresentSlot
+@onready var future_slot := $BoardLayout/PlayerArea/SpreadSlots/FutureSlot
+
+# Trial indicators
+@onready var trials_label := $BoardLayout/CenterArea/TrialsDisplay/TrialsLabel
+@onready var fate_particles := $BoardLayout/PlayerArea/FateParticles
 
 # Deck visuals
 @onready var player_deck := $BoardLayout/PlayerArea/DeckZone/Deck
@@ -134,8 +151,9 @@ func _ready() -> void:
 	add_child(reaction_timer)
 	reaction_timer.one_shot = false
 	reaction_timer.wait_time = 0.2
-	if not reaction_timer.timeout.is_connected(_on_reaction_tick):
-		reaction_timer.timeout.connect(_on_reaction_tick)
+	var callback: Callable = _on_reaction_tick
+	if not reaction_timer.timeout.is_connected(callback):
+		reaction_timer.timeout.connect(callback)
 	_setup_ui()
 	_connect_signals()
 	_initialize_game_state()
@@ -150,7 +168,7 @@ func _ready() -> void:
 		_start_pve_match()
 	else:
 		# Regular PvP match; honor selected deck
-		var conf_deck := ProjectSettings.get_setting("tarot/player_deck", "")
+		var conf_deck: String = str(ProjectSettings.get_setting("tarot/player_deck", ""))
 		if str(conf_deck) != "":
 			deck_name = str(conf_deck)
 		_start_pvp_match()
@@ -402,20 +420,20 @@ func _on_card_clicked(card: Node) -> void:
 
 func _get_card_cost(card: Node) -> int:
 	# Get cost from card data
-	var base_cost := card.get_meta("cost", 1)
+	var base_cost: int = card.get_meta("cost", 1) as int
 	# Apply spread bonuses
 	if spread_bonuses.has("present_cost_reduction") and current_turn == 1:
 		base_cost = max(0, base_cost - 1)
 	return base_cost
 
 func _flip_card_orientation(card: Node) -> void:
-	var card_id := card.get_meta("card_id", "")
+	var card_id: String = card.get_meta("card_id", "") as String
 	if card_id == "":
 		return
 	if player_fate < 1:
 		return
 	player_fate -= 1
-	var current := card_orientations.get(card_id, "upright")
+	var current: String = card_orientations.get(card_id, "upright") as String
 	card_orientations[card_id] = "reversed" if current == "upright" else "upright"
 	_update_fate_display()
 	# Visual feedback
@@ -519,7 +537,7 @@ func _on_mulligan_card_selected(event: InputEvent, card: Node, index: int) -> vo
 func _accept_mulligan() -> void:
 	# Apply spread bonuses based on selections
 	for card in mulligan_cards:
-		var pos := card.get_meta("spread_position", "")
+		var pos: String = str(card.get_meta("spread_position", ""))
 		match pos:
 			"past":
 				spread_bonuses["past_fate_refund"] = true
@@ -572,7 +590,7 @@ func _enable_major_arcana_ultimate() -> void:
 
 func _activate_major_arcana() -> void:
 	# Activate based on current significator
-	var sig := current_run.get("significator", "major_00")
+	var sig: String = current_run.get("significator", "major_00") as String
 	
 	match sig:
 		"major_00":  # The Fool
@@ -602,7 +620,7 @@ func _activate_major_arcana() -> void:
 	_update_major_arcana_display()
 
 func _apply_suit_style(card: Node) -> void:
-	var card_id := card.get_meta("card_id", "")
+	var card_id: String = card.get_meta("card_id", "") as String
 	
 	if card_id.begins_with("wands_"):
 		# Aggressive style
@@ -664,7 +682,7 @@ func _destroy_all_board() -> void:
 
 func _play_card_from_hand(card: Node) -> void:
 	# Store original position for animation
-	var start_pos := card.global_position
+	var start_pos: Vector2 = card.global_position
 	
 	# Move from hand to board
 	player_hand_container.remove_child(card)
@@ -740,7 +758,7 @@ func _send(action: Dictionary) -> void:
 
 func _validate_action(action: Dictionary) -> bool:
 	# Basic client-side guardrails. Extend with real validations.
-	var t := str(action.get("type", ""))
+	var t: String = str(action.get("type", ""))
 	match t:
 		"play_card":
 			return action.has("cardId")
@@ -763,7 +781,7 @@ func _arrange_hand(is_player: bool) -> void:
 	var start_x: float = - (card_count - 1) * FAN_SPACING / 2.0
 	
 	for i in range(card_count):
-		var card := cards[i]
+		var card: Node = cards[i]
 		var target_pos := Vector2(start_x + i * FAN_SPACING, 0)
 		
 		# Calculate fan curve (slight arc)
@@ -799,7 +817,7 @@ func _arrange_board(is_player: bool) -> void:
 	var start_x: float = - (min(card_count, MAX_BOARD_CARDS) - 1) * BOARD_CARD_SPACING / 2.0
 	
 	for i in range(min(card_count, MAX_BOARD_CARDS)):
-		var card := cards[i]
+		var card: Node = cards[i]
 		var target_pos := Vector2(start_x + i * BOARD_CARD_SPACING, 0)
 		
 		var tween := create_tween()
@@ -877,9 +895,9 @@ func _execute_combat_phase() -> void:
 	_check_victory_conditions()
 
 func _process_unit_combat(attacker: Node, defender, is_player: bool) -> void:
-	var damage := attacker.get_meta("attack", 1)
-	var attacker_id := attacker.get_meta("card_id", "")
-	var defender_id := "" if not defender else defender.get_meta("card_id", "")
+	var damage: int = attacker.get_meta("attack", 1) as int
+	var attacker_id: String = attacker.get_meta("card_id", "") as String
+	var defender_id: String = "" if not defender else str(defender.get_meta("card_id", ""))
 	
 	# Apply elemental interactions
 	damage = _calculate_elemental_damage(attacker_id, defender_id, damage)
@@ -898,7 +916,7 @@ func _process_unit_combat(attacker: Node, defender, is_player: bool) -> void:
 			opponent_health -= suit_styles["swords"]["counter_damage"]
 	
 	if defender:
-		var shield := defender.get_meta("shield", 0)
+		var shield: int = defender.get_meta("shield", 0) as int
 		damage = max(0, damage - shield)
 		defender.set_meta("health", defender.get_meta("health", 3) - damage)
 		if defender.get_meta("health", 0) <= 0:
@@ -944,7 +962,7 @@ func _calculate_elemental_damage(attacker_suit: String, defender_suit: String, b
 func _process_burn_effects() -> void:
 	for unit in player_board_container.get_children() + opponent_board_container.get_children():
 		if unit.has_meta("burn"):
-			var burn := unit.get_meta("burn", 0)
+			var burn: int = unit.get_meta("burn", 0) as int
 			if burn > 0:
 				unit.set_meta("health", unit.get_meta("health", 3) - 1)
 				unit.set_meta("burn", burn - 1)
@@ -1000,10 +1018,10 @@ func _on_card_drag_moved(card: Node) -> void:
 		return
 	_clear_target_lines()
 	# Draw a single target line to nearest opponent board slot center
-	var best_i := _nearest_child_index(opponent_board_container, card.global_position)
+	var best_i: int = _nearest_child_index(opponent_board_container, card.global_position)
 	if best_i != -1:
-		var child := opponent_board_container.get_child(best_i)
-		var dst := (child as Node2D).get_global_position() if child is Node2D else null
+		var child: Node = opponent_board_container.get_child(best_i)
+		var dst: Variant = (child as Node2D).get_global_position() if child is Node2D else null
 		if dst != null:
 			var line := Line2D.new()
 			line.default_color = Color(0.1, 0.6, 1.0, 0.7)
@@ -1075,7 +1093,10 @@ func _tint_target_lines(valid: bool) -> void:
 		return
 	for c in target_lines_node.get_children():
 		if c is Line2D:
-			(c as Line2D).default_color = valid?Color(0.1, 0.9, 0.3, 0.8): Color(0.9, 0.2, 0.2, 0.8)
+			if valid:
+				(c as Line2D).default_color = Color(0.1, 0.9, 0.3, 0.8)
+			else:
+				(c as Line2D).default_color = Color(0.9, 0.2, 0.2, 0.8)
 
 func _is_over_player_board(card: Node) -> bool:
 	# Compare card global position against player board container rect
@@ -1101,32 +1122,32 @@ func _switch_turn() -> void:
 			_draw_card_to_hand(false)
 			_process_spread_bonuses(false)
 			# Simulate AI turn after delay
-            await get_tree().create_timer(1.0).timeout
-            _simulate_ai_turn()
+			await get_tree().create_timer(1.0).timeout
+			_simulate_ai_turn()
 	
 	_update_fate_display()
 	_reset_turn_timer()
 
 func _simulate_ai_turn() -> void:
 	# Simple AI logic for PvE
-    await get_tree().create_timer(0.5).timeout
+	await get_tree().create_timer(0.5).timeout
 	
 	# AI plays a card
 	var hand_cards := opponent_hand_container.get_children()
-    if hand_cards.size() > 0 and opponent_fate > 0:
-        var card := hand_cards[0]
-        if card and card.has_method("set_card_back"):
-            opponent_hand_container.remove_child(card)
-            opponent_board_container.add_child(card)
-            card.set_card_back(false)
-            if card.has_method("load_card_image"):
-                card.load_card_image("major_" + str(randi() % 22).pad_zeros(2), deck_name)
-            opponent_fate -= 1
-            _update_fate_display()
-            _arrange_hand(false)
-            _arrange_board(false)
+	if hand_cards.size() > 0 and opponent_fate > 0:
+		var card: Node = hand_cards[0]
+		if card and card.has_method("set_card_back"):
+			opponent_hand_container.remove_child(card)
+			opponent_board_container.add_child(card)
+			card.set_card_back(false)
+			if card.has_method("load_card_image"):
+				card.load_card_image("major_" + str(randi() % 22).pad_zeros(2), deck_name)
+			opponent_fate -= 1
+			_update_fate_display()
+			_arrange_hand(false)
+			_arrange_board(false)
 	
-    await get_tree().create_timer(0.5).timeout
+	await get_tree().create_timer(0.5).timeout
 	_advance_phase()
 
 func _update_health_display() -> void:
@@ -1145,9 +1166,9 @@ func _show_fate_particles(active: bool) -> void:
 
 func _update_trials_display() -> void:
 	if trials_label:
-		var sun := arcana_trials.get("sun", 0)
-		var moon := arcana_trials.get("moon", 0) 
-		var judge := arcana_trials.get("judgement", 0)
+		var sun: int = arcana_trials.get("sun", 0) as int
+		var moon: int = arcana_trials.get("moon", 0) as int 
+		var judge: int = arcana_trials.get("judgement", 0) as int
 		trials_label.text = "Trials: Sun %d/100 | Moon %d/100 | Judge %d/100" % [sun, moon, judge]
 
 func _on_flip_pressed() -> void:
@@ -1190,7 +1211,7 @@ func _show_scrying_interface() -> void:
 	scry_panel.add_child(cards_container)
 	
 	# Show top 3 cards from deck
-	var scry_cards := []
+	var scry_cards: Array = []
 	for i in range(3):
 		var card := card_scene.instantiate()
 		cards_container.add_child(card)
@@ -1533,14 +1554,14 @@ func _handle_websocket_message(message: String) -> void:
 			_show_pvp_result(data)
 		"reaction_window":
 			# Server-driven reaction window with optional duration
-			var desc := str(data.get("event", "Reaction"))
-			var dur := int(data.get("duration", 10))
+			var desc: String = str(data.get("event", "Reaction"))
+			var dur: int = int(data.get("duration", 10))
 			_open_reaction_window(desc)
 			reaction_time_left = dur
 		"reaction_close":
 			_close_reaction_window()
 		"target_valid":
-			var idx := int(data.get("index", -1))
+			var idx: int = int(data.get("index", -1))
 			if idx == last_validated_idx or last_validated_idx == -1:
 				target_valid = bool(data.get("valid", true))
 				_tint_target_lines(target_valid)
@@ -1554,7 +1575,7 @@ func _update_game_state(state: Dictionary) -> void:
 		current_phase = str(state.get("phase"))
 		_update_phase_display()
 	if state.has("currentPlayerId"):
-		var cur := str(state.get("currentPlayerId"))
+		var cur: String = str(state.get("currentPlayerId"))
 		is_my_turn = (cur == current_player_id)
 		end_turn_button.disabled = not is_my_turn
 		_update_turn_display()
@@ -1608,7 +1629,7 @@ func _handle_opponent_card_played(data: Dictionary) -> void:
 	# Fallback: animate opponent moving one card from hand to board
 	var hand_cards := opponent_hand_container.get_children()
 	if hand_cards.size() > 0:
-		var card := hand_cards[0]
+		var card: Node = hand_cards[0]
 		opponent_hand_container.remove_child(card)
 		opponent_board_container.add_child(card)
 		if card.has_method("set_card_back"):
@@ -1642,8 +1663,8 @@ func _handle_game_over(data: Dictionary) -> void:
 func _show_pvp_result(data: Dictionary) -> void:
 	if get_meta("return_to_map", false):
 		return
-	var winner := str(data.get("winner", ""))
-	var rewards := data.get("rewards", {})
+	var winner: String = str(data.get("winner", ""))
+	var rewards: Dictionary = data.get("rewards", {}) as Dictionary
 	var gold := 0
 	if rewards is Dictionary and rewards.has("gold"):
 		gold = int(rewards.get("gold"))
@@ -1656,13 +1677,13 @@ func _show_pvp_result(data: Dictionary) -> void:
 	# Show rewards screen first if present, then result
 	if rewards is Dictionary and (rewards.has("gold") or rewards.has("cards")):
 		var rscene := load("res://scenes/PVPRewards.tscn")
-		var inst := rscene.instantiate()
+		var inst: Node = rscene.instantiate()
 		if inst and inst.has_method("set_rewards"):
 			inst.call_deferred("set_rewards", rewards, winner, current_player_id)
 		get_tree().change_scene_to_packed(rscene)
 	else:
 		var scene := load("res://scenes/PVPResult.tscn")
-		var inst2 := scene.instantiate()
+		var inst2: Node = scene.instantiate()
 		if inst2 and inst2.has_method("set_result"):
 			inst2.call_deferred("set_result", winner, current_player_id)
 		get_tree().change_scene_to_packed(scene)

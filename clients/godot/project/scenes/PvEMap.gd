@@ -857,7 +857,7 @@ func _setup_shop_ui(node_id: int) -> void:
 	fragment_container.add_child(fragment_button)
 	
 	# Generate 3 choices
-	var rng := RandomNumberGenerator.new()
+	# Note: rng variable already exists from _weighted_card_choices calls
 
 func _exchange_fragments(node_id: int) -> void:
 	if deck_fragments >= 1000:
@@ -869,6 +869,35 @@ func _exchange_fragments(node_id: int) -> void:
 		_unlock_full_deck(chosen_deck)
 		_update_ui()
 		shop_popup.hide()
+
+func _show_unlock_ceremony(deck_id: String) -> void:
+	# Show deck unlock ceremony animation
+	var ceremony_popup := AcceptDialog.new()
+	ceremony_popup.title = "Deck Unlocked!"
+	ceremony_popup.dialog_text = "You have unlocked the " + deck_id.capitalize() + " deck!"
+	ceremony_popup.ok_button_text = "Continue"
+	add_child(ceremony_popup)
+	ceremony_popup.popup_centered()
+	
+	# Particle effects
+	var particles := CPUParticles2D.new()
+	particles.position = get_viewport().size / 2
+	particles.emitting = true
+	particles.amount = 100
+	particles.lifetime = 2.0
+	particles.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
+	particles.spread = 45
+	particles.initial_velocity_min = 100
+	particles.initial_velocity_max = 300
+	particles.scale_amount_min = 0.5
+	particles.scale_amount_max = 2.0
+	particles.color = Color(1.0, 0.9, 0.3)
+	add_child(particles)
+	
+	# Auto-cleanup
+	await get_tree().create_timer(3.0).timeout
+	if particles:
+		particles.queue_free()
 
 func _unlock_full_deck(deck_id: String) -> void:
 	# Unlock all 78 cards for a deck
