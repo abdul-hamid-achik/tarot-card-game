@@ -160,15 +160,15 @@ alignment = 1
 
 [node name="Choice1" type="Button" parent="RewardsPopup/RewardsChoices"]
 text = "Choice 1"
-modulate = Color(0.8, 0.8, 0.8)
+modulate = Color(0.8, 0.8, 0.8, 1.0)
 
 [node name="Choice2" type="Button" parent="RewardsPopup/RewardsChoices"]
 text = "Choice 2"
-modulate = Color(0.8, 0.8, 0.8)
+modulate = Color(0.8, 0.8, 0.8, 1.0)
 
 [node name="Choice3" type="Button" parent="RewardsPopup/RewardsChoices"]
 text = "Choice 3"
-modulate = Color(0.8, 0.8, 0.8)
+modulate = Color(0.8, 0.8, 0.8, 1.0)
 
 [node name="Skip" type="Button" parent="RewardsPopup"]
 anchor_left = 0.4

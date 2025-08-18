@@ -23,15 +23,27 @@ export function resetDb() {
 
 function initDb() {
   if (!sqliteRaw) return;
-  sqliteRaw.exec(
-    'CREATE TABLE IF NOT EXISTS cards (id text primary key, name text not null, suit text not null, cost integer not null, type text not null, rarity text not null, set text not null);' +
-    'CREATE TABLE IF NOT EXISTS decks (id text primary key, owner_id text not null, format text not null);'
-  );
+  sqliteRaw.exec(`
+    CREATE TABLE IF NOT EXISTS cards (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      suit TEXT NOT NULL,
+      cost INTEGER NOT NULL,
+      type TEXT NOT NULL,
+      rarity TEXT NOT NULL,
+      card_set TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS decks (
+      id TEXT PRIMARY KEY,
+      owner_id TEXT NOT NULL,
+      format TEXT NOT NULL
+    );
+  `);
   const row = sqliteRaw.prepare('SELECT COUNT(1) as c FROM cards').get() as { c: number } | undefined;
   const count = row?.c ?? 0;
   if (count === 0) {
     sqliteRaw
-      .prepare('INSERT INTO cards (id, name, suit, cost, type, rarity, set) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .prepare('INSERT INTO cards (id, name, suit, cost, type, rarity, card_set) VALUES (?, ?, ?, ?, ?, ?, ?)')
       .run('swords_02', 'two of swords', 'swords', 2, 'spell', 'common', 'base');
     sqliteRaw
       .prepare('INSERT INTO decks (id, owner_id, format) VALUES (?, ?, ?)')

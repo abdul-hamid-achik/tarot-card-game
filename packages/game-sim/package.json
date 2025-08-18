@@ -12,10 +12,12 @@
     "clean": "rimraf dist || true"
   },
   "dependencies": {
+    "ws": "^8.16.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^20.12.12",
+    "@types/ws": "^8.5.10",
     "fast-check": "^3.17.1",
     "typescript": "^5.4.5",
     "vitest": "^3.2.4"
