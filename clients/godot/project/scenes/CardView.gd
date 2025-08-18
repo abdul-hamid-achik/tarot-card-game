@@ -11,6 +11,8 @@ var tried_fallback := false
 var is_face_down := false
 var card_data := {}
 var was_top_level := false
+var orientation := "upright"  # "upright" or "reversed"
+var is_major_arcana := false
 
 # Drag and drop
 var is_dragging := false
@@ -29,6 +31,7 @@ signal drag_started
 signal drag_ended
 signal dropped_on_board
 signal drag_moved
+signal orientation_flipped
 
 func _api_origin() -> String:
 	var env := OS.get_environment("TAROT_API_ORIGIN")
@@ -114,6 +117,10 @@ func load_card_image(card_id: String, deck: String = "classic") -> void:
 	last_card_id = card_id
 	last_deck = deck
 	tried_fallback = false
+	# Check if major arcana
+	is_major_arcana = card_id.begins_with("major_")
+	set_meta("card_id", card_id)
+	set_meta("is_major", is_major_arcana)
 	var url := _api_origin() + "/api/card-image?id=" + card_id.uri_encode() + "&deck=" + deck.uri_encode()
 	# Avoid duplicate connections if called multiple times
 	if not http.request_completed.is_connected(_on_image):
@@ -198,3 +205,25 @@ func _find_board_drop_zone() -> Area2D:
 		if a.has_meta("drop_zone") and a.get_meta("drop_zone") == "board":
 			return a
 	return null
+
+func set_orientation(new_orientation: String) -> void:
+	orientation = new_orientation
+	# Visual rotation for reversed cards
+	if orientation == "reversed":
+		rotation = PI
+	else:
+		rotation = 0
+	emit_signal("orientation_flipped")
+
+func flip_orientation() -> void:
+	if orientation == "upright":
+		set_orientation("reversed")
+	else:
+		set_orientation("upright")
+
+func get_card_effect() -> Dictionary:
+	# Return different effects based on orientation
+	if orientation == "upright":
+		return card_data.get("upright_effect", {})
+	else:
+		return card_data.get("reversed_effect", {})

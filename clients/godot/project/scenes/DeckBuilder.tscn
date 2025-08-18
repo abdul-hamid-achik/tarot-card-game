@@ -1,26 +1,220 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
-[ext_resource type="Script" path="res://scenes/DeckBuilder.gd" id=1]
+[ext_resource type="Script" path="res://scenes/DeckBuilder.gd" id="1"]
+
+[sub_resource type="StyleBoxFlat" id="1"]
+bg_color = Color(0.15, 0.15, 0.2, 0.9)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.4, 0.4, 0.5, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
 
 [node name="DeckBuilder" type="Control"]
 anchor_right = 1.0
 anchor_bottom = 1.0
-script = ExtResource( 1 )
+script = ExtResource("1")
 
-[node name="Label" type="Label" parent="."]
+[node name="Background" type="ColorRect" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.1, 0.1, 0.15, 1)
+
+[node name="TopBar" type="Panel" parent="."]
+anchor_right = 1.0
+anchor_bottom = 0.08
+theme_override_styles/panel = SubResource("1")
+
+[node name="Title" type="Label" parent="TopBar"]
 anchor_left = 0.4
-anchor_top = 0.45
 anchor_right = 0.6
-anchor_bottom = 0.55
-text = "Deck Builder (WIP)"
+anchor_bottom = 1.0
+theme_override_font_sizes/font_size = 20
+text = "Deck Builder"
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="DeckNameInput" type="LineEdit" parent="TopBar"]
+anchor_left = 0.35
+anchor_right = 0.5
+anchor_top = 0.25
+anchor_bottom = 0.75
+placeholder_text = "Deck Name"
+text = "My Deck"
+
+[node name="SaveButton" type="Button" parent="TopBar"]
+anchor_left = 0.85
+anchor_right = 0.95
+anchor_top = 0.2
+anchor_bottom = 0.8
+text = "Save Deck"
+
+[node name="LeftPanel" type="Panel" parent="."]
+anchor_left = 0.02
+anchor_top = 0.1
+anchor_right = 0.28
+anchor_bottom = 0.98
+theme_override_styles/panel = SubResource("1")
+
+[node name="PanelTitle" type="Label" parent="LeftPanel"]
+anchor_left = 0.05
+anchor_right = 0.95
+anchor_top = 0.01
+anchor_bottom = 0.05
+text = "Collection Browser"
+horizontal_alignment = 1
+
+[node name="ScrollContainer" type="ScrollContainer" parent="LeftPanel"]
+anchor_left = 0.05
+anchor_top = 0.06
+anchor_right = 0.95
+anchor_bottom = 0.95
+
+[node name="CollectionGrid" type="GridContainer" parent="LeftPanel/ScrollContainer"]
+columns = 3
+add_theme_constant_override("h_separation", 5)
+add_theme_constant_override("v_separation", 5)
+
+[node name="CenterPanel" type="Panel" parent="."]
+anchor_left = 0.3
+anchor_top = 0.1
+anchor_right = 0.68
+anchor_bottom = 0.98
+theme_override_styles/panel = SubResource("1")
+
+[node name="PanelTitle" type="Label" parent="CenterPanel"]
+anchor_left = 0.05
+anchor_right = 0.95
+anchor_top = 0.01
+anchor_bottom = 0.05
+text = "Current Deck"
+horizontal_alignment = 1
+
+[node name="DeckSlots" type="Control" parent="CenterPanel"]
+anchor_left = 0.05
+anchor_top = 0.06
+anchor_right = 0.95
+anchor_bottom = 0.88
+
+[node name="MajorSection" type="HBoxContainer" parent="CenterPanel/DeckSlots"]
+anchor_right = 1.0
+anchor_bottom = 0.15
+alignment = 1
+add_theme_constant_override("separation", 10)
+
+[node name="MajorLabel" type="Label" parent="CenterPanel/DeckSlots"]
+anchor_top = 0.16
+anchor_right = 1.0
+anchor_bottom = 0.18
+text = "─── Major Arcana (Max 2) ───"
+horizontal_alignment = 1
+
+[node name="MinorSection" type="GridContainer" parent="CenterPanel/DeckSlots"]
+anchor_top = 0.2
+anchor_right = 1.0
+anchor_bottom = 1.0
+columns = 5
+add_theme_constant_override("h_separation", 8)
+add_theme_constant_override("v_separation", 8)
+
+[node name="ValidationLabel" type="Label" parent="CenterPanel"]
+anchor_left = 0.1
+anchor_right = 0.9
+anchor_top = 0.9
+anchor_bottom = 0.95
+text = "✓ Deck is valid"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RightPanel" type="Panel" parent="."]
+anchor_left = 0.7
+anchor_top = 0.1
+anchor_right = 0.98
+anchor_bottom = 0.98
+theme_override_styles/panel = SubResource("1")
+
+[node name="PanelTitle" type="Label" parent="RightPanel"]
+anchor_left = 0.05
+anchor_right = 0.95
+anchor_top = 0.01
+anchor_bottom = 0.05
+text = "Statistics & Analysis"
+horizontal_alignment = 1
+
+[node name="CardCount" type="Label" parent="RightPanel"]
+anchor_left = 0.1
+anchor_right = 0.9
+anchor_top = 0.08
+anchor_bottom = 0.12
+text = "Cards: 0/30-40"
+horizontal_alignment = 1
+
+[node name="SuitDistribution" type="RichTextLabel" parent="RightPanel"]
+anchor_left = 0.1
+anchor_right = 0.9
+anchor_top = 0.15
+anchor_bottom = 0.35
+text = "Suits:
+Major: 0
+Wands: 0
+Cups: 0
+Swords: 0
+Pentacles: 0"
+
+[node name="ManaCurve" type="Control" parent="RightPanel"]
+anchor_left = 0.1
+anchor_right = 0.9
+anchor_top = 0.38
+anchor_bottom = 0.55
+
+[node name="CurveTitle" type="Label" parent="RightPanel/ManaCurve"]
+anchor_right = 1.0
+anchor_bottom = 0.2
+text = "Fate Cost Curve"
+horizontal_alignment = 1
+
+[node name="SynergyScore" type="Label" parent="RightPanel"]
+anchor_left = 0.1
+anchor_right = 0.9
+anchor_top = 0.58
+anchor_bottom = 0.62
+text = "Synergy: 0%"
+horizontal_alignment = 1
+
+[node name="Suggestions" type="ItemList" parent="RightPanel"]
+anchor_left = 0.1
+anchor_right = 0.9
+anchor_top = 0.65
+anchor_bottom = 0.8
+
+[node name="SuggestionsLabel" type="Label" parent="RightPanel"]
+anchor_left = 0.1
+anchor_right = 0.9
+anchor_top = 0.62
+anchor_bottom = 0.65
+text = "Smart Suggestions:"
+
+[node name="AutoCompleteButton" type="Button" parent="RightPanel"]
+anchor_left = 0.1
+anchor_right = 0.45
+anchor_top = 0.85
+anchor_bottom = 0.9
+text = "Auto-Complete"
+
+[node name="ClearDeckButton" type="Button" parent="RightPanel"]
+anchor_left = 0.55
+anchor_right = 0.9
+anchor_top = 0.85
+anchor_bottom = 0.9
+text = "Clear Deck"
 
 [node name="Back" type="Button" parent="."]
 anchor_left = 0.02
 anchor_top = 0.02
 anchor_right = 0.1
-anchor_bottom = 0.08
-text = "Back"
-
-
+anchor_bottom = 0.06
+text = "← Back"

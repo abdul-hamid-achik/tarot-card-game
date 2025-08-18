@@ -19,6 +19,9 @@ var completed_nodes := []
 var available_nodes := []
 var run_seed := ""
 var significator := "" # Major Arcana chosen as champion
+var deck_fragments := 0  # Currency for deck trading
+var omens := []  # Active run modifiers
+var boons := []  # Temporary buffs
 
 # Map generation
 var map_data := {}
@@ -45,6 +48,26 @@ const MAP_WIDTH := 900
 const MAP_HEIGHT := 500
 const NODES_PER_COLUMN := 3
 const COLUMNS_PER_REGION := 5
+
+# Event types
+var event_variants := [
+	{"name": "Fortune Teller", "choices": [
+		{"text": "Accept Reading (-50g, +Omen)", "cost": 50, "reward": "omen"},
+		{"text": "Decline", "cost": 0, "reward": "none"}
+	]},
+	{"name": "Mystic Merchant", "choices": [
+		{"text": "Trade Cards (Remove 2, Add 1 Rare)", "cost": 0, "reward": "card_trade"},
+		{"text": "Buy Fragments (100g for 50 fragments)", "cost": 100, "reward": "fragments"}
+	]},
+	{"name": "Ancient Shrine", "choices": [
+		{"text": "Offer Health (-5 HP, +Major Arcana)", "cost": 5, "reward": "major_arcana"},
+		{"text": "Meditate (+10 HP)", "cost": 0, "reward": "heal"}
+	]},
+	{"name": "Crossroads", "choices": [
+		{"text": "Safe Path (No effect)", "cost": 0, "reward": "none"},
+		{"text": "Risky Path (50% +Relic, 50% -10 HP)", "cost": 0, "reward": "risk"}
+	]}
+]
 
 # Node scene (created programmatically, no preload needed)
 
@@ -111,6 +134,7 @@ func _initialize_run() -> void:
 			"omens": [], # PvE-specific modifiers
 			"boons": [], # Temporary buffs
 			"relics": [], # Permanent passives
+			"deck_fragments": 0, # Currency for deck trading
 			"shop_remove_cost": 75,
 			"shop_upgrade_cost": 100
 		}
@@ -530,22 +554,79 @@ func _generate_enemy_deck(type: NodeType) -> Array:
 	return deck
 
 func _show_event(node_id: int) -> void:
-	# Hook up accept/decline to simple example outcomes
-	if not event_popup.confirmed.is_connected(_on_event_accept):
-		event_popup.confirmed.connect(_on_event_accept.bind(node_id))
-	if not event_popup.canceled.is_connected(_on_event_decline):
-		event_popup.canceled.connect(_on_event_decline)
-	event_popup.popup_centered()
+	# Select random event variant
+	var event := event_variants[randi() % event_variants.size()]
+	
+	# Setup event popup
+	if event_popup:
+		var title_label := event_popup.get_node_or_null("TitleLabel")
+		if title_label:
+			title_label.text = event["name"]
+		
+		var choices_container := event_popup.get_node_or_null("ChoicesContainer")
+		if choices_container:
+			# Clear existing choices
+			for child in choices_container.get_children():
+				child.queue_free()
+			
+			# Add new choice buttons
+			for choice in event["choices"]:
+				var btn := Button.new()
+				btn.text = choice["text"]
+				btn.pressed.connect(_on_event_choice.bind(choice, node_id))
+				choices_container.add_child(btn)
+		
+		event_popup.popup_centered()
 
-func _on_event_accept(node_id: int) -> void:
-	# Accept reading: -50 gold, add omen
-	current_run["gold"] = max(0, current_run["gold"] - 50)
-	current_run["omens"].append("fortune_reading")
+func _on_event_choice(choice: Dictionary, node_id: int) -> void:
+	# Apply choice cost
+	if choice["cost"] > 0:
+		if choice["text"].contains("HP"):
+			current_run["health"] -= choice["cost"]
+		else:
+			current_run["gold"] = max(0, current_run["gold"] - choice["cost"])
+	
+	# Apply reward
+	match choice["reward"]:
+		"omen":
+			if not current_run.has("omens"):
+				current_run["omens"] = []
+			current_run["omens"].append("fortune_reading")
+		"fragments":
+			deck_fragments += 50
+			current_run["deck_fragments"] = deck_fragments
+		"major_arcana":
+			_add_card_to_deck("major_%02d" % randi_range(0, 21))
+		"heal":
+			current_run["health"] = min(current_run["max_health"], current_run["health"] + 10)
+		"card_trade":
+			_show_card_trade_ui()
+		"risk":
+			if randf() > 0.5:
+				# Win relic
+				if not current_run.has("relics"):
+					current_run["relics"] = []
+				current_run["relics"].append("lucky_charm")
+			else:
+				# Lose health
+				current_run["health"] -= 10
+	
+	if event_popup:
+		event_popup.hide()
 	_complete_node(node_id)
 
-func _on_event_decline() -> void:
-	# No effect
-	pass
+func _show_card_trade_ui() -> void:
+	# Simple implementation: remove 2 random cards, add 1 rare
+	if current_run["deck"].size() > 2:
+		for i in range(2):
+			if current_run["deck"].size() > 0:
+				var idx := randi() % current_run["deck"].size()
+				var card = current_run["deck"][idx]
+				if card["count"] > 1:
+					card["count"] -= 1
+				else:
+					current_run["deck"].remove_at(idx)
+		_add_card_to_deck("major_%02d" % randi_range(0, 21))
 
 func _show_shop(node_id: int) -> void:
 	# Minimal shop: confirm to remove a card (cost 75g)
@@ -756,8 +837,66 @@ func _setup_shop_ui(node_id: int) -> void:
 	var gold_label := shop_popup.get_node_or_null("ShopUI/GoldLabel") as Label
 	if gold_label:
 		gold_label.text = "Gold: " + str(current_run["gold"])
+	
+	# Add fragment exchange option
+	var fragment_container := shop_popup.get_node_or_null("ShopUI/FragmentExchange")
+	if not fragment_container:
+		fragment_container = VBoxContainer.new()
+		fragment_container.name = "FragmentExchange"
+		shop_popup.get_node("ShopUI").add_child(fragment_container)
+	
+	var fragment_label := Label.new()
+	fragment_label.text = "Deck Fragments: %d / 1000" % deck_fragments
+	fragment_container.add_child(fragment_label)
+	
+	var fragment_button := Button.new()
+	fragment_button.text = "Exchange 1000 Fragments for Full Deck"
+	fragment_button.disabled = deck_fragments < 1000
+	if deck_fragments >= 1000:
+		fragment_button.pressed.connect(_exchange_fragments.bind(node_id))
+	fragment_container.add_child(fragment_button)
+	
 	# Generate 3 choices
 	var rng := RandomNumberGenerator.new()
+
+func _exchange_fragments(node_id: int) -> void:
+	if deck_fragments >= 1000:
+		deck_fragments -= 1000
+		current_run["deck_fragments"] = deck_fragments
+		# Unlock a full deck
+		var decks := ["marigold", "arcana", "duality"]
+		var chosen_deck := decks[randi() % decks.size()]
+		_unlock_full_deck(chosen_deck)
+		_update_ui()
+		shop_popup.hide()
+
+func _unlock_full_deck(deck_id: String) -> void:
+	# Unlock all 78 cards for a deck
+	var all_cards := []
+	# Major Arcana
+	for i in range(22):
+		all_cards.append("major_%02d" % i)
+	# Minor Arcana
+	for suit in ["wands", "cups", "swords", "pentacles"]:
+		for i in range(1, 15):
+			all_cards.append("%s_%02d" % [suit, i])
+	
+	# Save to collection
+	var deck_progress = ProjectSettings.get_setting("tarot/deck_progress", {})
+	if not deck_progress.has(deck_id):
+		deck_progress[deck_id] = {}
+	deck_progress[deck_id]["unlocked_list"] = all_cards
+	deck_progress[deck_id]["cards_unlocked"] = 78
+	deck_progress[deck_id]["completion"] = 100.0
+	
+	var owned_decks = ProjectSettings.get_setting("tarot/owned_decks", {})
+	owned_decks[deck_id] = true
+	
+	ProjectSettings.set_setting("tarot/deck_progress", deck_progress)
+	ProjectSettings.set_setting("tarot/owned_decks", owned_decks)
+	ProjectSettings.save()
+	
+	_show_unlock_ceremony("Full %s Deck Unlocked!" % deck_id.capitalize())
 	rng.randomize()
 	var choices := _weighted_card_choices(3, rng)
 	for i in range(3):

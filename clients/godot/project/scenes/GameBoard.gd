@@ -16,6 +16,23 @@ var opponent_health := 20
 var opponent_max_health := 20
 var opponent_fate := 1
 
+# Tarot Mechanics
+var spread_bonuses := {}
+var arcana_trials := {"sun": 0, "moon": 0, "judgement": 0}
+var major_arcana_charge := 0
+var major_arcana_max_charge := 100
+var fate_generation_per_turn := 1
+var card_orientations := {} # card_id -> "upright" or "reversed"
+var mulligan_cards := []  # Cards for opening reading
+var channeling_card := null  # Currently channeling card
+var channeling_turns := 0
+var suit_styles := {
+	"wands": {"style": "aggressive", "effect": "burn", "damage_bonus": 2},
+	"cups": {"style": "defensive", "effect": "heal", "heal_amount": 2},
+	"swords": {"style": "precise", "effect": "counter", "counter_damage": 1},
+	"pentacles": {"style": "slow", "effect": "inevitable", "shield": 1}
+}
+
 # Card zones
 @onready var player_hand_container := $BoardLayout/PlayerArea/HandContainer
 @onready var player_board_container := $BoardLayout/CenterArea/PlayerBoard
@@ -177,13 +194,25 @@ func _connect_signals() -> void:
 	settings_button.pressed.connect(_on_settings_button_pressed)
 	confirmation_dialog.confirmed.connect(_on_menu_confirmed)
 	confirmation_dialog.canceled.connect(_on_menu_canceled)
+	# Fate action buttons
+	if flip_button:
+		flip_button.pressed.connect(_on_flip_pressed)
+	if peek_button:
+		peek_button.pressed.connect(_on_peek_pressed)
+	if force_draw_button:
+		force_draw_button.pressed.connect(_on_force_draw_pressed)
+	if block_flip_button:
+		block_flip_button.pressed.connect(_on_block_flip_pressed)
+	if divine_button:
+		divine_button.pressed.connect(_on_divine_pressed)
 
 func _initialize_game_state() -> void:
 	current_turn = 1
-	current_phase = "draw"
+	current_phase = "mulligan"  # Start with mulligan phase
 	player_fate = 1
 	opponent_fate = 1
 	_reset_turn_timer()
+	_show_opening_reading()
 
 func _api_origin() -> String:
 	var env := OS.get_environment("TAROT_API_ORIGIN")
@@ -317,16 +346,15 @@ func _on_poll_result(_result: int, code: int, _headers: PackedStringArray, body:
 		_poll_match_result()
 
 func _load_initial_cards() -> void:
-	# Draw initial hand for player
-	for i in range(4):
-		_draw_card_to_hand(true)
-	
-	# Show opponent cards (face down)
-	for i in range(4):
-		_draw_card_to_hand(false)
+	# Now handled by _draw_initial_hands after mulligan
+	if current_phase != "mulligan":
+		_draw_initial_hands()
 
 func _draw_card_to_hand(is_player: bool) -> void:
 	var card := card_scene.instantiate()
+	
+	# Start from deck position for animation
+	var deck_pos := player_deck.global_position if is_player else opponent_deck.global_position
 	
 	if is_player:
 		player_hand_container.add_child(card)
@@ -338,6 +366,18 @@ func _draw_card_to_hand(is_player: bool) -> void:
 		card.set_meta("zone", "opponent_hand")
 		card.set_card_back(true)
 	
+	# Animate from deck to hand (0.3s draw animation as per diagram)
+	card.global_position = deck_pos
+	card.scale = Vector2(0.1, 0.1)
+	card.modulate.a = 0.0
+	
+	var tween := create_tween()
+	tween.set_parallel()
+	tween.tween_property(card, "scale", Vector2(0.5, 0.5), 0.3)  # Scale to hand size
+	tween.tween_property(card, "modulate:a", 1.0, 0.3)
+	
+	# Then arrange hand
+	await tween.finished
 	_arrange_hand(is_player)
 	
 	# Connect signals for player cards
@@ -362,17 +402,312 @@ func _on_card_clicked(card: Node) -> void:
 
 func _get_card_cost(card: Node) -> int:
 	# Get cost from card data
-	return card.get_meta("cost", 1)
+	var base_cost := card.get_meta("cost", 1)
+	# Apply spread bonuses
+	if spread_bonuses.has("present_cost_reduction") and current_turn == 1:
+		base_cost = max(0, base_cost - 1)
+	return base_cost
+
+func _flip_card_orientation(card: Node) -> void:
+	var card_id := card.get_meta("card_id", "")
+	if card_id == "":
+		return
+	if player_fate < 1:
+		return
+	player_fate -= 1
+	var current := card_orientations.get(card_id, "upright")
+	card_orientations[card_id] = "reversed" if current == "upright" else "upright"
+	_update_fate_display()
+	# Visual feedback
+	var tween := create_tween()
+	tween.tween_property(card, "rotation", PI if card_orientations[card_id] == "reversed" else 0, 0.3)
+	# Send to server
+	_send({"type": "flip_orientation", "cardId": card_id})
+
+func _process_spread_bonuses(is_player: bool) -> void:
+	# Past card: Fate refund on turns 1-2
+	if spread_bonuses.has("past_fate_refund") and current_turn <= 2:
+		if is_player:
+			player_fate = min(player_max_fate, player_fate + 1)
+			_update_fate_display()
+	
+	# Future card: Extra draw
+	if spread_bonuses.has("future_draw_bonus") and current_turn == 2:
+		if is_player:
+			_draw_card_to_hand(true)
+
+func _check_trials_progress() -> void:
+	# Check for trial completions
+	var completed := 0
+	for trial in arcana_trials:
+		if arcana_trials[trial] >= 100:
+			completed += 1
+	if completed >= 3:
+		_trigger_victory("trials")
+
+func _trigger_victory(type: String) -> void:
+	if type == "trials":
+		print("Victory by completing 3 Arcana Trials!")
+		_handle_game_over({"winner": current_player_id, "type": "trials"})
+
+func _show_opening_reading() -> void:
+	# Mulligan: Three-card spread for opening hand
+	var mulligan_panel := Panel.new()
+	mulligan_panel.name = "MulliganPanel"
+	mulligan_panel.anchor_left = 0.2
+	mulligan_panel.anchor_right = 0.8
+	mulligan_panel.anchor_top = 0.3
+	mulligan_panel.anchor_bottom = 0.7
+	add_child(mulligan_panel)
+	
+	var title := Label.new()
+	title.text = "Opening Reading - Choose Your Fate"
+	title.anchor_right = 1.0
+	title.anchor_bottom = 0.1
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mulligan_panel.add_child(title)
+	
+	var spread_container := HBoxContainer.new()
+	spread_container.anchor_left = 0.1
+	spread_container.anchor_right = 0.9
+	spread_container.anchor_top = 0.2
+	spread_container.anchor_bottom = 0.7
+	spread_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	mulligan_panel.add_child(spread_container)
+	
+	# Draw 3 cards for Past, Present, Future
+	for i in range(3):
+		var card := card_scene.instantiate()
+		spread_container.add_child(card)
+		card.load_card_image("major_%02d" % randi_range(0, 21), deck_name)
+		
+		var label := Label.new()
+		match i:
+			0: 
+				label.text = "Past\n(Fate refund T1-2)"
+				card.set_meta("spread_position", "past")
+			1: 
+				label.text = "Present\n(Cost -1 on T1)"
+				card.set_meta("spread_position", "present")
+			2: 
+				label.text = "Future\n(Draw next turn)"
+				card.set_meta("spread_position", "future")
+		label.anchor_top = 1.0
+		label.anchor_bottom = 1.2
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		card.add_child(label)
+		
+		card.gui_input.connect(_on_mulligan_card_selected.bind(card, i))
+		mulligan_cards.append(card)
+	
+	var keep_button := Button.new()
+	keep_button.text = "Keep This Reading"
+	keep_button.anchor_left = 0.4
+	keep_button.anchor_right = 0.6
+	keep_button.anchor_top = 0.85
+	keep_button.anchor_bottom = 0.95
+	mulligan_panel.add_child(keep_button)
+	keep_button.pressed.connect(_accept_mulligan)
+
+func _on_mulligan_card_selected(event: InputEvent, card: Node, index: int) -> void:
+	if event is InputEventMouseButton and event.pressed:
+		# Highlight selected card
+		for c in mulligan_cards:
+			c.modulate = Color.WHITE
+		card.modulate = Color(1.2, 1.2, 0.8)
+
+func _accept_mulligan() -> void:
+	# Apply spread bonuses based on selections
+	for card in mulligan_cards:
+		var pos := card.get_meta("spread_position", "")
+		match pos:
+			"past":
+				spread_bonuses["past_fate_refund"] = true
+				if past_slot:
+					card.reparent(past_slot)
+			"present":
+				spread_bonuses["present_cost_reduction"] = true
+				if present_slot:
+					card.reparent(present_slot)
+			"future":
+				spread_bonuses["future_draw_bonus"] = true
+				if future_slot:
+					card.reparent(future_slot)
+	
+	# Remove mulligan panel
+	get_node("MulliganPanel").queue_free()
+	
+	# Start normal game
+	current_phase = "draw"
+	_update_phase_display()
+	_draw_initial_hands()
+
+func _draw_initial_hands() -> void:
+	# Draw starting hands after mulligan
+	for i in range(4):
+		_draw_card_to_hand(true)
+	for i in range(4):
+		_draw_card_to_hand(false)
+
+func _charge_major_arcana(amount: int) -> void:
+	major_arcana_charge = min(major_arcana_max_charge, major_arcana_charge + amount)
+	_update_major_arcana_display()
+	
+	if major_arcana_charge >= major_arcana_max_charge:
+		_enable_major_arcana_ultimate()
+
+func _update_major_arcana_display() -> void:
+	var charge_bar := get_node_or_null("BoardLayout/MajorArcanaCharge")
+	if charge_bar and charge_bar is ProgressBar:
+		charge_bar.value = (major_arcana_charge / float(major_arcana_max_charge)) * 100.0
+
+func _enable_major_arcana_ultimate() -> void:
+	# Enable ultimate ability based on significator
+	var ultimate_button := get_node_or_null("BoardLayout/UltimateButton")
+	if ultimate_button:
+		ultimate_button.disabled = false
+		ultimate_button.text = "Unleash Major Arcana!"
+		if not ultimate_button.pressed.is_connected(_activate_major_arcana):
+			ultimate_button.pressed.connect(_activate_major_arcana)
+
+func _activate_major_arcana() -> void:
+	# Activate based on current significator
+	var sig := current_run.get("significator", "major_00")
+	
+	match sig:
+		"major_00":  # The Fool
+			# Chaos - randomize all hands
+			_randomize_all_hands()
+		"major_01":  # The Magician
+			# Manifest any card
+			_manifest_card()
+		"major_13":  # Death
+			# Transform all units
+			_transform_all_units()
+		"major_16":  # The Tower
+			# Destroy everything
+			_destroy_all_board()
+		"major_21":  # The World
+			# Complete a trial instantly
+			arcana_trials["sun"] = 100
+			_check_trials_progress()
+		_:
+			# Default: Deal 5 damage to all enemies
+			for unit in opponent_board_container.get_children():
+				unit.set_meta("health", unit.get_meta("health", 3) - 5)
+				if unit.get_meta("health", 0) <= 0:
+					unit.queue_free()
+	
+	major_arcana_charge = 0
+	_update_major_arcana_display()
+
+func _apply_suit_style(card: Node) -> void:
+	var card_id := card.get_meta("card_id", "")
+	
+	if card_id.begins_with("wands_"):
+		# Aggressive style
+		card.set_meta("attack", card.get_meta("attack", 1) + 2)
+	elif card_id.begins_with("cups_"):
+		# Defensive/Heal style
+		player_health = min(player_max_health, player_health + 2)
+		_update_health_display()
+	elif card_id.begins_with("swords_"):
+		# Precise/Counter style
+		card.set_meta("counter", true)
+	elif card_id.begins_with("pentacles_"):
+		# Slow/Inevitable style
+		card.set_meta("shield", 1)
+		card.set_meta("attack", card.get_meta("attack", 1) + 1)
+
+func _randomize_all_hands() -> void:
+	# The Fool ultimate
+	var all_cards := player_hand_container.get_children() + opponent_hand_container.get_children()
+	all_cards.shuffle()
+	
+	for card in all_cards:
+		if randf() > 0.5:
+			card.reparent(player_hand_container)
+		else:
+			card.reparent(opponent_hand_container)
+	
+	_arrange_hand(true)
+	_arrange_hand(false)
+
+func _manifest_card() -> void:
+	# The Magician ultimate - create any card
+	var card := card_scene.instantiate()
+	player_hand_container.add_child(card)
+	card.load_card_image("major_%02d" % randi_range(0, 21), deck_name)
+	card.set_meta("zone", "player_hand")
+	_arrange_hand(true)
+
+func _transform_all_units() -> void:
+	# Death ultimate - transform all units
+	for unit in player_board_container.get_children() + opponent_board_container.get_children():
+		var new_id := "major_%02d" % randi_range(0, 21)
+		if unit.has_method("load_card_image"):
+			unit.load_card_image(new_id, deck_name)
+		unit.set_meta("card_id", new_id)
+		unit.set_meta("attack", randi_range(1, 5))
+		unit.set_meta("health", randi_range(1, 5))
+
+func _destroy_all_board() -> void:
+	# The Tower ultimate - destroy everything
+	for unit in player_board_container.get_children() + opponent_board_container.get_children():
+		unit.queue_free()
+	
+	# Deal 5 damage to both players
+	player_health -= 5
+	opponent_health -= 5
+	_update_health_display()
+	_check_victory_conditions()
 
 func _play_card_from_hand(card: Node) -> void:
+	# Store original position for animation
+	var start_pos := card.global_position
+	
 	# Move from hand to board
 	player_hand_container.remove_child(card)
 	player_board_container.add_child(card)
 	card.set_meta("zone", "player_board")
 	
+	# Play animation (0.4s + VFX as per diagram)
+	card.global_position = start_pos
+	
+	# Create VFX
+	var vfx := CPUParticles2D.new()
+	vfx.position = card.position
+	vfx.amount = 20
+	vfx.lifetime = 0.4
+	vfx.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
+	vfx.initial_velocity_min = 50
+	vfx.initial_velocity_max = 150
+	vfx.scale_amount_min = 0.5
+	vfx.scale_amount_max = 1.5
+	vfx.color = Color(0.8, 0.6, 1.0)
+	vfx.emitting = true
+	player_board_container.add_child(vfx)
+	
+	# Animate card to board position
+	var tween := create_tween()
+	tween.set_trans(Tween.TRANS_BACK)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.tween_property(card, "scale", Vector2(1.2, 1.2), 0.2)
+	tween.tween_property(card, "scale", Vector2(1.0, 1.0), 0.2)
+	
+	# Clean up VFX after animation
+	await tween.finished
+	vfx.queue_free()
+	
 	# Deduct fate cost
 	player_fate -= _get_card_cost(card)
 	_update_fate_display()
+	
+	# Apply suit combat style
+	_apply_suit_style(card)
+	
+	# Charge Major Arcana
+	_charge_major_arcana(10)
 	
 	# Rearrange zones
 	_arrange_hand(true)
@@ -422,26 +757,36 @@ func _arrange_hand(is_player: bool) -> void:
 	if card_count == 0:
 		return
 	
-    var start_x: float = - (card_count - 1) * HAND_CARD_SPACING / 2.0
+	# Proper fanning: 50px spacing, 5° angles as per diagram
+	const FAN_SPACING := 50.0  # 50px spacing
+	const FAN_ANGLE := deg_to_rad(5.0)  # 5° rotation per card
+	var start_x: float = - (card_count - 1) * FAN_SPACING / 2.0
 	
 	for i in range(card_count):
 		var card := cards[i]
-        # Place cards within their container; ensure they are mouse-draggable by setting draggable anchor
-        var target_pos := Vector2(start_x + i * HAND_CARD_SPACING, 0)
+		var target_pos := Vector2(start_x + i * FAN_SPACING, 0)
 		
-		# Animate to position
+		# Calculate fan curve (slight arc)
+		var center_offset := (i - (card_count - 1) / 2.0)
+		target_pos.y = abs(center_offset) * 5  # Slight vertical curve
+		
+		# Animate to position with proper timing (0.3s draw animation)
 		var tween := create_tween()
 		tween.set_trans(Tween.TRANS_CUBIC)
 		tween.set_ease(Tween.EASE_OUT)
-		tween.tween_property(card, "position", target_pos, 0.3)
+		tween.tween_property(card, "position", target_pos, 0.3)  # 0.3s as per diagram
 		
-		# Fan cards slightly
+		# Fan cards with 5° angles
 		if is_player:
-            var rotation := (i - card_count / 2.0) * 0.05
-            tween.parallel().tween_property(card, "rotation", rotation, 0.3)
-        # Ensure card can receive inputs while inside hand
-        if card.has_method("set_process"):
-            card.set_process(true)
+			var rotation := center_offset * FAN_ANGLE
+			tween.parallel().tween_property(card, "rotation", rotation, 0.3)
+		
+		# Set z_index for proper overlap
+		card.z_index = i
+		
+		# Ensure card can receive inputs
+		if card.has_method("set_process"):
+			card.set_process(true)
 
 func _arrange_board(is_player: bool) -> void:
 	var container := player_board_container if is_player else opponent_board_container
@@ -482,10 +827,13 @@ func _advance_phase() -> void:
 	match current_phase:
 		"draw":
 			current_phase = "main"
+			_execute_draw_phase()
 		"main":
 			current_phase = "combat"
+			_execute_combat_phase()
 		"combat":
 			current_phase = "end"
+			_execute_end_phase()
 		"end":
 			current_phase = "draw"
 			current_turn += 1
@@ -493,6 +841,141 @@ func _advance_phase() -> void:
 	
 	_update_phase_display()
 	_update_turn_display()
+	_send({"type": "phase_change", "phase": current_phase})
+
+func _execute_draw_phase() -> void:
+	# Draw phase actions
+	if is_my_turn:
+		_draw_card_to_hand(true)
+	# Trigger draw phase effects
+	_trigger_phase_effects("draw")
+
+func _execute_combat_phase() -> void:
+	# Combat phase with lanes
+	var player_units := player_board_container.get_children()
+	var opponent_units := opponent_board_container.get_children()
+	
+	# Process each lane (6 lanes)
+	for lane in range(6):
+		var player_unit = null
+		var opponent_unit = null
+		
+		if lane < player_units.size():
+			player_unit = player_units[lane]
+		if lane < opponent_units.size():
+			opponent_unit = opponent_units[lane]
+		
+		if is_my_turn and player_unit:
+			_process_unit_combat(player_unit, opponent_unit, true)
+		elif not is_my_turn and opponent_unit:
+			_process_unit_combat(opponent_unit, player_unit, false)
+	
+	# Process burn effects
+	_process_burn_effects()
+	
+	_update_health_display()
+	_check_victory_conditions()
+
+func _process_unit_combat(attacker: Node, defender, is_player: bool) -> void:
+	var damage := attacker.get_meta("attack", 1)
+	var attacker_id := attacker.get_meta("card_id", "")
+	var defender_id := "" if not defender else defender.get_meta("card_id", "")
+	
+	# Apply elemental interactions
+	damage = _calculate_elemental_damage(attacker_id, defender_id, damage)
+	
+	# Apply suit style bonuses
+	if attacker_id.begins_with("wands_"):
+		damage += suit_styles["wands"]["damage_bonus"]
+		# Apply burn
+		if defender:
+			defender.set_meta("burn", 2)
+	elif attacker_id.begins_with("swords_") and defender:
+		# Counter damage
+		if is_player:
+			player_health -= suit_styles["swords"]["counter_damage"]
+		else:
+			opponent_health -= suit_styles["swords"]["counter_damage"]
+	
+	if defender:
+		var shield := defender.get_meta("shield", 0)
+		damage = max(0, damage - shield)
+		defender.set_meta("health", defender.get_meta("health", 3) - damage)
+		if defender.get_meta("health", 0) <= 0:
+			defender.queue_free()
+	else:
+		# Direct face damage
+		if is_player:
+			opponent_health -= damage
+		else:
+			player_health -= damage
+
+func _calculate_elemental_damage(attacker_suit: String, defender_suit: String, base_damage: int) -> int:
+	# Elemental interactions: Fire↔Water, Air↔Earth
+	var damage := base_damage
+	
+	# Extract suits
+	var att_suit := ""
+	var def_suit := ""
+	
+	if attacker_suit.begins_with("wands_"): att_suit = "fire"
+	elif attacker_suit.begins_with("cups_"): att_suit = "water"
+	elif attacker_suit.begins_with("swords_"): att_suit = "air"
+	elif attacker_suit.begins_with("pentacles_"): att_suit = "earth"
+	
+	if defender_suit.begins_with("wands_"): def_suit = "fire"
+	elif defender_suit.begins_with("cups_"): def_suit = "water"
+	elif defender_suit.begins_with("swords_"): def_suit = "air"
+	elif defender_suit.begins_with("pentacles_"): def_suit = "earth"
+	
+	# Opposition interactions (deal more damage)
+	if (att_suit == "fire" and def_suit == "water") or (att_suit == "water" and def_suit == "fire"):
+		damage = int(damage * 1.5)
+	elif (att_suit == "air" and def_suit == "earth") or (att_suit == "earth" and def_suit == "air"):
+		damage = int(damage * 1.5)
+	# Diagonal synergies (deal less damage to allies)
+	elif (att_suit == "fire" and def_suit == "air") or (att_suit == "air" and def_suit == "fire"):
+		damage = int(damage * 0.75)
+	elif (att_suit == "water" and def_suit == "earth") or (att_suit == "earth" and def_suit == "water"):
+		damage = int(damage * 0.75)
+	
+	return damage
+
+func _process_burn_effects() -> void:
+	for unit in player_board_container.get_children() + opponent_board_container.get_children():
+		if unit.has_meta("burn"):
+			var burn := unit.get_meta("burn", 0)
+			if burn > 0:
+				unit.set_meta("health", unit.get_meta("health", 3) - 1)
+				unit.set_meta("burn", burn - 1)
+				if unit.get_meta("health", 0) <= 0:
+					unit.queue_free()
+
+func _execute_end_phase() -> void:
+	# End phase cleanup
+	_trigger_phase_effects("end")
+	# Clear temporary effects
+	for boon in spread_bonuses:
+		if boon.ends_with("_temp"):
+			spread_bonuses.erase(boon)
+
+func _trigger_phase_effects(phase: String) -> void:
+	# Trigger effects based on phase
+	for omen in current_run.get("omens", []):
+		match omen:
+			"fortune_reading":
+				if phase == "draw":
+					# Scry 1
+					print("Fortune Reading: Scrying top card")
+
+func _check_victory_conditions() -> void:
+	# Check health victory
+	if opponent_health <= 0:
+		_trigger_victory("health")
+	elif player_health <= 0:
+		_handle_game_over({"winner": opponent_id, "type": "health"})
+	
+	# Check trials victory (already implemented in _check_trials_progress)
 
 func _on_hand_toggle_pressed() -> void:
 	player_hand_container.visible = not player_hand_container.visible
@@ -608,12 +1091,15 @@ func _switch_turn() -> void:
 	if get_meta("game_mode", "pvp") == "pve":
 		if is_my_turn:
 			# Player's turn - gain fate
-			player_fate = min(player_max_fate, player_fate + 1)
+			player_fate = min(player_max_fate, player_fate + fate_generation_per_turn)
 			_draw_card_to_hand(true)
+			_process_spread_bonuses(true)
+			_check_trials_progress()
 		else:
 			# Opponent's turn
-			opponent_fate = min(3, opponent_fate + 1)
+			opponent_fate = min(3, opponent_fate + fate_generation_per_turn)
 			_draw_card_to_hand(false)
+			_process_spread_bonuses(false)
 			# Simulate AI turn after delay
             await get_tree().create_timer(1.0).timeout
             _simulate_ai_turn()
@@ -650,6 +1136,101 @@ func _update_health_display() -> void:
 func _update_fate_display() -> void:
 	player_fate_label.text = "Fate: " + str(player_fate) + "/" + str(player_max_fate)
 	opponent_fate_label.text = "Fate: " + str(opponent_fate) + "/3"
+	# Update fate particles effect
+	_show_fate_particles(player_fate > 0)
+
+func _show_fate_particles(active: bool) -> void:
+	if fate_particles and fate_particles is CPUParticles2D:
+		(fate_particles as CPUParticles2D).emitting = active
+
+func _update_trials_display() -> void:
+	if trials_label:
+		var sun := arcana_trials.get("sun", 0)
+		var moon := arcana_trials.get("moon", 0) 
+		var judge := arcana_trials.get("judgement", 0)
+		trials_label.text = "Trials: Sun %d/100 | Moon %d/100 | Judge %d/100" % [sun, moon, judge]
+
+func _on_flip_pressed() -> void:
+	if player_fate < 1:
+		return
+	# Need to select a card to flip
+	print("Select a card to flip orientation")
+
+func _on_peek_pressed() -> void:
+	if player_fate < 1:
+		return
+	player_fate -= 1
+	_update_fate_display()
+	# Scrying: Look at top 3 cards and rearrange
+	_show_scrying_interface()
+	_send({"type": "peek"})
+
+func _show_scrying_interface() -> void:
+	# Oracle Eye scrying interface
+	var scry_panel := Panel.new()
+	scry_panel.name = "ScryPanel"
+	scry_panel.anchor_left = 0.3
+	scry_panel.anchor_right = 0.7
+	scry_panel.anchor_top = 0.3
+	scry_panel.anchor_bottom = 0.7
+	add_child(scry_panel)
+	
+	var title := Label.new()
+	title.text = "Scrying - Rearrange Your Destiny"
+	title.anchor_right = 1.0
+	title.anchor_bottom = 0.15
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	scry_panel.add_child(title)
+	
+	var cards_container := HBoxContainer.new()
+	cards_container.anchor_left = 0.1
+	cards_container.anchor_right = 0.9
+	cards_container.anchor_top = 0.2
+	cards_container.anchor_bottom = 0.7
+	scry_panel.add_child(cards_container)
+	
+	# Show top 3 cards from deck
+	var scry_cards := []
+	for i in range(3):
+		var card := card_scene.instantiate()
+		cards_container.add_child(card)
+		card.load_card_image("wands_%02d" % randi_range(1, 14), deck_name)
+		card.set_meta("scry_position", i)
+		card.can_be_dragged = true
+		scry_cards.append(card)
+	
+	var confirm_button := Button.new()
+	confirm_button.text = "Accept Fate"
+	confirm_button.anchor_left = 0.35
+	confirm_button.anchor_right = 0.65
+	confirm_button.anchor_top = 0.8
+	confirm_button.anchor_bottom = 0.9
+	scry_panel.add_child(confirm_button)
+	confirm_button.pressed.connect(func(): scry_panel.queue_free())
+
+func _on_force_draw_pressed() -> void:
+	if player_fate < 2:
+		return
+	player_fate -= 2
+	_update_fate_display()
+	_draw_card_to_hand(true)
+	_send({"type": "force_draw"})
+
+func _on_block_flip_pressed() -> void:
+	if player_fate < 2:
+		return
+	player_fate -= 2
+	_update_fate_display()
+	# Block next flip attempt
+	_send({"type": "block_flip"})
+
+func _on_divine_pressed() -> void:
+	if player_fate < 3:
+		return
+	player_fate -= 3
+	_update_fate_display()
+	# Trigger divine intervention
+	_send({"type": "divine_intervention"})
 
 func _update_phase_display() -> void:
 	phase_label.text = current_phase.capitalize()
