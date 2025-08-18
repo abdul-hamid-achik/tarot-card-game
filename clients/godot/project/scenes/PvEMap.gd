@@ -111,7 +111,7 @@ func _show_deck() -> void:
 	list.anchor_right = 0.95
 	list.anchor_bottom = 0.95
 	var lines := []
-	var sorted := current_run["deck"].duplicate()
+	var sorted: Array = current_run["deck"].duplicate()
 	sorted.sort_custom(func(a, b):
 		return str(a["id"]) < str(b["id"]))
 	for entry in sorted:
@@ -555,7 +555,7 @@ func _generate_enemy_deck(type: NodeType) -> Array:
 
 func _show_event(node_id: int) -> void:
 	# Select random event variant
-	var event := event_variants[randi() % event_variants.size()]
+	var event: Dictionary = event_variants[randi() % event_variants.size()]
 	
 	# Setup event popup
 	if event_popup:
@@ -620,7 +620,7 @@ func _show_card_trade_ui() -> void:
 	if current_run["deck"].size() > 2:
 		for i in range(2):
 			if current_run["deck"].size() > 0:
-				var idx := randi() % current_run["deck"].size()
+				var idx: int = randi() % current_run["deck"].size()
 				var card = current_run["deck"][idx]
 				if card["count"] > 1:
 					card["count"] -= 1
@@ -652,7 +652,7 @@ func _complete_node(node_id: int) -> void:
 	completed_nodes.append(node_id)
 	current_node_id = node_id
 	if map_data.has(node_id):
-		var t := map_data[node_id]["type"]
+		var t: int = map_data[node_id]["type"] as int
 		if t == NodeType.BATTLE or t == NodeType.ELITE:
 			trials_completed = min(3, trials_completed + 1)
 	_update_available_nodes()
@@ -795,7 +795,7 @@ func _card_hint(card_id: String) -> String:
 		"major_03": "High-impact effect.",
 		"major_04": "High-impact effect."
 	}
-	var d := descs.get(card_id, "A mysterious card.")
+	var d: String = descs.get(card_id, "A mysterious card.") as String
 	return rarity + "\n" + d
 
 func _save_run() -> void:
@@ -857,7 +857,7 @@ func _setup_shop_ui(node_id: int) -> void:
 	fragment_container.add_child(fragment_button)
 	
 	# Generate 3 choices
-	# Note: rng variable already exists from _weighted_card_choices calls
+	var rng := RandomNumberGenerator.new()
 
 func _exchange_fragments(node_id: int) -> void:
 	if deck_fragments >= 1000:
@@ -865,7 +865,7 @@ func _exchange_fragments(node_id: int) -> void:
 		current_run["deck_fragments"] = deck_fragments
 		# Unlock a full deck
 		var decks := ["marigold", "arcana", "duality"]
-		var chosen_deck := decks[randi() % decks.size()]
+		var chosen_deck: String = decks[randi() % decks.size()]
 		_unlock_full_deck(chosen_deck)
 		_update_ui()
 		shop_popup.hide()
@@ -926,8 +926,9 @@ func _unlock_full_deck(deck_id: String) -> void:
 	ProjectSettings.save()
 	
 	_show_unlock_ceremony("Full %s Deck Unlocked!" % deck_id.capitalize())
+	var rng := RandomNumberGenerator.new()
 	rng.randomize()
-	var choices := _weighted_card_choices(3, rng)
+	var choices: Array = _weighted_card_choices(3, rng)
 	for i in range(3):
 		var path := "ShopUI/CardsRow/Buy" + str(i + 1)
 		var btn := shop_popup.get_node_or_null(path) as Button
