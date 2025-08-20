@@ -64,9 +64,9 @@ function advancePhase(state: MatchState): MatchState {
       const nextTurn = state.turn + 1;
       const nextPlayerIdx = nextTurn % state.players.length;
       const nextPlayer = state.players[nextPlayerIdx];
-      const fate = { ...state.fate } as Record<string, number>;
-      fate[nextPlayer] = Math.min(3, (fate[nextPlayer] ?? 0) + 1);
-      return processTriggers(resetReactionWindow({ ...state, turn: nextTurn, phase: 'draw', fate }));
+      const resources = { ...(state.resources ?? {}) as Record<string, number> };
+      resources[nextPlayer] = Math.min(3, (resources[nextPlayer] ?? 0) + 1);
+      return processTriggers(resetReactionWindow({ ...state, turn: nextTurn, phase: 'draw', resources }));
     }
     default:
       return state;
@@ -126,14 +126,9 @@ export function applyIntent(state: MatchState, intent: IntentInput): MatchState 
       }
       // End of turn hooks
       const withTrials = updateTrialsOnTurnEnd(state);
-      // Ramp: +1 resource to the current player (round-robin by turn)
-      const currentPlayerIdx = withTrials.turn % withTrials.players.length;
-      const currentPlayer = withTrials.players[currentPlayerIdx];
-      const resources = { ...((withTrials.resources ?? {}) as Record<string, number>) } as Record<string, number>;
-      resources[currentPlayer] = (resources[currentPlayer] ?? 0) + 1;
       // Advance to next turn and phase 'draw', add +1 Fate to new current player capped at 3
-      const afterTurn = { ...withTrials, resources } as MatchState;
-      return advancePhase(afterTurn);
+      // The advancePhase function will handle the fate increment
+      return advancePhase(withTrials);
     }
     case 'play_card': {
       // Only allow play if card is in hand and has enough resources (cost=1)

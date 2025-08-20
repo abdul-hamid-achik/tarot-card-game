@@ -351,13 +351,13 @@ export class EnemyAI {
         case 'aggressive':
           score += (card.attack || 0) * 3;
           score -= (card.health || 0) * 0.5;
-          if (card.type === 'spell' && card.description.includes('damage')) score += 10;
+          if (card.type === 'spell' && card.description?.includes('damage')) score += 10;
           break;
           
         case 'defensive':
           score += (card.health || 0) * 3;
           score += (card.attack || 0) * 0.5;
-          if (card.description.includes('heal') || card.description.includes('taunt')) score += 10;
+          if (card.description?.includes('heal') || card.description?.includes('taunt')) score += 10;
           break;
           
         case 'strategic':

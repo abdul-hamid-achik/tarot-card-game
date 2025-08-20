@@ -72,10 +72,10 @@ export function OpponentArea({ player, isActive }: OpponentAreaProps) {
           <motion.div
             key={index}
             initial={{ scale: 0, y: -50 }}
-            animate={{ scale: 0.4, y: 0 }}
+            animate={{ scale: 0.7, y: 0 }}
             transition={{ delay: index * 0.1 }}
             style={{
-              marginLeft: index === 0 ? 0 : '-30px',
+              marginLeft: index === 0 ? 0 : '-40px',
               zIndex: index + 1
             }}
             className="relative"

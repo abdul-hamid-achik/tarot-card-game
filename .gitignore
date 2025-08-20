@@ -21,3 +21,5 @@ clients/godot/project/.import/
 clients/godot/project/**/*.import
 clients/godot/project/builds/
 apps/web/public/godot/*
+
+*.tsbuildinfo

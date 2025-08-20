@@ -6,88 +6,87 @@ import { cn } from '@/lib/utils';
 interface PixelButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'default' | 'gold' | 'blue' | 'red';
   size?: 'sm' | 'md' | 'lg';
-  state?: 'normal' | 'hover' | 'active' | 'disabled';
 }
 
 const PixelButton = forwardRef<HTMLButtonElement, PixelButtonProps>(
-  ({ className, variant = 'default', size = 'md', state, children, disabled, ...props }, ref) => {
-    // Button states in the spritesheet (4x3 grid)
-    // Each button is approximately 32x42 pixels
-    const buttonWidth = 32;
-    const buttonHeight = 42;
-    
-    // Map variants to column positions (0-indexed)
-    const variantPositions = {
-      default: 0,  // Gray buttons (column 1)
-      gold: 1,     // Gold/yellow buttons (column 2)
-      blue: 2,     // Blue buttons (column 3)
-      red: 3,      // Red buttons (column 4)
-    };
-    
-    // Map states to row positions (0-indexed)
-    const statePositions = {
-      normal: 0,    // Top row
-      hover: 1,     // Middle row
-      active: 2,    // Bottom row (pressed)
-      disabled: 0,  // Use normal state for disabled
-    };
-    
-    // Calculate background position
-    const column = variantPositions[variant];
-    const row = disabled ? statePositions.disabled : (state ? statePositions[state] : statePositions.normal);
-    const bgPosX = -(column * buttonWidth);
-    const bgPosY = -(row * buttonHeight);
-    
+  ({ className, variant = 'default', size = 'md', children, disabled, ...props }, ref) => {
     // Size classes
     const sizeClasses = {
-      sm: 'min-w-[64px] h-[32px] text-xs px-2',
-      md: 'min-w-[96px] h-[42px] text-sm px-3',
-      lg: 'min-w-[128px] h-[48px] text-base px-4',
+      sm: 'px-4 py-2 text-xs',
+      md: 'px-6 py-3 text-sm',
+      lg: 'px-8 py-4 text-base',
     };
-    
+
+    // Variant classes with gradient backgrounds
+    const variantClasses = {
+      default: cn(
+        'bg-gradient-to-b from-gray-600 to-gray-800',
+        'hover:from-gray-500 hover:to-gray-700',
+        'border-2 border-gray-500',
+        'shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2)]'
+      ),
+      gold: cn(
+        'bg-gradient-to-b from-yellow-500 to-yellow-700',
+        'hover:from-yellow-400 hover:to-yellow-600',
+        'border-2 border-yellow-600',
+        'shadow-[inset_0_1px_0_0_rgba(255,255,255,0.3)]'
+      ),
+      blue: cn(
+        'bg-gradient-to-b from-blue-500 to-blue-700',
+        'hover:from-blue-400 hover:to-blue-600',
+        'border-2 border-blue-600',
+        'shadow-[inset_0_1px_0_0_rgba(255,255,255,0.3)]'
+      ),
+      red: cn(
+        'bg-gradient-to-b from-red-500 to-red-700',
+        'hover:from-red-400 hover:to-red-600',
+        'border-2 border-red-600',
+        'shadow-[inset_0_1px_0_0_rgba(255,255,255,0.3)]'
+      ),
+    };
+
     return (
       <button
         ref={ref}
         disabled={disabled}
         className={cn(
-          "relative inline-flex items-center justify-center font-bold",
-          "transition-transform duration-75",
-          "text-white drop-shadow-[1px_1px_0px_rgba(0,0,0,0.5)]",
+          // Base styles
+          "relative inline-flex items-center justify-center",
+          "font-bold text-white uppercase tracking-wider",
+          "rounded-lg transition-all duration-400 ",
+          "transform-gpu",
+
+          // 3D effect
+          "shadow-[0_4px_0_0_rgba(0,0,0,0.3)]",
+          "active:shadow-[0_2px_0_0_rgba(0,0,0,0.3)]",
+          "active:translate-y-[2px]",
+
+          // Size
           sizeClasses[size],
-          disabled && "opacity-50 cursor-not-allowed",
-          !disabled && "cursor-pointer active:translate-y-[2px]",
+
+          // Variant
+          variantClasses[variant],
+
+          // States
+          disabled && "opacity-50 cursor-not-allowed active:translate-y-0 active:shadow-[0_4px_0_0_rgba(0,0,0,0.3)]",
+          !disabled && "cursor-pointer hover:brightness-110",
+
           className
         )}
-        style={{
-          backgroundImage: 'url(/api/ui/themes/pixel-pack/others/card_ui_buttons.png)',
-          backgroundPosition: `${bgPosX}px ${bgPosY}px`,
-          backgroundSize: '128px 128px',
-          imageRendering: 'pixelated',
-          backgroundRepeat: 'no-repeat',
-        }}
-        onMouseEnter={(e) => {
-          if (!disabled && !state) {
-            e.currentTarget.style.backgroundPosition = `${bgPosX}px ${-(buttonHeight)}px`;
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!disabled && !state) {
-            e.currentTarget.style.backgroundPosition = `${bgPosX}px ${bgPosY}px`;
-          }
-        }}
-        onMouseDown={(e) => {
-          if (!disabled && !state) {
-            e.currentTarget.style.backgroundPosition = `${bgPosX}px ${-(buttonHeight * 2)}px`;
-          }
-        }}
-        onMouseUp={(e) => {
-          if (!disabled && !state) {
-            e.currentTarget.style.backgroundPosition = `${bgPosX}px ${-(buttonHeight)}px`;
-          }
-        }}
         {...props}
       >
-        <span className="relative z-10">{children}</span>
+        {/* Inner text with shadow for depth */}
+        <span className="relative z-10 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
+          {children}
+        </span>
+
+        {/* Pixel corners effect */}
+        <div className="absolute inset-0 rounded-lg pointer-events-none">
+          <div className="absolute top-0 left-0 w-1 h-1 bg-white/20" />
+          <div className="absolute top-0 right-0 w-1 h-1 bg-white/20" />
+          <div className="absolute bottom-0 left-0 w-1 h-1 bg-black/20" />
+          <div className="absolute bottom-0 right-0 w-1 h-1 bg-black/20" />
+        </div>
       </button>
     );
   }

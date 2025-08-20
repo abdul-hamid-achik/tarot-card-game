@@ -9,26 +9,42 @@ import { enemyTemplates } from '@/lib/ai/EnemyAI';
 import { audioManager } from '@/lib/audio/AudioManager';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/lib/store/gameStore';
+import { CoinFlip } from '@/components/game/CoinFlip';
 
-// Generate sample cards for demo
+// Generate sample cards for demo using tarot cards with proper IDs
 function generateDemoCards(count: number, prefix: string): Card[] {
   const cards: Card[] = [];
-  const suits: Array<'wands' | 'cups' | 'swords' | 'pentacles'> = ['wands', 'cups', 'swords', 'pentacles'];
+  
+  // Sample tarot cards for demo with proper card IDs
+  const sampleCards = [
+    { id: 'major_00', name: 'The Fool', suit: 'major', cost: 0, attack: 1, health: 4 },
+    { id: 'major_01', name: 'The Magician', suit: 'major', cost: 1, attack: 2, health: 3 },
+    { id: 'major_02', name: 'The High Priestess', suit: 'major', cost: 2, attack: 1, health: 5 },
+    { id: 'wands_01', name: 'Ace of Wands', suit: 'wands', cost: 1, attack: 3, health: 2 },
+    { id: 'cups_02', name: 'Two of Cups', suit: 'cups', cost: 2, attack: 2, health: 4 },
+    { id: 'swords_03', name: 'Three of Swords', suit: 'swords', cost: 3, attack: 4, health: 3 },
+    { id: 'pentacles_04', name: 'Four of Pentacles', suit: 'pentacles', cost: 4, attack: 3, health: 5 },
+    { id: 'wands_knight', name: 'Knight of Wands', suit: 'wands', cost: 3, attack: 4, health: 4 },
+    { id: 'cups_queen', name: 'Queen of Cups', suit: 'cups', cost: 4, attack: 3, health: 6 },
+    { id: 'swords_king', name: 'King of Swords', suit: 'swords', cost: 5, attack: 5, health: 5 },
+  ];
   
   for (let i = 0; i < count; i++) {
-    const suit = suits[i % suits.length];
+    const template = sampleCards[i % sampleCards.length];
     cards.push({
-      id: `${prefix}-card-${i}`,
-      name: `${suit.charAt(0).toUpperCase() + suit.slice(1)} Card ${i + 1}`,
-      suit,
-      cost: Math.floor(Math.random() * 3) + 1,
-      attack: Math.floor(Math.random() * 5) + 1,
-      health: Math.floor(Math.random() * 5) + 2,
-      orientation: 'upright',
-      description: 'A mystical tarot card',
-      type: Math.random() > 0.3 ? 'unit' : 'spell',
-      rarity: 'common',
-      deck: 'classic'
+      id: `${prefix}-${i}-${template.id}`, // Unique ID but preserves card reference
+      name: template.name,
+      suit: template.suit as any,
+      cost: template.cost,
+      attack: template.attack,
+      health: template.health,
+      orientation: Math.random() > 0.8 ? 'reversed' : 'upright',
+      description: `${template.name} - A powerful tarot card`,
+      type: template.suit === 'major' ? 'spell' : 'unit',
+      rarity: template.suit === 'major' ? 'mythic' : 'common',
+      deck: 'classic',
+      imageUrl: `/api/card-image?id=${template.id}&deck=classic`,
+      backImageUrl: '/api/ui/themes/pixel-pack/sheets/card_ui_01.png'
     });
   }
   
@@ -46,14 +62,24 @@ export default function MatchDemoPage() {
   
   const [enemyAI, setEnemyAI] = useState<EnemyAI | null>(null);
   const [isAIThinking, setIsAIThinking] = useState(false);
+  const [showCoinFlip, setShowCoinFlip] = useState(true);
+  const [enemy, setEnemy] = useState<any>(null);
 
-  // Initialize demo match
+  // Initialize enemy for demo
   useEffect(() => {
-    console.log('Initializing demo match...');
+    console.log('Preparing demo match...');
     // Pick a random enemy
-    const enemy = enemyTemplates[0]; // Luna - Apprentice Seer
-    const ai = new EnemyAI(enemy);
+    const selectedEnemy = enemyTemplates[0]; // Luna - Apprentice Seer
+    setEnemy(selectedEnemy);
+    const ai = new EnemyAI(selectedEnemy);
     setEnemyAI(ai);
+  }, []);
+
+  // Handle coin flip result
+  const handleCoinFlipComplete = (playerStarts: boolean) => {
+    setShowCoinFlip(false);
+    
+    if (!enemy) return;
     
     // Generate demo decks
     const playerDeck = generateDemoCards(30, 'player');
@@ -69,12 +95,12 @@ export default function MatchDemoPage() {
           name: 'You',
           health: 30,
           maxHealth: 30,
-          fate: 3,
+          fate: playerStarts ? 1 : 0, // Starting player gets 1 fate
           maxFate: 3,
           hand: playerDeck.slice(0, 5),
           deck: playerDeck.slice(5),
           discard: [],
-          board: Array(5).fill(null).map((_, i) => ({ id: `p1-slot-${i}`, card: null })),
+          board: Array(6).fill(null).map((_, i) => ({ id: `p1-slot-${i}`, card: null })),
           trials: []
         },
         ai: {
@@ -82,20 +108,20 @@ export default function MatchDemoPage() {
           name: enemy.name,
           health: 30,
           maxHealth: 30,
-          fate: 3,
+          fate: playerStarts ? 0 : 1, // Non-starting player gets 0 fate
           maxFate: 3,
           hand: aiDeck.slice(0, 5),
           deck: aiDeck.slice(5),
           discard: [],
-          board: Array(5).fill(null).map((_, i) => ({ id: `ai-slot-${i}`, card: null })),
+          board: Array(6).fill(null).map((_, i) => ({ id: `ai-slot-${i}`, card: null })),
           trials: [],
           avatar: enemy.portrait,
           isAI: true
         }
       },
-      activePlayer: 'player1',
+      activePlayer: playerStarts ? 'player1' : 'ai',
       turn: 1,
-      phase: 'main' as const,
+      phase: 'main' as const, // Start in main phase
       turnTimer: 60
     };
     
@@ -104,7 +130,7 @@ export default function MatchDemoPage() {
     console.log('AI hand:', matchData.players.ai.hand);
     
     initializeMatch(matchData);
-  }, []);
+  };
 
   // Simple AI turn handler
   useEffect(() => {
@@ -142,7 +168,7 @@ export default function MatchDemoPage() {
     setIsAIThinking(false);
   };
 
-  if (!currentMatch) {
+  if (!currentMatch && !showCoinFlip) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-900 to-purple-900 flex items-center justify-center">
         <div className="text-white text-2xl animate-pulse">Loading Demo Battle...</div>
@@ -152,7 +178,15 @@ export default function MatchDemoPage() {
 
   return (
     <>
-      <GameBoard />
+      {showCoinFlip && enemy ? (
+        <CoinFlip
+          onComplete={handleCoinFlipComplete}
+          playerName="You"
+          opponentName={enemy.name}
+        />
+      ) : (
+        <GameBoard />
+      )}
       
       {/* AI Thinking Indicator */}
       {isAIThinking && (

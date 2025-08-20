@@ -37,11 +37,13 @@ export function TarotCard({
   const [isHovered, setIsHovered] = useState(false);
   const [playerCardBack, setPlayerCardBack] = useState<string>('/api/ui/themes/pixel-pack/sheets/card_ui_01.png');
   const isReversed = card.orientation === 'reversed';
-  
+
   useEffect(() => {
     const cardBack = getPlayerCardBack();
     setPlayerCardBack(cardBack.image);
   }, []);
+
+  const canDrag = isInHand && isSelectable;
 
   const {
     attributes,
@@ -52,18 +54,20 @@ export function TarotCard({
   } = useDraggable({
     id: card.id,
     data: card,
-    disabled: !isInHand || !isSelectable
+    disabled: !canDrag
   });
+
+
 
   const style = transform ? {
     transform: CSS.Translate.toString(transform),
   } : undefined;
 
-  const cardScale = isInHand && !isHovered ? 0.5 : scale;
+  const cardScale = isInHand && !isHovered ? 0.9 : scale;
   const actuallyDragging = isDragging || isDraggingLocal;
 
   const getSuitColor = (suit: string) => {
-    switch(suit) {
+    switch (suit) {
       case 'wands': return 'from-tarot-suits-wands to-red-700';
       case 'cups': return 'from-tarot-suits-cups to-blue-700';
       case 'swords': return 'from-tarot-suits-swords to-purple-700';
@@ -74,7 +78,7 @@ export function TarotCard({
   };
 
   const getSuitIcon = (suit: string) => {
-    switch(suit) {
+    switch (suit) {
       case 'wands': return <Flame className="w-5 h-5 text-orange-400" />;
       case 'cups': return <Droplets className="w-5 h-5 text-blue-400" />;
       case 'swords': return <Swords className="w-5 h-5 text-purple-400" />;
@@ -84,8 +88,13 @@ export function TarotCard({
     }
   };
 
-  // Build card image URL from server
-  const cardImageUrl = `/api/card-image?id=${card.id}&deck=${card.deck || 'classic'}`;
+  // Use pixel art card frames from assets
+  const getCardFrame = () => {
+    if (card.rarity === 'mythic' || card.suit === 'major') {
+      return '/api/ui/themes/pixel-pack/others/card_ui_gold_front.png';
+    }
+    return '/api/ui/themes/pixel-pack/others/card_ui_black_front.png';
+  };
 
   return (
     <div
@@ -116,6 +125,26 @@ export function TarotCard({
         setIsFlipped(!isFlipped);
       }}
     >
+      {/* Always-on top badges (outside flip/rotation) */}
+      {card.type === 'unit' && (
+        <div className="absolute -top-5 left-0 right-0 z-40 pointer-events-none select-none">
+          {/* Optional decorative top border */}
+          <img
+            src="/api/ui/themes/pixel-pack/others/card_ui_top_borders.png"
+            alt=""
+            className="absolute -top-3 left-1/2 -translate-x-1/2 w-[110%] opacity-90"
+          />
+          <div className="relative flex justify-between px-1">
+            <div className="bg-red-900/95 px-2 py-0.5 rounded border border-red-700 text-white text-xs font-bold shadow-md">
+              ⚔ {card.attack || 0}
+            </div>
+            <div className="bg-blue-900/95 px-2 py-0.5 rounded border border-blue-700 text-white text-xs font-bold shadow-md">
+              ❤ {card.health || 0}
+            </div>
+          </div>
+        </div>
+      )}
+
       <AnimatePresence mode="wait">
         <motion.div
           className="relative preserve-3d"
@@ -140,74 +169,111 @@ export function TarotCard({
           {/* Card Front */}
           <motion.div
             className={cn(
-              "absolute inset-0 rounded-lg shadow-xl backface-hidden",
-              "bg-gradient-to-br border-2",
-              getSuitColor(card.suit),
+              "absolute inset-0 rounded-lg shadow-xl backface-hidden overflow-hidden",
               isHovered && "shadow-2xl ring-2 ring-yellow-400",
               actuallyDragging && "opacity-90"
             )}
-            style={{ backfaceVisibility: 'hidden' }}
+            style={{
+              backfaceVisibility: 'hidden'
+            }}
           >
-            <div className="relative h-full p-2 flex flex-col text-white">
-              {/* Card Header */}
-              <div className="flex justify-between items-start mb-1">
-                <div className="flex items-center gap-1">
-                  <span className="text-lg font-bold">{card.cost}</span>
-                  {card.orientation === 'reversed' && (
-                    <Moon className="w-3 h-3" />
+            {/* Use actual card image if available, otherwise use frame */}
+            {card.imageUrl ? (
+              <>
+                {/* Actual card image */}
+                <img
+                  src={card.imageUrl}
+                  alt={card.name}
+                  className="absolute inset-0 w-full h-full rounded-lg"
+                  style={{ imageRendering: 'auto' }}
+                />
+                {/* Overlay for stats */}
+                <div className="absolute inset-0 flex flex-col justify-between p-2">
+                  {/* Cost at top left */}
+                  <div className="flex justify-between">
+                    <div className="bg-black/70 rounded-full w-8 h-8 flex items-center justify-center">
+                      <span className="text-lg font-bold text-yellow-300">{card.cost}</span>
+                    </div>
+                    {card.orientation === 'reversed' && (
+                      <div className="bg-black/70 rounded-full w-6 h-6 flex items-center justify-center">
+                        <Moon className="w-4 h-4 text-white" />
+                      </div>
+                    )}
+                  </div>
+                  {/* Stats at bottom */}
+                  {card.type === 'unit' && (
+                    <div className="flex justify-between">
+                      <div className="bg-red-900/90 px-2 py-1 rounded text-white font-bold">
+                        ⚔ {card.attack || 0}
+                      </div>
+                      <div className="bg-blue-900/90 px-2 py-1 rounded text-white font-bold">
+                        ❤ {card.health || 0}
+                      </div>
+                    </div>
                   )}
                 </div>
-                <div className="text-2xl">{getSuitIcon(card.suit)}</div>
-              </div>
+              </>
+            ) : (
+              /* Fallback to stylized frame */
+              <>
+                <div
+                  className="absolute inset-0 rounded-lg"
+                  style={{
+                    backgroundImage: `url(${getCardFrame()})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    imageRendering: 'pixelated'
+                  }}
+                />
+                <div className="relative h-full p-3 flex flex-col">
+                  {/* Card Header */}
+                  <div className="flex justify-between items-start mb-1">
+                    <div className="flex items-center gap-1">
+                      <span className="text-lg font-bold text-yellow-300 drop-shadow-[1px_1px_0px_rgba(0,0,0,0.8)]">{card.cost}</span>
+                      {card.orientation === 'reversed' && (
+                        <Moon className="w-3 h-3" />
+                      )}
+                    </div>
+                    <div className="text-2xl">{getSuitIcon(card.suit)}</div>
+                  </div>
 
-              {/* Card Name */}
-              <div className="text-center mb-2">
-                <h3 className="text-sm font-bold leading-tight">{card.name}</h3>
-              </div>
+                  {/* Card Name */}
+                  <div className="text-center mb-2">
+                    <h3 className="text-xs font-bold leading-tight text-white drop-shadow-[1px_1px_0px_rgba(0,0,0,0.8)]">{card.name}</h3>
+                  </div>
 
-              {/* Card Art Area */}
-              <div className="flex-1 bg-black/20 rounded mb-2 overflow-hidden relative">
-                {/* Try to load the actual card image */}
-                {cardImageUrl && (
-                  <img 
-                    src={cardImageUrl} 
-                    alt={card.name}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      // Hide image on error and show fallback
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                )}
-                {/* Fallback icon */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  {card.type === 'major' ? (
-                    <Sparkles className="w-12 h-12 text-yellow-300" />
-                  ) : (
-                    <div className="text-4xl opacity-50">{getSuitIcon(card.suit)}</div>
+                  {/* Card Art Area */}
+                  <div className="flex-1 bg-black/10 rounded mb-2 overflow-hidden relative">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      {card.suit === 'major' ? (
+                        <Sparkles className="w-12 h-12 text-yellow-300 drop-shadow-[2px_2px_0px_rgba(0,0,0,0.8)]" />
+                      ) : (
+                        <div className="text-4xl opacity-70">{getSuitIcon(card.suit)}</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Card Text */}
+                  <div className="text-xs leading-tight mb-2 min-h-[30px]">
+                    <p className="line-clamp-2 text-gray-200 drop-shadow-[1px_1px_0px_rgba(0,0,0,0.8)]">
+                      {card.type === 'spell' ? 'Mystical Spell' : 'Tarot Warrior'}
+                    </p>
+                  </div>
+
+                  {/* Card Stats */}
+                  {card.type === 'unit' && (
+                    <div className="flex justify-between text-sm font-bold">
+                      <span className="bg-red-800 px-2 py-1 rounded border border-red-600 text-white drop-shadow-[1px_1px_0px_rgba(0,0,0,0.8)]">
+                        ⚔ {card.attack || 0}
+                      </span>
+                      <span className="bg-blue-800 px-2 py-1 rounded border border-blue-600 text-white drop-shadow-[1px_1px_0px_rgba(0,0,0,0.8)]">
+                        ❤ {card.health || 0}
+                      </span>
+                    </div>
                   )}
                 </div>
-              </div>
-
-              {/* Card Text */}
-              <div className="text-xs leading-tight mb-2 min-h-[40px]">
-                <p className="line-clamp-3">
-                  {isReversed ? card.reversedDescription : card.description}
-                </p>
-              </div>
-
-              {/* Card Stats */}
-              {card.type === 'unit' && (
-                <div className="flex justify-between text-sm font-bold">
-                  <span className="bg-red-600/50 px-2 py-1 rounded">
-                    {card.attack || 0}
-                  </span>
-                  <span className="bg-blue-600/50 px-2 py-1 rounded">
-                    {card.health || 0}
-                  </span>
-                </div>
-              )}
-            </div>
+              </>
+            )}
 
             {/* Rarity Gem */}
             <div className="absolute top-1 right-1">
@@ -226,7 +292,7 @@ export function TarotCard({
           {/* Card Back */}
           <motion.div
             className="absolute inset-0 rounded-lg shadow-xl backface-hidden overflow-hidden"
-            style={{ 
+            style={{
               backfaceVisibility: 'hidden',
               transform: 'rotateY(180deg)'
             }}

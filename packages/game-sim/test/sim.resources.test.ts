@@ -19,7 +19,11 @@ describe('Resources and costs', () => {
   it('ramp then play succeeds and spends resource', () => {
     let s = createInitialState({ matchId: 'm', seed: 's', players: ['p'] });
     s = applyIntent(s, { type: 'draw', playerId: 'p', cardId: 'x' });
-    s = applyIntent(s, { type: 'end_turn', playerId: 'p' });
+    // Advance through phases to reach 'end' phase where turn increment happens
+    s = applyIntent(s, { type: 'end_turn', playerId: 'p' }); // draw -> main
+    s = applyIntent(s, { type: 'end_turn', playerId: 'p' }); // main -> combat
+    s = applyIntent(s, { type: 'end_turn', playerId: 'p' }); // combat -> end
+    s = applyIntent(s, { type: 'end_turn', playerId: 'p' }); // end -> draw, turn +1, fate +1
     expect(s.resources?.['p']).toBe(1);
     s = applyIntent(s, { type: 'play_card', playerId: 'p', cardId: 'x' });
     expect((s.battlefield as BattlefieldShape)['p'].played).toEqual(['x']);

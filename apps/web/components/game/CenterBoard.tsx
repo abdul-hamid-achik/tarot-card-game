@@ -22,21 +22,26 @@ interface BoardSlotComponentProps {
 }
 
 function BoardSlotComponent({ slot, index, isPlayerSlot, canDrop }: BoardSlotComponentProps) {
+  const droppableId = `slot-${isPlayerSlot ? 'player' : 'opponent'}-${index}`;
+  
   const { setNodeRef, isOver } = useDroppable({
-    id: `slot-${isPlayerSlot ? 'player' : 'opponent'}-${index}`,
+    id: droppableId,
     data: { slot: index, isPlayerSlot },
     disabled: !canDrop
   });
+  
 
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "relative w-[150px] h-[210px] rounded-lg border-2 transition-all duration-200",
+        "relative w-[150px] h-[210px] rounded-lg border-2 transition-all duration-200 z-10",
         slot.card 
           ? "border-transparent" 
-          : "border-dashed border-white/20 bg-black/20",
-        isOver && canDrop && "border-yellow-400 bg-yellow-400/10 scale-105",
+          : canDrop 
+            ? "border-dashed border-green-400/50 bg-green-900/20"
+            : "border-dashed border-white/20 bg-black/20",
+        isOver && canDrop && "border-yellow-400 bg-yellow-400/20 scale-105 shadow-xl",
         slot.isBlocked && "opacity-50 cursor-not-allowed"
       )}
     >
@@ -78,6 +83,8 @@ export function CenterBoard({ playerBoard, opponentBoard, phase, isMyTurn }: Cen
   );
 
   const showCombatLines = phase === 'combat';
+  
+  // Debug - removed to reduce console spam
 
   return (
     <div className="h-full flex flex-col justify-center relative">

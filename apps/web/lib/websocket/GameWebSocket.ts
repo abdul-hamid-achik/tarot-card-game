@@ -1,7 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 import { useGameStore } from '@/lib/store/gameStore';
 
-export type WebSocketMessage = 
+export type WebSocketMessage =
   | { type: 'join_match'; matchId: string; playerId: string }
   | { type: 'game_state'; state: any }
   | { type: 'play_card'; cardId: string; targetSlot?: number }
@@ -59,7 +59,22 @@ class GameWebSocket {
 
     this.socket.on('game_state', (data: any) => {
       console.log('Received game state:', data);
-      store.setCurrentMatch(data);
+      // Map server state to client state
+      // Server uses 'resources' for fate, client uses 'fate' field
+      const mappedData = {
+        ...data,
+        players: Object.fromEntries(
+          Object.entries(data.players || {}).map(([playerId, player]: [string, any]) => [
+            playerId,
+            {
+              ...player,
+              fate: data.resources?.[playerId] || 0,
+              maxFate: 3 // Set max fate to 3 as per game design
+            }
+          ])
+        )
+      };
+      store.setCurrentMatch(mappedData);
     });
 
     this.socket.on('match_found', (data: any) => {
@@ -73,21 +88,48 @@ class GameWebSocket {
       console.log('Card played:', data);
       // Update match state
       const currentMatch = store.currentMatch;
-      if (currentMatch) {
-        // Apply card play to state
-        store.updateMatchState(data.newState);
+      if (currentMatch && data.newState) {
+        // Map server state to client state for card play updates
+        const mappedNewState = {
+          ...data.newState,
+          players: Object.fromEntries(
+            Object.entries(data.newState.players || {}).map(([playerId, player]: [string, any]) => [
+              playerId,
+              {
+                ...player,
+                fate: data.newState.resources?.[playerId] || 0,
+                maxFate: 3
+              }
+            ])
+          )
+        };
+        store.updateMatchState(mappedNewState);
       }
     });
 
     this.socket.on('turn_ended', (data: any) => {
       console.log('Turn ended:', data);
-      store.updateMatchState(data.newState);
+      // Map server state to client state for turn updates
+      const mappedNewState = data.newState ? {
+        ...data.newState,
+        players: Object.fromEntries(
+          Object.entries(data.newState.players || {}).map(([playerId, player]: [string, any]) => [
+            playerId,
+            {
+              ...player,
+              fate: data.newState.resources?.[playerId] || 0,
+              maxFate: 3
+            }
+          ])
+        )
+      } : data.newState;
+      store.updateMatchState(mappedNewState);
     });
 
     this.socket.on('game_over', (data: any) => {
       console.log('Game over:', data);
       // Handle game over
-      store.updateMatchState({ 
+      store.updateMatchState({
         ...store.currentMatch,
         gameOver: true,
         winner: data.winner,
