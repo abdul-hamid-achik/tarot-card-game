@@ -14,12 +14,7 @@ apps/*/.vercel
 *.log
 **/test-results/**
 **/playwright-report/**
-# Godot project artifacts
-clients/godot/project/.godot/
-clients/godot/project/.import/
+# Build artifacts
 **/*.uid
-clients/godot/project/**/*.import
-clients/godot/project/builds/
-apps/web/public/godot/*
 
 *.tsbuildinfo

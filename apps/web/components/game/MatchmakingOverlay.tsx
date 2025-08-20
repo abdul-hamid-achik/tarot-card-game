@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Loader2, X, Users, Sparkles } from 'lucide-react';
 import { useGameStore } from '@/lib/store/gameStore';
+import { useSmoothTimer } from '@/components/ui/smooth-timer';
 
 
 interface MatchmakingOverlayProps {
@@ -16,10 +17,20 @@ interface MatchmakingOverlayProps {
 }
 
 export function MatchmakingOverlay({ isOpen, onCancel, deckId }: MatchmakingOverlayProps) {
-  const [searchTime, setSearchTime] = useState(0);
   const [estimatedTime, setEstimatedTime] = useState(15);
   const [playersInQueue, setPlayersInQueue] = useState(0);
   const { isSearchingMatch, setSearchingMatch } = useGameStore();
+  const animationFrameRef = useRef<number>();
+  const startTimeRef = useRef<number>(0);
+  const lastUpdateRef = useRef<number>(0);
+  
+  // Use the smooth timer hook for elapsed time
+  const { timeRemaining: elapsedSeconds } = useSmoothTimer(
+    999999, // Large number since we're counting up
+    isSearchingMatch
+  );
+  
+  const searchTime = Math.floor(999999 - elapsedSeconds);
 
   useEffect(() => {
     if (isOpen && !isSearchingMatch) {
@@ -29,19 +40,39 @@ export function MatchmakingOverlay({ isOpen, onCancel, deckId }: MatchmakingOver
 
   useEffect(() => {
     if (isSearchingMatch) {
-      const interval = setInterval(() => {
-        setSearchTime((prev) => prev + 1);
-        // Simulate players in queue
-        setPlayersInQueue(Math.floor(Math.random() * 20) + 5);
-      }, 1000);
-
-      return () => clearInterval(interval);
+      const updateQueueInfo = (timestamp: number) => {
+        if (!startTimeRef.current) {
+          startTimeRef.current = timestamp;
+        }
+        
+        const elapsed = timestamp - startTimeRef.current;
+        const currentSecond = Math.floor(elapsed / 1000);
+        
+        // Update players in queue once per second
+        if (currentSecond > lastUpdateRef.current) {
+          lastUpdateRef.current = currentSecond;
+          setPlayersInQueue(Math.floor(Math.random() * 20) + 5);
+        }
+        
+        if (isSearchingMatch) {
+          animationFrameRef.current = requestAnimationFrame(updateQueueInfo);
+        }
+      };
+      
+      animationFrameRef.current = requestAnimationFrame(updateQueueInfo);
+      
+      return () => {
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
+      };
     }
   }, [isSearchingMatch]);
 
   const startMatchmaking = async () => {
     setSearchingMatch(true);
-    setSearchTime(0);
+    startTimeRef.current = 0;
+    lastUpdateRef.current = 0;
 
 
 

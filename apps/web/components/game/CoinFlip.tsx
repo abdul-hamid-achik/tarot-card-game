@@ -1,9 +1,10 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { audioManager } from '@/lib/audio/AudioManager';
+import { useAnimationDelay } from '@/hooks/useAnimationFrame';
 
 interface CoinFlipProps {
   onComplete: (playerStarts: boolean) => void;
@@ -17,6 +18,10 @@ export function CoinFlip({ onComplete, playerName, opponentName }: CoinFlipProps
   const [playerChoice, setPlayerChoice] = useState<'heads' | 'tails' | null>(null);
   const [showResult, setShowResult] = useState(false);
 
+  const flipStartTimeRef = useRef<number>(0);
+  const resultStartTimeRef = useRef<number>(0);
+  const animationFrameRef = useRef<number>();
+
   const handleChoice = (choice: 'heads' | 'tails') => {
     setPlayerChoice(choice);
     setIsFlipping(true);
@@ -24,25 +29,63 @@ export function CoinFlip({ onComplete, playerName, opponentName }: CoinFlipProps
     // Play coin flip sound
     audioManager.playRandom('coinFlip');
     
-    // Simulate coin flip
-    setTimeout(() => {
-      const flipResult = Math.random() < 0.5 ? 'heads' : 'tails';
-      setResult(flipResult);
-      setIsFlipping(false);
-      setShowResult(true);
+    // Start flip animation with requestAnimationFrame
+    flipStartTimeRef.current = 0;
+    
+    const animateFlip = (timestamp: number) => {
+      if (!flipStartTimeRef.current) {
+        flipStartTimeRef.current = timestamp;
+      }
       
-      // Determine who goes first
-      const playerWins = flipResult === choice;
+      const elapsed = timestamp - flipStartTimeRef.current;
       
-      // Play coin fall sound
-      audioManager.playRandom('coinFall');
-      
-      // Complete after showing result
-      setTimeout(() => {
-        onComplete(playerWins);
-      }, 2000);
-    }, 2000);
+      if (elapsed >= 2000) {
+        // Flip complete
+        const flipResult = Math.random() < 0.5 ? 'heads' : 'tails';
+        setResult(flipResult);
+        setIsFlipping(false);
+        setShowResult(true);
+        
+        // Determine who goes first
+        const playerWins = flipResult === choice;
+        
+        // Play coin fall sound
+        audioManager.playRandom('coinFall');
+        
+        // Start result display animation
+        resultStartTimeRef.current = 0;
+        
+        const animateResult = (resultTimestamp: number) => {
+          if (!resultStartTimeRef.current) {
+            resultStartTimeRef.current = resultTimestamp;
+          }
+          
+          const resultElapsed = resultTimestamp - resultStartTimeRef.current;
+          
+          if (resultElapsed >= 2000) {
+            onComplete(playerWins);
+          } else {
+            animationFrameRef.current = requestAnimationFrame(animateResult);
+          }
+        };
+        
+        animationFrameRef.current = requestAnimationFrame(animateResult);
+      } else {
+        animationFrameRef.current = requestAnimationFrame(animateFlip);
+      }
+    };
+    
+    animationFrameRef.current = requestAnimationFrame(animateFlip);
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
 
   return (
     <AnimatePresence>

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, Clock, Pause, Flag, AlertCircle, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { SmoothTimer } from '@/components/ui/smooth-timer';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,26 +34,14 @@ interface TopBarProps {
 export function TopBar({ matchId, turn, phase, turnTimer }: TopBarProps) {
   const router = useRouter();
   const { disconnect, updateMatch } = useGameStore();
-  const [timeRemaining, setTimeRemaining] = useState(turnTimer || 0);
   const [showTimer, setShowTimer] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [showConcedeDialog, setShowConcedeDialog] = useState(false);
   const [showPauseDialog, setShowPauseDialog] = useState(false);
 
   useEffect(() => {
-    if (turnTimer && turnTimer > 0) {
-      setTimeRemaining(turnTimer);
-      const interval = setInterval(() => {
-        setTimeRemaining((prev) => {
-          if (prev <= 31) setShowTimer(true);
-          if (prev <= 1) {
-            clearInterval(interval);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-      return () => clearInterval(interval);
+    if (turnTimer && turnTimer > 0 && turnTimer <= 30) {
+      setShowTimer(true);
     }
   }, [turnTimer]);
 
@@ -115,7 +104,7 @@ export function TopBar({ matchId, turn, phase, turnTimer }: TopBarProps) {
         {/* Right Side - Turn Timer */}
         <div className="justify-self-end px-8">
           <AnimatePresence>
-            {showTimer && timeRemaining > 0 && (
+            {turnTimer && turnTimer > 0 && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -123,10 +112,13 @@ export function TopBar({ matchId, turn, phase, turnTimer }: TopBarProps) {
                 className="flex items-center gap-2"
               >
                 <Clock className="w-5 h-5 text-yellow-400" />
-                <span className={`text-lg font-bold ${timeRemaining <= 10 ? 'text-red-400 animate-pulse' : 'text-yellow-400'
-                  }`}>
-                  {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
-                </span>
+                <SmoothTimer
+                  duration={turnTimer}
+                  isActive={!isPaused}
+                  warningThreshold={10}
+                  className="text-lg font-bold text-yellow-400"
+                  format="mm:ss"
+                />
               </motion.div>
             )}
           </AnimatePresence>

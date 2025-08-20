@@ -7,12 +7,13 @@ import { Button } from '@/components/ui/button';
 import { PixelButton } from '@/components/ui/pixel-button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Swords, 
-  Trophy, 
-  Map, 
-  BookOpen, 
-  Settings, 
+import { UserProfile } from '@/components/auth/UserProfile';
+import {
+  Swords,
+  Trophy,
+  Map,
+  BookOpen,
+  Settings,
   Users,
   Sparkles,
   Zap,
@@ -90,7 +91,7 @@ export function MainMenu() {
           const xPos = i * 300 + 100;
           const rotation = (i * 60) % 360;
           const duration = 20 + (i * 3);
-          
+
           return (
             <motion.div
               key={i}
@@ -116,6 +117,11 @@ export function MainMenu() {
       </div>
 
       <div className="relative z-10 container mx-auto px-4 py-8">
+        {/* User Profile */}
+        <div className="absolute top-4 right-4">
+          <UserProfile />
+        </div>
+
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -50 }}
@@ -170,7 +176,7 @@ export function MainMenu() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              <Card 
+              <Card
                 className="relative overflow-hidden cursor-pointer bg-black/40 backdrop-blur-sm border-white/10 hover:border-white/30 transition-all duration-300"
                 onClick={item.action}
               >

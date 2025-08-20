@@ -6,7 +6,7 @@ import { TarotCard } from './TarotCard';
 import { BoardSlot, GamePhase, Card, useGameStore } from '@/lib/store/gameStore';
 import { Swords, Zap, Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface CenterBoardProps {
   playerBoard: BoardSlot[];
@@ -267,20 +267,32 @@ function CombatAnimationSystem({ showCombatLines, playerSlots, opponentSlots }: 
 
   useEffect(() => {
     if (showCombatLines && combatState === 'idle') {
-      // Start combat animation sequence
-      const sequence = async () => {
-        setCombatState('charging');
-        await new Promise(resolve => setTimeout(resolve, 600));
-
-        setCombatState('clashing');
-        await new Promise(resolve => setTimeout(resolve, 400));
-
-        setCombatState('resolving');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        setCombatState('idle');
+      // Start combat animation sequence with requestAnimationFrame
+      const startTime = performance.now();
+      const animationDurations = {
+        charging: 600,
+        clashing: 400,
+        resolving: 1000
       };
-      sequence();
+      
+      const animate = (currentTime: number) => {
+        const elapsed = currentTime - startTime;
+        
+        if (elapsed < animationDurations.charging) {
+          setCombatState('charging');
+          requestAnimationFrame(animate);
+        } else if (elapsed < animationDurations.charging + animationDurations.clashing) {
+          setCombatState('clashing');
+          requestAnimationFrame(animate);
+        } else if (elapsed < animationDurations.charging + animationDurations.clashing + animationDurations.resolving) {
+          setCombatState('resolving');
+          requestAnimationFrame(animate);
+        } else {
+          setCombatState('idle');
+        }
+      };
+      
+      requestAnimationFrame(animate);
     }
   }, [showCombatLines, combatState]);
 

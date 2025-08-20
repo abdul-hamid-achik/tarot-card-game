@@ -1,6 +1,6 @@
 /**
  * Tarot TCG WebSocket Server Adapter
- * Bridges the Godot client with the game-sim engine
+ * Bridges WebSocket clients with the game-sim engine
  */
 
 import { WebSocketServer } from 'ws';

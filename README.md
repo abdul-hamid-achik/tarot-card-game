@@ -10,7 +10,6 @@ Workspaces
 - `packages/game-sim`: Deterministic server-authoritative simulator (TS + Vitest)
 - `packages/db`: Drizzle ORM schema scaffold
 - `apps/web`: Next.js app + API stubs (cards, decks, auth session, redis ping, match queue/start/result, demo stream)
-- `clients/godot`: Godot 4 client scaffold
 
 Endpoints (web)
 - `GET /api/health` – health check
@@ -26,10 +25,6 @@ Endpoints (web)
 Simulator
 - Deterministic RNG, intents, resources ramp, victory check, effects (`gain`, `both_discard_random`, `silence` placeholder)
 - Tests: unit, property, golden timeline, long-run determinism, bot-vs-bot
-
-Godot
-- Minimal `GameRoot`, `Board`, `Hand`, `CardView`, `StreamLog`, `QueuePoll`
-- Pings `/api/health`, fetches `/api/cards`, demo SSE and queue+poll
 
 E2E (manual)
 - In one terminal: `npm run dev:web`

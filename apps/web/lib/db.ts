@@ -2,10 +2,12 @@
 // This provides a clean, typed interface to the database
 
 import { database as db, getDb } from '@tarot/db';
+import { users, accounts, sessions, verificationTokens } from '@tarot/db';
 import cardsData from '@/data/cards.json';
 
-// Re-export the database instance and types for convenience
+// Re-export the database instance, tables, and types for convenience
 export { db, getDb };
+export { users, accounts, sessions, verificationTokens };
 export type { Card, Deck } from '@tarot/db';
 
 // Seed function for initial data using the typed db package

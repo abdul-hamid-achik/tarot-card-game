@@ -114,8 +114,6 @@ async function seedDatabase() {
     try {
         console.log('🌱 Starting database seeding...');
 
-        // TODO: fix this
-        // @ts-expect-error - db type is incorrect here
         await seed(db, {
             cards: tarotCards,
             decks: sampleDecks,
