@@ -6,7 +6,7 @@ import { useMachine } from '@xstate/react';
 import { useEffect, useCallback } from 'react';
 // Import the FSM - we'll need to export it properly from game-sim
 // For now, using a local copy
-import { lorGameMachine } from '../lib/game/lor-game-flow';
+import { lorGameMachine } from '../lib/game/lor-game-flow-v5';
 import { gameLogger } from '@tarot/game-logger';
 import type { Card } from '../lib/types';
 

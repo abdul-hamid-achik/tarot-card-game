@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { GameBoardFSM } from '@/components/game/GameBoardFSM';
+import { GameBoard } from '@/components/game/GameBoard';
 import { useGameStore } from '@/lib/store/gameStore';
 import { EnemyAI } from '@/lib/ai/EnemyAI';
 import { enemyTemplates } from '@/lib/ai/EnemyAI';
@@ -198,7 +198,7 @@ export default function MatchDemoPage() {
           opponentName={enemy.name}
         />
       ) : (
-        <GameBoardFSM />
+        <GameBoard />
       )}
 
       {/* AI Thinking Indicator */}

@@ -1,0 +1,74 @@
+---
+title: Game Flow FSM
+---
+
+# Game Flow Implementation
+
+## Finite State Machine Overview
+
+The game uses XState to manage the complete game flow with proper state transitions. The FSM is located at `packages/game-sim/src/lor-game-flow.ts`.
+
+### Key Features
+- Attack token system
+- Priority management
+- Spell stack with 4 speeds (Burst, Focus, Fast, Slow)
+- Combat phases with blocking
+
+## Core Mechanics Fixed
+
+### Attack Token & Priority System
+- **Defender gets first priority** each round (was incorrectly giving to attacker)
+- Attack token alternates between players each round
+- Rally mechanic support for multiple attacks per round
+
+### Spell Speed System
+```typescript
+type SpellSpeed = 'burst' | 'focus' | 'fast' | 'slow';
+```
+
+- **Burst**: Resolves instantly, doesn't pass priority
+- **Focus**: Like Burst but can't be played in combat
+- **Fast**: Can be responded to, playable anytime
+- **Slow**: Can be responded to, not playable in combat or on stack
+
+### Pass & Priority Rules
+- Units automatically pass priority when played
+- Spells create a stack (except Burst/Focus)
+- Two consecutive passes:
+  - If stack exists → Resolve stack
+  - If in main phase with units → Go to combat
+  - Otherwise → End round
+
+## Combat Flow
+
+### Correct Sequence:
+1. Attacker declares attackers → Creates stack
+2. Defender gets priority to respond
+3. Defender declares blockers
+4. Attacker gets priority to respond
+5. Both pass → Combat resolves
+
+## State Machine Visualization
+
+```bash
+# Generate FSM visualization
+npx xstate visualize packages/game-sim/src/lor-game-flow.ts
+```
+
+## Common Issues & Solutions
+
+### Issue: Combat triggering immediately
+**Solution**: Ensure defender gets priority first and both players must pass
+
+### Issue: Burst spells passing priority
+**Solution**: Check `isBurstOrFocus` guard in FSM
+
+### Issue: Can't play spells during combat
+**Solution**: Verify spell speed is Fast or Burst for combat
+
+### Issue: Attack token not switching
+**Solution**: Check `switchAttackToken` action in round start
+
+## Resources
+- [XState Documentation](https://xstate.js.org/docs/)
+- [LoR Rules Reference](https://support-legendsofruneterra.riotgames.com)

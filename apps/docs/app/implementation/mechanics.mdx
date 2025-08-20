@@ -1,0 +1,125 @@
+---
+title: Core Mechanics
+---
+
+# Core Game Mechanics
+
+## Resource Management
+
+### Mana System
+- Increments each round (max 10)
+- Up to 3 unused mana carries to next round as spell-only mana
+- **Location**: `packages/game-sim/src/game-fsm-v5.ts`
+
+### Fate System
+- Your Tarot-specific resource
+- Used for card manipulation and special abilities
+- **Location**: `lib/game/tarot-mechanics.ts`
+
+## Priority System
+
+### Rules
+1. **Defender Priority**: Defender gets priority at round start
+2. **Attack Token**: Player with attack token acts first
+3. **Priority Passing**: Priority passes after each action
+4. **Stack Resolution**: Two passes resolves stack or advances phase
+
+### Implementation
+```typescript
+// Priority checking
+const isMyPriority = (state: GameState, playerId: string) =>
+  state.currentPriority === playerId;
+
+// Priority passing
+const passPriority = (state: GameState) => ({
+  ...state,
+  currentPriority: getNextPlayer(state.currentPriority)
+});
+```
+
+## Spell Speed System
+
+### Speed Types
+
+| Speed | Can Respond | Playable In Combat | Passes Priority |
+|-------|-------------|-------------------|-----------------|
+| Burst | No | Yes | No |
+| Focus | No | No | No |
+| Fast | Yes | Yes | Yes |
+| Slow | Yes | No | Yes |
+
+### Usage Examples
+
+```typescript
+// Burst spell - instant damage
+const fireball: SpellCard = {
+  speed: 'burst',
+  effect: (state) => dealDamage(state, 3)
+};
+
+// Focus spell - strategic play
+const tacticalPlay: SpellCard = {
+  speed: 'focus',
+  effect: (state) => drawCards(state, 2)
+};
+
+// Fast spell - combat trick
+const combatTrick: SpellCard = {
+  speed: 'fast',
+  effect: (state) => buffUnit(state, targetId, 1)
+};
+
+// Slow spell - main phase only
+const majorArcana: SpellCard = {
+  speed: 'slow',
+  effect: (state) => majorEffect(state)
+};
+```
+
+## Combat System
+
+### Combat Phases
+1. **Declaration Phase**: Attacker chooses attackers
+2. **Response Phase**: Defender can respond with Fast spells
+3. **Block Phase**: Defender assigns blockers
+4. **Resolution Phase**: Calculate and apply damage
+
+### Damage Calculation
+- Base damage + suit bonuses
+- Overwhelm mechanics
+- Death effects processing
+- Trial updates
+
+```typescript
+const resolveCombat = (state: GameState) => {
+  const damage = calculateDamage(state.attackers, state.blockers);
+  const updatedState = applyDamage(state, damage);
+  return processDeaths(updatedState);
+};
+```
+
+## Keywords & Abilities
+
+### Implemented Keywords
+- **Quick Attack**: Attack immediately
+- **Overwhelm**: Excess damage to nexus
+- **Barrier**: Prevents first damage
+- **SpellShield**: Prevents spell effects
+
+### Rally System
+- Multiple attacks per round
+- Token-based activation
+- **Location**: `lib/game/rally-system.ts`
+
+## Round Structure
+
+### Round Flow
+1. **Start Phase**: Draw cards, gain mana, gain fate
+2. **Main Phase**: Play cards, use abilities
+3. **Combat Phase**: Attack and block
+4. **End Phase**: Cleanup, victory check
+
+### Victory Conditions
+- **Trial Victory**: Complete 3 trials
+- **Defeat Victory**: Reduce opponent nexus to 0
+- **Turn 10+**: Sudden death rules apply

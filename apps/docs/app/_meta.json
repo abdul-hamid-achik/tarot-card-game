@@ -5,6 +5,9 @@
   "gameplay": {
     "title": "Gameplay"
   },
+  "implementation": {
+    "title": "Implementation"
+  },
   "architecture": {
     "title": "Architecture"
   },

@@ -16,7 +16,7 @@ import { CardOverlay } from './CardOverlay';
 import { PixelButton } from '@/components/ui/pixel-button';
 import { cn } from '@/lib/utils';
 import { audioManager } from '@/lib/audio/AudioManager';
-import { gameLogger } from '@/lib/logging/game-logger';
+import { gameLogger } from '@tarot/game-logger';
 import { GameLogViewer, DebugToggle } from '@/components/debug/GameLogViewer';
 
 export function GameBoardFSM() {

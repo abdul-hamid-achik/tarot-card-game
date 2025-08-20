@@ -277,13 +277,23 @@ interface DebugToggleProps {
 
 export function DebugToggle({ onToggle, isVisible }: DebugToggleProps) {
   return (
-    <PixelButton
-      size="sm"
-      variant={isVisible ? "gold" : "default"}
+    <button
       onClick={onToggle}
-      className="fixed bottom-4 right-4 z-40"
+      className={cn(
+        "fixed bottom-0 right-0 z-50",
+        "w-8 h-8 rounded-tl-lg",
+        "flex items-center justify-center",
+        "transition-all duration-200",
+        "hover:scale-110",
+        isVisible 
+          ? "bg-yellow-500/80 hover:bg-yellow-500" 
+          : "bg-black/50 hover:bg-black/70",
+        "border-l border-t",
+        isVisible ? "border-yellow-400/50" : "border-white/20"
+      )}
+      title={isVisible ? "Hide Debug" : "Show Debug"}
     >
-      🐛 Debug {isVisible ? 'ON' : 'OFF'}
-    </PixelButton>
+      <span className="text-sm">🐛</span>
+    </button>
   );
 }

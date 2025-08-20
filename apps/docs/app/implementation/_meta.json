@@ -1,0 +1,17 @@
+{
+    "index": {
+        "title": "Overview"
+    },
+    "game-flow": {
+        "title": "Game Flow FSM"
+    },
+    "mechanics": {
+        "title": "Core Mechanics"
+    },
+    "integration": {
+        "title": "Integration Guide"
+    },
+    "testing": {
+        "title": "Testing Checklist"
+    }
+}

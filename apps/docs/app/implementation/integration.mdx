@@ -1,0 +1,161 @@
+---
+title: Integration Guide
+---
+
+# Integration Guide
+
+This guide covers how to integrate the game engine with frontend and backend systems.
+
+## Frontend Integration
+
+### GameBoard Component Update
+
+Update `components/game/GameBoard.tsx` to use the state machine:
+
+```tsx
+import { useGameStateMachine } from '@/hooks/useGameStateMachine';
+
+function GameBoard() {
+  const {
+    gameState,
+    context,
+    isMyPriority,
+    canAttack,
+    playUnit,
+    playSpell,
+    declareAttack,
+    pass
+  } = useGameStateMachine(matchId, players, currentPlayerId);
+
+  // UI reflects state machine state
+  return (
+    <div>
+      {isMyPriority && <div>Your Priority</div>}
+      {canAttack && <AttackButton onClick={handleAttack} />}
+      <PassButton onClick={pass} disabled={!isMyPriority} />
+    </div>
+  );
+}
+```
+
+### Game State Store Migration
+
+Replace old phase management in `lib/store/gameStore.ts`:
+
+```tsx
+// Remove old phase management
+// Use FSM for all state transitions
+// State updates come from FSM context
+```
+
+## Backend Integration
+
+### Sim Update
+
+Update `apps/web/app/api/match/sim.ts` to use new game logic:
+
+```typescript
+import { handlePass, playCard, initiateCombat } from './game-logic';
+
+export function applyIntent(state: MatchState, intent: IntentInput): MatchState {
+  switch (intent.type) {
+    case 'pass':
+      return handlePass(state, intent.playerId);
+    case 'play_card':
+      return playCard(state, intent.playerId, intent.cardId, intent.target);
+    case 'initiate_combat':
+      return initiateCombat(state);
+    // ...
+  }
+}
+```
+
+### WebSocket Validation
+
+Update WebSocket server to validate using FSM:
+
+```typescript
+// Validate actions against FSM state before applying
+const isValidAction = (state: GameState, action: Action) => {
+  // Check current state allows this action
+  return fsmService.getSnapshot().can(action);
+};
+```
+
+## Testing Setup
+
+### Unit Tests
+```typescript
+import { createGameMachine } from '@/game-sim/src/lor-game-flow';
+
+describe('Game Flow FSM', () => {
+  test('priority passes correctly', () => {
+    const machine = createGameMachine();
+    const service = interpret(machine);
+
+    service.start();
+    expect(service.state.value).toBe('round.start');
+
+    service.send({ type: 'PASS' });
+    expect(service.state.value).toBe('main');
+  });
+});
+```
+
+### Integration Tests
+```typescript
+describe('Full Game Flow', () => {
+  test('complete round with combat', async () => {
+    const game = createTestGame();
+    await playFullRound(game);
+    expect(game.state.value).toBe('round.end');
+  });
+});
+```
+
+## Debug Commands
+
+```bash
+# Run tests
+npm run test
+
+# Check FSM visualization
+npx xstate visualize packages/game-sim/src/lor-game-flow.ts
+
+# Debug logging
+localStorage.setItem('DEBUG_GAME_FSM', 'true')
+```
+
+## Common Integration Issues
+
+### State Synchronization
+**Problem**: Frontend and backend states get out of sync
+**Solution**: Always use FSM state as single source of truth
+
+### Action Validation
+**Problem**: Invalid actions reach the backend
+**Solution**: Validate actions against FSM before sending
+
+### Priority Management
+**Problem**: UI shows wrong priority state
+**Solution**: Subscribe to FSM state changes for UI updates
+
+## Migration Checklist
+
+### Frontend
+- [ ] Replace old store with FSM hook
+- [ ] Update UI components to reflect FSM state
+- [ ] Add priority indicators
+- [ ] Implement action validation
+
+### Backend
+- [ ] Update sim logic to use FSM
+- [ ] Add WebSocket validation
+- [ ] Update database schema if needed
+- [ ] Add error handling for invalid states
+
+### Testing
+- [ ] Add FSM unit tests
+- [ ] Create integration test suite
+- [ ] Add E2E tests for player interactions
+- [ ] Performance testing for state transitions

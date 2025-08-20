@@ -1,0 +1,187 @@
+---
+title: Testing Checklist
+---
+
+# Testing Checklist
+
+Comprehensive testing guide for the game implementation.
+
+## Priority System Tests
+
+### ✅ Priority Management
+- [ ] Defender gets priority at round start
+- [ ] Priority passes correctly after unit play
+- [ ] Priority stays with player after Burst spell
+- [ ] Priority passes after Fast/Slow spell
+
+### ✅ Attack Token System
+- [ ] Only attack token owner can attack
+- [ ] Attack token switches each round
+- [ ] Rally allows multiple attacks
+
+## Spell Stack Tests
+
+### ✅ Spell Speed Validation
+- [ ] Slow spells can't be played in combat
+- [ ] Focus spells can't be played in combat
+- [ ] Fast spells can respond to stack
+- [ ] Burst spells resolve immediately
+- [ ] Stack resolves in LIFO order
+
+### ✅ Stack Resolution
+- [ ] Fast spells create stack
+- [ ] Slow spells create stack
+- [ ] Burst/Focus don't create stack
+- [ ] Stack resolves after two passes
+
+## Combat Tests
+
+### ✅ Combat Flow
+- [ ] Attack declaration creates stack
+- [ ] Defender can respond before blocking
+- [ ] Blockers lock in correctly
+- [ ] Combat damage calculates properly
+- [ ] Overwhelm works correctly
+
+### ✅ Combat Timing
+- [ ] Combat triggers after main phase
+- [ ] Combat requires both players to pass
+- [ ] Combat ends round correctly
+
+## Round Flow Tests
+
+### ✅ Resource Management
+- [ ] Mana increments correctly
+- [ ] Spell mana carries over (max 3)
+- [ ] Attack token switches each round
+- [ ] Cards draw at round start
+
+### ✅ Phase Transitions
+- [ ] Two passes end round/phase correctly
+- [ ] Combat phase triggers appropriately
+- [ ] Round cleanup works properly
+
+## Integration Tests
+
+### ✅ Frontend Integration
+- [ ] FSM state reflects in UI
+- [ ] Priority indicators work correctly
+- [ ] Action buttons enable/disable properly
+- [ ] State synchronization works
+
+### ✅ Backend Integration
+- [ ] WebSocket actions validate against FSM
+- [ ] Database state matches FSM state
+- [ ] Error handling for invalid actions
+
+### ✅ Multiplayer Tests
+- [ ] Priority passing works for both players
+- [ ] Combat resolution is consistent
+- [ ] State updates broadcast correctly
+
+## Performance Tests
+
+### ✅ State Machine Performance
+- [ ] State transitions under 10ms
+- [ ] Large game states don't cause lag
+- [ ] Memory usage stays reasonable
+
+### ✅ Network Performance
+- [ ] WebSocket messages under 50ms
+- [ ] State sync doesn't cause delays
+- [ ] Reconnection handling works
+
+## Edge Cases
+
+### ✅ Error Conditions
+- [ ] Invalid actions are rejected
+- [ ] Network disconnects handled gracefully
+- [ ] Corrupted state recovery
+
+### ✅ Game State Edge Cases
+- [ ] Maximum mana handling
+- [ ] Full hand scenarios
+- [ ] Combat with no valid targets
+
+## Debug & Monitoring
+
+### ✅ Logging
+- [ ] FSM transitions logged
+- [ ] Action validation logged
+- [ ] Error conditions logged
+
+### ✅ Monitoring
+- [ ] Game completion rates tracked
+- [ ] Error rates monitored
+- [ ] Performance metrics collected
+
+## Test Automation
+
+### ✅ Unit Tests
+- [ ] FSM transition tests
+- [ ] Action validation tests
+- [ ] Calculation tests
+
+### ✅ Integration Tests
+- [ ] Full game flow tests
+- [ ] Multiplayer scenario tests
+- [ ] Error recovery tests
+
+### ✅ E2E Tests
+- [ ] Complete game playthrough
+- [ ] Different victory conditions
+- [ ] Various deck compositions
+
+## Browser Compatibility
+
+### ✅ Desktop Browsers
+- [ ] Chrome/Chromium
+- [ ] Firefox
+- [ ] Safari
+- [ ] Edge
+
+### ✅ Mobile Browsers
+- [ ] iOS Safari
+- [ ] Chrome Mobile
+- [ ] Firefox Mobile
+
+## Accessibility Tests
+
+### ✅ Keyboard Navigation
+- [ ] All actions keyboard accessible
+- [ ] Focus management works
+- [ ] Screen reader support
+
+### ✅ Visual Accessibility
+- [ ] Color contrast meets WCAG
+- [ ] Focus indicators visible
+- [ ] Text scaling works
+
+---
+
+## Test Results Template
+
+```markdown
+## Test Session: [Date]
+
+### Environment
+- Version: [game version]
+- Browser: [browser/version]
+- Test Type: [unit/integration/e2e]
+
+### Results
+- ✅ Passed: [count]
+- ❌ Failed: [count]
+- ⏭️ Skipped: [count]
+
+### Issues Found
+1. [Issue description] - [Severity]
+   - Steps to reproduce
+   - Expected vs actual
+   - Fix required
+
+### Performance Metrics
+- Average state transition: [time]ms
+- Memory usage: [amount]
+- Network latency: [time]ms
+```
