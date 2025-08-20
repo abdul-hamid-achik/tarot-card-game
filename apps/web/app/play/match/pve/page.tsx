@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+export const dynamic = 'force-dynamic';
+
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { GameBoard } from '@/components/game/GameBoard';
 import { useGameStore } from '@/lib/store/gameStore';
@@ -61,7 +63,7 @@ function generateDeck(count: number, prefix: string): Card[] {
   return cards;
 }
 
-export default function PvEMatchPage() {
+function PvEInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const enemyId = searchParams.get('enemyId');
@@ -72,6 +74,7 @@ export default function PvEMatchPage() {
     currentMatch,
     initializeMatch,
     playCard,
+    startCombat,
     endTurn,
     updateMatch
   } = useGameStore();
@@ -151,9 +154,10 @@ export default function PvEMatchPage() {
             name: 'You',
             health: 30,
             maxHealth: 30,
-            // Legends of Runeterra-style start: starting player begins with 1/1 mana
+            // LoR-style start
             maxFate: playerStarts ? 1 : 0,
             fate: playerStarts ? 1 : 0,
+            spellMana: 0,
             hand: playerHand,
             deck: playerRemainingDeck,
             discard: [],
@@ -165,9 +169,10 @@ export default function PvEMatchPage() {
             name: enemy.name,
             health: 30 + Math.floor((enemy as any).powerLevel / 10 || 0),
             maxHealth: 30 + Math.floor((enemy as any).powerLevel / 10 || 0),
-            // Non-starting player will get their 1/1 when their first turn begins
+            // Non-starting player gets 0/1 at start
             maxFate: playerStarts ? 0 : 1,
             fate: playerStarts ? 0 : 1,
+            spellMana: 0,
             hand: aiHand,
             deck: aiRemainingDeck,
             discard: [],
@@ -178,6 +183,7 @@ export default function PvEMatchPage() {
           }
         },
         activePlayer: playerStarts ? 'player1' : 'ai',
+        attackTokenOwner: playerStarts ? 'player1' : 'ai',
         turn: 1,
         phase: 'main', // Start in main phase so cards can be played
         turnTimer: 60
@@ -222,8 +228,9 @@ export default function PvEMatchPage() {
     // Simulate AI thinking
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // AI decision: play cards
+    // AI decision: play cards only when it's AI's turn
     for (let i = 0; i < 3; i++) { // Try to play up to 3 cards
+      if (useGameStore.getState().currentMatch?.activePlayer !== 'ai') break;
       const decision = await enemyAI.decideCardToPlay(
         aiPlayer.hand,
         aiPlayer.fate,
@@ -240,7 +247,12 @@ export default function PvEMatchPage() {
     }
 
     // End AI turn
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 500));
+    // Initiate combat for AI
+    if (useGameStore.getState().currentMatch?.attackTokenOwner === 'ai') {
+      startCombat();
+    }
+    await new Promise(resolve => setTimeout(resolve, 700));
     endTurn();
     setIsAIThinking(false);
   };
@@ -384,5 +396,13 @@ export default function PvEMatchPage() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+export default function PvEMatchPage() {
+  return (
+    <Suspense>
+      <PvEInner />
+    </Suspense>
   );
 }

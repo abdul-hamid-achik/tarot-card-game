@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createTarotAI } from '@tarot/game-sim/src/tarot-ai';
+// import { createTarotAI } from '@tarot/game-sim/src/tarot-ai';
 
 // Queue management
 interface QueueEntry {
@@ -29,19 +29,19 @@ export async function POST(request: NextRequest) {
       if (matchQueue.has(playerId)) {
         const entry = matchQueue.get(playerId)!;
         const elapsed = Date.now() - entry.timestamp;
-        
+
         // Check for timeout
         if (elapsed >= QUEUE_TIMEOUT_MS) {
           // Auto-match with AI
           return createAIMatch(playerId, deck);
         }
-        
+
         // Still waiting
         return NextResponse.json({
           matched: false,
           queueTime: elapsed,
           suggestAI: elapsed >= AI_SUGGEST_MS,
-          message: elapsed >= AI_SUGGEST_MS 
+          message: elapsed >= AI_SUGGEST_MS
             ? 'Still searching... AI opponent available'
             : 'Searching for opponent...'
         });
@@ -57,12 +57,12 @@ export async function POST(request: NextRequest) {
 
       // Try to find a match
       const opponent = findOpponent(playerId);
-      
+
       if (opponent) {
         // Create match with human opponent
         return createHumanMatch(playerId, opponent);
       }
-      
+
       // No match yet
       return NextResponse.json({
         matched: false,
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const playerId = searchParams.get('playerId');
-  
+
   if (!playerId) {
     return NextResponse.json({ error: 'Player ID required' }, { status: 400 });
   }
@@ -98,19 +98,19 @@ export async function GET(request: NextRequest) {
   if (matchQueue.has(playerId)) {
     const entry = matchQueue.get(playerId)!;
     const elapsed = Date.now() - entry.timestamp;
-    
+
     // Auto-match with AI after timeout
     if (elapsed >= QUEUE_TIMEOUT_MS) {
       matchQueue.delete(playerId);
       return createAIMatch(playerId, entry.deck);
     }
-    
+
     // Try to find match
     const opponent = findOpponent(playerId);
     if (opponent) {
       return createHumanMatch(playerId, opponent);
     }
-    
+
     // Still in queue
     return NextResponse.json({
       matched: false,
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
       message: getQueueMessage(elapsed)
     });
   }
-  
+
   // Check if in active match
   if (activeMatches.has(playerId)) {
     const match = activeMatches.get(playerId);
@@ -132,7 +132,7 @@ export async function GET(request: NextRequest) {
       state: match.state
     });
   }
-  
+
   return NextResponse.json({
     matched: false,
     message: 'Not in queue or match'
@@ -155,11 +155,11 @@ function findOpponent(playerId: string): QueueEntry | null {
 
 function createHumanMatch(player1Id: string, opponent: QueueEntry) {
   const matchId = `match_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-  
+
   // Remove both from queue
   matchQueue.delete(player1Id);
   matchQueue.delete(opponent.playerId);
-  
+
   // Create match state
   const matchState = {
     id: matchId,
@@ -169,18 +169,18 @@ function createHumanMatch(player1Id: string, opponent: QueueEntry) {
     state: 'starting',
     timestamp: Date.now()
   };
-  
+
   // Store match for both players
   activeMatches.set(player1Id, {
     ...matchState,
     opponentId: opponent.playerId
   });
-  
+
   activeMatches.set(opponent.playerId, {
     ...matchState,
     opponentId: player1Id
   });
-  
+
   return NextResponse.json({
     matched: true,
     matchId,
@@ -192,16 +192,16 @@ function createHumanMatch(player1Id: string, opponent: QueueEntry) {
 
 async function createAIMatch(playerId: string, deck: string[]) {
   const matchId = `ai_match_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-  
+
   // Determine AI difficulty based on player stats
   const difficulty = determineAIDifficulty(playerId);
-  
+
   // Create AI opponent
   const aiId = `ai_${difficulty}_${Math.random().toString(36).substring(4)}`;
-  
+
   // Remove from queue if present
   matchQueue.delete(playerId);
-  
+
   // Create match state with AI
   const matchState = {
     id: matchId,
@@ -212,13 +212,13 @@ async function createAIMatch(playerId: string, deck: string[]) {
     state: 'starting',
     timestamp: Date.now()
   };
-  
+
   // Store match
   activeMatches.set(playerId, {
     ...matchState,
     opponentId: aiId
   });
-  
+
   return NextResponse.json({
     matched: true,
     matchId,
@@ -232,7 +232,7 @@ async function createAIMatch(playerId: string, deck: string[]) {
 function determineAIDifficulty(playerId: string): string {
   // In a real implementation, this would check player stats from database
   // For now, return a difficulty based on simple logic
-  
+
   const random = Math.random();
   if (random < 0.3) return 'easy';
   if (random < 0.7) return 'medium';
@@ -243,13 +243,13 @@ function determineAIDifficulty(playerId: string): string {
 function getQueuePosition(playerId: string): number {
   let position = 1;
   const playerTimestamp = matchQueue.get(playerId)?.timestamp || 0;
-  
+
   for (const [id, entry] of matchQueue.entries()) {
     if (id !== playerId && entry.timestamp < playerTimestamp) {
       position++;
     }
   }
-  
+
   return position;
 }
 
@@ -269,13 +269,13 @@ function getQueueMessage(elapsed: number): string {
 setInterval(() => {
   const now = Date.now();
   const MATCH_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
-  
+
   for (const [playerId, match] of activeMatches.entries()) {
     if (now - match.timestamp > MATCH_EXPIRY_MS) {
       activeMatches.delete(playerId);
     }
   }
-  
+
   // Also clean up old queue entries
   for (const [playerId, entry] of matchQueue.entries()) {
     if (now - entry.timestamp > QUEUE_TIMEOUT_MS * 2) {

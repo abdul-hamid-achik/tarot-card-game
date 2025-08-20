@@ -15,13 +15,13 @@ interface OpponentAreaProps {
 
 export function OpponentArea({ player, isActive }: OpponentAreaProps) {
   const [cardBack, setCardBack] = useState<string>('/api/ui/themes/pixel-pack/sheets/card_ui_01.png');
-  
+
   useEffect(() => {
     // Select a random card back for this opponent
     const randomBack = getRandomCardBack();
     setCardBack(randomBack.image);
   }, []);
-  
+
   if (!player) return null;
 
   const handCount = player.hand?.length || 0;
@@ -40,12 +40,12 @@ export function OpponentArea({ player, isActive }: OpponentAreaProps) {
               <span className="text-white font-bold">{player.health}/{player.maxHealth}</span>
             </div>
           </div>
-          <Progress 
-            value={(player.health / player.maxHealth) * 100} 
+          <Progress
+            value={(player.health / player.maxHealth) * 100}
             className="w-32 h-2 mt-1"
           />
         </div>
-        
+
         <Avatar className="w-16 h-16 border-2 border-white/20">
           <AvatarImage src={player.avatar} />
           <AvatarFallback className="bg-gradient-to-br from-red-600 to-orange-600 text-white">
@@ -80,8 +80,8 @@ export function OpponentArea({ player, isActive }: OpponentAreaProps) {
             }}
             className="relative"
           >
-            <div 
-              className="w-[100px] h-[140px] rounded-lg shadow-xl overflow-hidden border-2 border-purple-600"
+            <div
+              className="w-[150px] h-[210px] rounded-lg shadow-xl overflow-hidden border-2 border-purple-600"
               style={{
                 backgroundImage: `url(${cardBack})`,
                 backgroundSize: 'cover',

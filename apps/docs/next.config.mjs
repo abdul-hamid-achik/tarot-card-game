@@ -1,14 +1,7 @@
 import nextra from 'nextra'
 
-const withNextra = nextra({
-  theme: 'nextra-theme-docs',
-  themeConfig: './theme.config.tsx',
-  defaultShowCopyCode: true
-})
+const withNextra = nextra({})
 
 export default withNextra({
-  output: 'export',
-  experimental: {
-    appDir: true
-  }
+  output: 'export'
 })

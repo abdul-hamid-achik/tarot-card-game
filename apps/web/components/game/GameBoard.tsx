@@ -11,6 +11,7 @@ import { CenterBoard } from './CenterBoard';
 import { TopBar } from './TopBar';
 import { FateCounter } from './FateCounter';
 import { TrialsDisplay } from './TrialsDisplay';
+import { CardOverlay } from './CardOverlay';
 import { PixelButton } from '@/components/ui/pixel-button';
 import { cn } from '@/lib/utils';
 import { audioManager } from '@/lib/audio/AudioManager';
@@ -21,44 +22,66 @@ export function GameBoard() {
     draggedCard,
     setDraggedCard,
     playCard,
+    startCombat,
     endTurn,
     validDropZones
   } = useGameStore();
 
   const [activePlayer, setActivePlayer] = useState<string | null>(null);
   const [showSpellStack, setShowSpellStack] = useState(false);
+  const [selectedCard, setSelectedCard] = useState<Card | null>(null);
+  const [showCardOverlay, setShowCardOverlay] = useState(false);
 
   useEffect(() => {
     // Preload common game sounds
     audioManager.preloadGameSounds();
   }, []);
 
+  const handleCardClick = (card: Card) => {
+    requestAnimationFrame(() => {
+      setSelectedCard(card);
+      setShowCardOverlay(true);
+    });
+  };
+
+  const handleCloseOverlay = () => {
+    requestAnimationFrame(() => {
+      setShowCardOverlay(false);
+      setSelectedCard(null);
+    });
+  };
+
   const handleDragStart = (event: DragStartEvent) => {
     const card = event.active.data.current as Card;
-    console.log('Drag started:', card?.name);
-    if (card) {
-      setDraggedCard(card);
-    }
+    console.log('🎯 DRAG START:', card?.name, 'ID:', event.active.id);
+    requestAnimationFrame(() => {
+      if (card) {
+        setDraggedCard(card);
+      }
+    });
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    console.log('Drag ended. Over:', over?.id, 'Data:', over?.data?.current);
+    console.log('🎯 DRAG END. Over:', over?.id, 'Data:', over?.data?.current);
+    requestAnimationFrame(() => {
 
-    if (over && draggedCard) {
-      // Check if this is a player slot (not opponent slot)
-      const isPlayerSlot = over.data.current?.isPlayerSlot;
-      const targetSlot = over.data.current?.slot;
+      if (over && draggedCard) {
+        // Check if this is a player slot (not opponent slot)
+        const isPlayerSlot = over.data.current?.isPlayerSlot;
+        const targetSlot = over.data.current?.slot;
 
-      console.log('Drop attempt - isPlayerSlot:', isPlayerSlot, 'targetSlot:', targetSlot);
+        console.log('Drop attempt - isPlayerSlot:', isPlayerSlot, 'targetSlot:', targetSlot);
 
-      if (isPlayerSlot && targetSlot !== undefined) {
-        console.log('Dropping card on slot:', targetSlot, 'Card:', draggedCard.name);
-        playCard(draggedCard, targetSlot);
+        if (isPlayerSlot && targetSlot !== undefined) {
+          console.log('Dropping card on slot:', targetSlot, 'Card:', draggedCard.name);
+          playCard(draggedCard, targetSlot);
+          audioManager.playRandom('cardPlace');
+        }
       }
-    }
 
-    setDraggedCard(null);
+      setDraggedCard(null);
+    });
   };
 
   if (!currentMatch) {
@@ -75,6 +98,7 @@ export function GameBoard() {
   const currentPlayer = currentMatch.players[currentPlayerId];
   const opponentPlayer = currentMatch.players[opponentId];
   const isMyTurn = currentMatch.activePlayer === currentPlayerId;
+  const hasAttackToken = currentMatch.attackTokenOwner === currentPlayerId;
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -120,7 +144,7 @@ export function GameBoard() {
             <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-40 pointer-events-none">
               <FateCounter
                 current={opponentPlayer?.fate || 0}
-                max={opponentPlayer?.maxFate || 3}
+                max={opponentPlayer?.maxFate || 1}
                 position="top"
                 label="Fate"
               />
@@ -134,6 +158,7 @@ export function GameBoard() {
               opponentBoard={opponentPlayer?.board || []}
               phase={currentMatch.phase}
               isMyTurn={isMyTurn}
+              onCardClick={handleCardClick}
             />
 
             {/* Phase Indicator */}
@@ -177,30 +202,37 @@ export function GameBoard() {
             <PlayerArea
               player={currentPlayer}
               isActive={isMyTurn}
+              onCardClick={handleCardClick}
             />
 
             {/* Player Fate Counter */}
             <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-40 pointer-events-none">
               <FateCounter
                 current={currentPlayer?.fate || 0}
-                max={currentPlayer?.maxFate || 3}
+                max={currentPlayer?.maxFate || 1}
                 position="bottom"
                 label="Fate"
               />
             </div>
 
-            {/* End Turn Button */}
-            <div className="absolute bottom-8 right-8">
+            {/* Action Button: ATTACK when you own the token, otherwise PASS */}
+            <div className="absolute bottom-8 right-8 flex gap-3">
               <PixelButton
                 size="lg"
-                variant={isMyTurn ? "gold" : "default"}
-                onClick={endTurn}
+                variant={isMyTurn && hasAttackToken ? "red" : isMyTurn ? "gold" : "default"}
+                onClick={() => {
+                  if (!isMyTurn) return;
+                  if (hasAttackToken) {
+                    startCombat();
+                    audioManager.playRandom('turnChange');
+                  } else {
+                    endTurn();
+                  }
+                }}
                 disabled={!isMyTurn}
-                className={cn(
-                  isMyTurn && "animate-pulse"
-                )}
+                className={cn(isMyTurn && "animate-pulse")}
               >
-                {isMyTurn ? "END TURN" : "OPPONENT'S TURN"}
+                {isMyTurn ? (hasAttackToken ? "ATTACK" : "PASS") : "OPPONENT'S TURN"}
               </PixelButton>
             </div>
 
@@ -243,6 +275,13 @@ export function GameBoard() {
           />
         </div>
       </div>
+
+      {/* Card Overlay */}
+      <CardOverlay
+        card={selectedCard}
+        isOpen={showCardOverlay}
+        onClose={handleCloseOverlay}
+      />
     </DndContext>
   );
 }

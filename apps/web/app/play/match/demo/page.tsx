@@ -14,7 +14,7 @@ import { CoinFlip } from '@/components/game/CoinFlip';
 // Generate sample cards for demo using tarot cards with proper IDs
 function generateDemoCards(count: number, prefix: string): Card[] {
   const cards: Card[] = [];
-  
+
   // Sample tarot cards for demo with proper card IDs
   const sampleCards = [
     { id: 'major_00', name: 'The Fool', suit: 'major', cost: 0, attack: 1, health: 4 },
@@ -28,7 +28,7 @@ function generateDemoCards(count: number, prefix: string): Card[] {
     { id: 'cups_queen', name: 'Queen of Cups', suit: 'cups', cost: 4, attack: 3, health: 6 },
     { id: 'swords_king', name: 'King of Swords', suit: 'swords', cost: 5, attack: 5, health: 5 },
   ];
-  
+
   for (let i = 0; i < count; i++) {
     const template = sampleCards[i % sampleCards.length];
     cards.push({
@@ -47,19 +47,20 @@ function generateDemoCards(count: number, prefix: string): Card[] {
       backImageUrl: '/api/ui/themes/pixel-pack/sheets/card_ui_01.png'
     });
   }
-  
+
   return cards;
 }
 
 export default function MatchDemoPage() {
   const router = useRouter();
-  const { 
-    currentMatch, 
+  const {
+    currentMatch,
     initializeMatch,
     playCard,
+    startCombat,
     endTurn
   } = useGameStore();
-  
+
   const [enemyAI, setEnemyAI] = useState<EnemyAI | null>(null);
   const [isAIThinking, setIsAIThinking] = useState(false);
   const [showCoinFlip, setShowCoinFlip] = useState(true);
@@ -78,13 +79,13 @@ export default function MatchDemoPage() {
   // Handle coin flip result
   const handleCoinFlipComplete = (playerStarts: boolean) => {
     setShowCoinFlip(false);
-    
+
     if (!enemy) return;
-    
+
     // Generate demo decks
     const playerDeck = generateDemoCards(30, 'player');
     const aiDeck = generateDemoCards(30, 'ai');
-    
+
     // Initialize match with starting hands
     const matchData = {
       matchId: `demo-${Date.now()}`,
@@ -95,8 +96,9 @@ export default function MatchDemoPage() {
           name: 'You',
           health: 30,
           maxHealth: 30,
-          fate: playerStarts ? 1 : 0, // Starting player gets 1 fate
-          maxFate: 3,
+          fate: playerStarts ? 1 : 0,
+          maxFate: 1,
+          spellMana: 0,
           hand: playerDeck.slice(0, 5),
           deck: playerDeck.slice(5),
           discard: [],
@@ -108,8 +110,9 @@ export default function MatchDemoPage() {
           name: enemy.name,
           health: 30,
           maxHealth: 30,
-          fate: playerStarts ? 0 : 1, // Non-starting player gets 0 fate
-          maxFate: 3,
+          fate: playerStarts ? 0 : 1,
+          maxFate: 1,
+          spellMana: 0,
           hand: aiDeck.slice(0, 5),
           deck: aiDeck.slice(5),
           discard: [],
@@ -120,15 +123,16 @@ export default function MatchDemoPage() {
         }
       },
       activePlayer: playerStarts ? 'player1' : 'ai',
+      attackTokenOwner: playerStarts ? 'player1' : 'ai',
       turn: 1,
       phase: 'main' as const, // Start in main phase
       turnTimer: 60
     };
-    
+
     console.log('Match data:', matchData);
     console.log('Player hand:', matchData.players.player1.hand);
     console.log('AI hand:', matchData.players.ai.hand);
-    
+
     initializeMatch(matchData);
   };
 
@@ -141,11 +145,15 @@ export default function MatchDemoPage() {
 
   const handleAITurn = async () => {
     if (!enemyAI || !currentMatch) return;
-    
+
     setIsAIThinking(true);
-    
-    // Simple AI: play a random card
+
+    // Simple AI: play a random card only if it's AI's turn
     const aiPlayer = currentMatch.players['ai'];
+    if (useGameStore.getState().currentMatch?.activePlayer !== 'ai') {
+      setIsAIThinking(false);
+      return;
+    }
     if (aiPlayer.hand.length > 0) {
       const playableCards = aiPlayer.hand.filter(c => c.cost <= aiPlayer.fate);
       if (playableCards.length > 0) {
@@ -153,7 +161,7 @@ export default function MatchDemoPage() {
         const emptySlots = aiPlayer.board
           .map((slot, i) => !slot.card ? i : -1)
           .filter(i => i >= 0);
-        
+
         if (emptySlots.length > 0) {
           const randomSlot = emptySlots[Math.floor(Math.random() * emptySlots.length)];
           await new Promise(resolve => setTimeout(resolve, 1000));
@@ -161,9 +169,14 @@ export default function MatchDemoPage() {
         }
       }
     }
-    
+
+    // Initiate combat in demo
+    await new Promise(resolve => setTimeout(resolve, 500));
+    if (useGameStore.getState().currentMatch?.attackTokenOwner === 'ai') {
+      startCombat();
+    }
+    await new Promise(resolve => setTimeout(resolve, 700));
     // End AI turn
-    await new Promise(resolve => setTimeout(resolve, 1500));
     endTurn();
     setIsAIThinking(false);
   };
@@ -187,7 +200,7 @@ export default function MatchDemoPage() {
       ) : (
         <GameBoard />
       )}
-      
+
       {/* AI Thinking Indicator */}
       {isAIThinking && (
         <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50">
@@ -199,7 +212,7 @@ export default function MatchDemoPage() {
           </div>
         </div>
       )}
-      
+
       {/* Back Button */}
       <div className="fixed bottom-4 left-4">
         <Button

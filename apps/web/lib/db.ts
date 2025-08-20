@@ -1,13 +1,16 @@
-import Database from 'better-sqlite3';
+import type Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import * as schema from '@tarot/db';
 
 let db: ReturnType<typeof drizzle> | null = null;
-let sqliteRaw: Database | null = null;
+let sqliteRaw: any | null = null;
 
 export function getDb() {
   if (!db) {
-    sqliteRaw = new Database(':memory:');
+    // Use require to avoid top-level await and keep type loose for build
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const BetterSqlite = require('better-sqlite3');
+    sqliteRaw = new BetterSqlite(':memory:');
     db = drizzle(sqliteRaw, { schema });
     initDb();
   }

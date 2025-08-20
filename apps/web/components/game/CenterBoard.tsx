@@ -3,8 +3,8 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDroppable } from '@dnd-kit/core';
 import { TarotCard } from './TarotCard';
-import { BoardSlot, GamePhase } from '@/lib/store/gameStore';
-import { Swords, Shield, Zap } from 'lucide-react';
+import { BoardSlot, GamePhase, Card, useGameStore } from '@/lib/store/gameStore';
+import { Swords } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface CenterBoardProps {
@@ -12,6 +12,7 @@ interface CenterBoardProps {
   opponentBoard: BoardSlot[];
   phase: GamePhase;
   isMyTurn: boolean;
+  onCardClick?: (card: Card) => void;
 }
 
 interface BoardSlotComponentProps {
@@ -19,37 +20,39 @@ interface BoardSlotComponentProps {
   index: number;
   isPlayerSlot: boolean;
   canDrop: boolean;
+  onCardClick?: (card: Card) => void;
 }
 
-function BoardSlotComponent({ slot, index, isPlayerSlot, canDrop }: BoardSlotComponentProps) {
+function BoardSlotComponent({ slot, index, isPlayerSlot, canDrop, onCardClick }: BoardSlotComponentProps) {
   const droppableId = `slot-${isPlayerSlot ? 'player' : 'opponent'}-${index}`;
-  
+
   const { setNodeRef, isOver } = useDroppable({
     id: droppableId,
     data: { slot: index, isPlayerSlot },
     disabled: !canDrop
   });
-  
 
+  const blocked = slot.isBlocked || !canDrop;
   return (
     <div
       ref={setNodeRef}
       className={cn(
         "relative w-[150px] h-[210px] rounded-lg border-2 transition-all duration-200 z-10",
-        slot.card 
-          ? "border-transparent" 
-          : canDrop 
+        slot.card
+          ? "border-transparent"
+          : canDrop
             ? "border-dashed border-green-400/50 bg-green-900/20"
             : "border-dashed border-white/20 bg-black/20",
         isOver && canDrop && "border-yellow-400 bg-yellow-400/20 scale-105 shadow-xl",
-        slot.isBlocked && "opacity-50 cursor-not-allowed"
+        blocked && "opacity-50 cursor-not-allowed"
       )}
     >
       {slot.card ? (
         <TarotCard
           card={slot.card}
           isOnBoard={true}
-          isSelectable={false}
+          isSelectable={true}
+          onClick={() => onCardClick?.(slot.card!)}
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center">
@@ -73,17 +76,20 @@ function BoardSlotComponent({ slot, index, isPlayerSlot, canDrop }: BoardSlotCom
   );
 }
 
-export function CenterBoard({ playerBoard, opponentBoard, phase, isMyTurn }: CenterBoardProps) {
+export function CenterBoard({ playerBoard, opponentBoard, phase, isMyTurn, onCardClick }: CenterBoardProps) {
+  const { currentMatch } = useGameStore();
   // Ensure we always have 6 slots
-  const playerSlots: BoardSlot[] = Array.from({ length: 6 }, (_, i) => 
+  const playerSlots: BoardSlot[] = Array.from({ length: 6 }, (_, i) =>
     playerBoard[i] || { card: null, position: i }
   );
-  const opponentSlots: BoardSlot[] = Array.from({ length: 6 }, (_, i) => 
+  const opponentSlots: BoardSlot[] = Array.from({ length: 6 }, (_, i) =>
     opponentBoard[i] || { card: null, position: i }
   );
 
   const showCombatLines = phase === 'combat';
-  
+  const reactionOpen = !!currentMatch?.reactionWindow?.active;
+  const canPlayUnits = isMyTurn && phase === 'main' && !reactionOpen;
+
   // Debug - removed to reduce console spam
 
   return (
@@ -97,6 +103,7 @@ export function CenterBoard({ playerBoard, opponentBoard, phase, isMyTurn }: Cen
             index={index}
             isPlayerSlot={false}
             canDrop={false}
+            onCardClick={onCardClick}
           />
         ))}
       </div>
@@ -104,7 +111,7 @@ export function CenterBoard({ playerBoard, opponentBoard, phase, isMyTurn }: Cen
       {/* Battle Line */}
       <div className="relative h-2 my-4">
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-        
+
         {/* Combat Phase Indicator */}
         {showCombatLines && (
           <motion.div
@@ -123,7 +130,8 @@ export function CenterBoard({ playerBoard, opponentBoard, phase, isMyTurn }: Cen
             slot={slot}
             index={index}
             isPlayerSlot={true}
-            canDrop={isMyTurn && phase === 'main'}
+            canDrop={canPlayUnits}
+            onCardClick={onCardClick}
           />
         ))}
       </div>
@@ -134,12 +142,12 @@ export function CenterBoard({ playerBoard, opponentBoard, phase, isMyTurn }: Cen
           {playerSlots.map((playerSlot, index) => {
             const oppSlot = opponentSlots[index];
             if (!playerSlot.card || !oppSlot.card) return null;
-            
+
             const startX = 150 + (index * 158) + 75;
             const startY = 280;
             const endX = startX;
             const endY = 140;
-            
+
             return (
               <motion.line
                 key={`combat-line-${index}`}

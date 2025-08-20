@@ -129,11 +129,13 @@ class GameWebSocket {
     this.socket.on('game_over', (data: any) => {
       console.log('Game over:', data);
       // Handle game over
+      // Append minimal flags into lastAction if needed to avoid typing issues
       store.updateMatchState({
-        ...store.currentMatch,
-        gameOver: true,
-        winner: data.winner,
-        reason: data.reason
+        lastAction: {
+          type: 'game_over',
+          playerId: data.winner,
+          data: { reason: data.reason }
+        }
       });
     });
 

@@ -7,16 +7,17 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Eye, EyeOff, Package, Trash2 } from 'lucide-react';
-import { Player } from '@/lib/store/gameStore';
+import { Player, Card } from '@/lib/store/gameStore';
 import { cn } from '@/lib/utils';
 import { audioManager } from '@/lib/audio/AudioManager';
 
 interface PlayerAreaProps {
   player: Player | undefined;
   isActive: boolean;
+  onCardClick?: (card: Card) => void;
 }
 
-export function PlayerArea({ player, isActive }: PlayerAreaProps) {
+export function PlayerArea({ player, isActive, onCardClick }: PlayerAreaProps) {
   const [showHand, setShowHand] = useState(true);
 
   if (!player) return null;
@@ -69,7 +70,7 @@ export function PlayerArea({ player, isActive }: PlayerAreaProps) {
           className="relative cursor-pointer"
           onClick={() => {
             setShowHand(!showHand);
-            audioManager.playRandom('cardSlide');
+            audioManager.playRandom('cardShuffle');
           }}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
@@ -108,6 +109,7 @@ export function PlayerArea({ player, isActive }: PlayerAreaProps) {
                   card={card}
                   isInHand={true}
                   isSelectable={isActive}
+                  onClick={() => onCardClick?.(card)}
                 />
               ))}
             </div>

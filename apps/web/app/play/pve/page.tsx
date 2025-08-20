@@ -13,10 +13,10 @@ import { EnemyAI } from '@/lib/ai/EnemyAI';
 import { audioManager } from '@/lib/audio/AudioManager';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import { 
-  Swords, 
-  ShoppingBag, 
-  Home, 
+import {
+  Swords,
+  ShoppingBag,
+  Home,
   HelpCircle,
   Heart,
   Shield,
@@ -41,7 +41,7 @@ export default function PvEPage() {
   const router = useRouter();
   const [isClient, setIsClient] = useState(false);
   const [runState, setRunState] = useState<RunState>(createInitialRunState());
-  
+
   // Generate random seed only on client side
   useEffect(() => {
     setIsClient(true);
@@ -63,7 +63,7 @@ export default function PvEPage() {
 
   const handleNodeClick = (node: MapNode) => {
     setSelectedNode(node);
-    
+
     switch (node.type) {
       case 'battle':
       case 'elite':
@@ -163,6 +163,11 @@ export default function PvEPage() {
     }
   };
 
+  const handleAbandonRun = () => {
+    // Reset run state and return to play selection
+    router.push('/play');
+  };
+
   // Show loading state until client-side seed is generated
   if (!isClient) {
     return (
@@ -174,7 +179,7 @@ export default function PvEPage() {
 
   return (
     <>
-      <PvEMap runState={runState} onNodeClick={handleNodeClick} />
+      <PvEMap runState={runState} onNodeClick={handleNodeClick} onAbandonRun={handleAbandonRun} />
 
       {/* Event Dialog */}
       <Dialog open={showEventDialog} onOpenChange={setShowEventDialog}>
@@ -185,13 +190,13 @@ export default function PvEPage() {
               Mysterious Encounter
             </DialogTitle>
           </DialogHeader>
-          
+
           <div className="py-4">
             <p className="text-gray-300 mb-6">
-              A wandering fortune teller offers to read your future in the cards. 
+              A wandering fortune teller offers to read your future in the cards.
               She asks for 50 gold in exchange for an Omen that will aid your journey.
             </p>
-            
+
             <div className="space-y-3">
               <Button
                 onClick={() => handleEventChoice('accept')}
@@ -201,7 +206,7 @@ export default function PvEPage() {
                 <Sparkles className="w-4 h-4 mr-2" />
                 Accept Reading (-50g, +Omen)
               </Button>
-              
+
               <Button
                 onClick={() => handleEventChoice('decline')}
                 variant="outline"
@@ -223,7 +228,7 @@ export default function PvEPage() {
               Mystic Shop
             </DialogTitle>
           </DialogHeader>
-          
+
           <div className="py-4">
             <div className="flex justify-between items-center mb-4">
               <span className="text-gray-300">Your Gold:</span>
@@ -231,12 +236,12 @@ export default function PvEPage() {
                 {runState.gold}g
               </Badge>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4">
               <Card className="bg-black/40 backdrop-blur-sm border-white/10 p-4">
                 <h3 className="text-white font-bold mb-2">Remove Card</h3>
                 <p className="text-xs text-gray-400 mb-3">Remove a card from your deck</p>
-                <Button 
+                <Button
                   size="sm"
                   onClick={() => handleShopPurchase('remove', 75)}
                   disabled={runState.gold < 75}
@@ -245,11 +250,11 @@ export default function PvEPage() {
                   75g
                 </Button>
               </Card>
-              
+
               <Card className="bg-black/40 backdrop-blur-sm border-white/10 p-4">
                 <h3 className="text-white font-bold mb-2">Upgrade Card</h3>
                 <p className="text-xs text-gray-400 mb-3">Enhance a card's power</p>
-                <Button 
+                <Button
                   size="sm"
                   onClick={() => handleShopPurchase('upgrade', 100)}
                   disabled={runState.gold < 100}
@@ -258,11 +263,11 @@ export default function PvEPage() {
                   100g
                 </Button>
               </Card>
-              
+
               <Card className="bg-black/40 backdrop-blur-sm border-white/10 p-4">
                 <h3 className="text-white font-bold mb-2">Mystery Card</h3>
                 <p className="text-xs text-gray-400 mb-3">Add a random rare card</p>
-                <Button 
+                <Button
                   size="sm"
                   onClick={() => handleShopPurchase('mystery', 150)}
                   disabled={runState.gold < 150}
@@ -271,11 +276,11 @@ export default function PvEPage() {
                   150g
                 </Button>
               </Card>
-              
+
               <Card className="bg-black/40 backdrop-blur-sm border-white/10 p-4">
                 <h3 className="text-white font-bold mb-2">Healing Potion</h3>
                 <p className="text-xs text-gray-400 mb-3">Restore 10 health</p>
-                <Button 
+                <Button
                   size="sm"
                   onClick={() => {
                     handleShopPurchase('heal', 50);
@@ -291,7 +296,7 @@ export default function PvEPage() {
                 </Button>
               </Card>
             </div>
-            
+
             <Button
               onClick={() => setShowShopDialog(false)}
               className="w-full mt-4"
@@ -312,12 +317,12 @@ export default function PvEPage() {
               Rest Site
             </DialogTitle>
           </DialogHeader>
-          
+
           <div className="py-4">
             <p className="text-gray-300 mb-6">
               You've found a safe place to rest. Choose how to spend your time:
             </p>
-            
+
             <div className="space-y-3">
               <Card className="bg-black/40 backdrop-blur-sm border-white/10 p-4">
                 <Button
@@ -331,7 +336,7 @@ export default function PvEPage() {
                   Current: {runState.health}/{runState.maxHealth}
                 </p>
               </Card>
-              
+
               <Card className="bg-black/40 backdrop-blur-sm border-white/10 p-4">
                 <Button
                   onClick={() => handleRest('upgrade')}
@@ -358,14 +363,14 @@ export default function PvEPage() {
               Enemy Encounter!
             </DialogTitle>
           </DialogHeader>
-          
+
           {currentEnemy && (
             <div className="py-4">
               <div className="flex gap-6">
                 {/* Enemy Portrait */}
                 <div className="flex-shrink-0">
                   <div className="relative w-32 h-32">
-                    <div 
+                    <div
                       className="absolute inset-0 rounded-lg border-2 border-purple-500/50 overflow-hidden"
                       style={{
                         backgroundImage: `url(${currentEnemy.portrait})`,
@@ -388,12 +393,12 @@ export default function PvEPage() {
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Enemy Info */}
                 <div className="flex-1">
                   <h3 className="text-white text-2xl font-bold mb-1">{currentEnemy.name}</h3>
                   <p className="text-purple-300 text-sm mb-3">{currentEnemy.title}</p>
-                  
+
                   <div className="space-y-2 mb-4">
                     <div className="flex items-center gap-2">
                       <span className="text-gray-400 text-sm">Deck Theme:</span>
@@ -411,7 +416,7 @@ export default function PvEPage() {
                       <span className="text-gray-400 text-sm">Power Level:</span>
                       <div className="flex gap-1">
                         {Array.from({ length: 5 }).map((_, i) => (
-                          <div 
+                          <div
                             key={i}
                             className={cn(
                               "w-4 h-4 rounded-full",
@@ -424,7 +429,7 @@ export default function PvEPage() {
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Enemy Taunt */}
                   <div className="bg-black/40 backdrop-blur-sm rounded-lg p-3 border border-white/10">
                     <p className="text-gray-300 italic">
@@ -433,7 +438,7 @@ export default function PvEPage() {
                   </div>
                 </div>
               </div>
-              
+
               {/* Rewards Preview */}
               <div className="mt-6 bg-black/40 backdrop-blur-sm rounded-lg p-4 border border-white/10">
                 <h4 className="text-white font-bold mb-2 flex items-center gap-2">
@@ -457,7 +462,7 @@ export default function PvEPage() {
                   )}
                 </div>
               </div>
-              
+
               {/* Action Buttons */}
               <div className="flex gap-3 mt-6">
                 <Button

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { getFrame, cssBackgroundStyle, type AtlasGrid } from '@/lib/uiAtlas';
+import { audioManager } from '@/lib/audio/AudioManager';
 
 type DeckId = 'classic' | 'marigold' | 'arcana-a' | 'duality-color' | 'duality-mono';
 
@@ -10,22 +11,11 @@ type StepEvent = { idx: number; intent: { type: string; playerId?: string; cardI
 
 const DEFAULT_DECK: DeckId = 'classic';
 
+// Route SFX playback through the AudioManager so throttling/mute/volume apply
 function useSfx() {
-    const cache = useRef<Map<string, HTMLAudioElement>>(new Map());
-    function getAudio(name: string) {
-        const key = name;
-        if (!cache.current.has(key)) {
-            const a = new Audio(`/api/sounds/effects/${name}`);
-            a.preload = 'auto';
-            cache.current.set(key, a);
-        }
-        return cache.current.get(key)!;
-    }
     function play(name: string) {
-        const base = getAudio(name);
-        // Clone to allow overlapping
-        const a = base.cloneNode(true) as HTMLAudioElement;
-        void a.play().catch(() => { });
+        const id = name.replace(/\.wav$/i, '').replace(/\.mp3$/i, '').replace(/\.ogg$/i, '');
+        void audioManager.play(id);
     }
     return { play };
 }

@@ -1,0 +1,558 @@
+{
+  "major": {
+    "fool": {
+      "name": "The Fool",
+      "uprightMeaning": "New beginnings, innocence, spontaneity, free spirit",
+      "reversedMeaning": "Recklessness, taken advantage of, inconsideration",
+      "uprightDescription": "The Fool represents new journeys and fresh starts. A time to take a leap of faith and trust in the universe. Embrace your inner child and approach life with wonder and optimism.",
+      "reversedDescription": "When reversed, The Fool warns against reckless decisions and poor judgment. Take time to think before acting and avoid impulsive behavior that could lead to trouble."
+    },
+    "magician": {
+      "name": "The Magician",
+      "uprightMeaning": "Manifestation, resourcefulness, power, inspired action",
+      "reversedMeaning": "Manipulation, poor planning, untapped talents",
+      "uprightDescription": "The Magician signifies having all the tools needed to succeed. You have the power to manifest your desires through focused will and determination. Channel your energy purposefully.",
+      "reversedDescription": "Reversed, The Magician suggests misuse of power or inability to harness your potential. Beware of manipulation and focus on developing your skills before taking action."
+    },
+    "high_priestess": {
+      "name": "The High Priestess",
+      "uprightMeaning": "Intuition, sacred knowledge, divine feminine, subconscious",
+      "reversedMeaning": "Secrets, disconnected from intuition, withdrawal",
+      "uprightDescription": "The High Priestess represents inner wisdom and intuitive knowledge. Trust your instincts and look beyond the surface. The answers you seek lie within.",
+      "reversedDescription": "When reversed, you may be ignoring your intuition or hiding important truths. Reconnect with your inner voice and be honest about what you truly know."
+    },
+    "empress": {
+      "name": "The Empress",
+      "uprightMeaning": "Femininity, beauty, nature, nurturing, abundance",
+      "reversedMeaning": "Creative block, dependence on others, empty nest",
+      "uprightDescription": "The Empress embodies feminine power, creativity, and abundance. A time of growth, nurturing, and natural beauty. Your creative projects will flourish.",
+      "reversedDescription": "Reversed, The Empress may indicate creative blocks or over-dependence on others. Focus on self-care and reconnecting with your creative spark."
+    },
+    "emperor": {
+      "name": "The Emperor",
+      "uprightMeaning": "Authority, establishment, structure, father figure",
+      "reversedMeaning": "Tyranny, rigidity, coldness",
+      "uprightDescription": "The Emperor represents structure, authority, and solid foundations. A time to take control, establish order, and provide stable leadership.",
+      "reversedDescription": "When reversed, The Emperor warns against being too rigid or controlling. Avoid tyrannical behavior and find balance between authority and compassion."
+    },
+    "hierophant": {
+      "name": "The Hierophant",
+      "uprightMeaning": "Spiritual wisdom, religious beliefs, conformity, tradition",
+      "reversedMeaning": "Personal beliefs, freedom, challenging the status quo",
+      "uprightDescription": "The Hierophant represents traditional wisdom and spiritual guidance. Seek knowledge from established institutions and honor time-tested traditions.",
+      "reversedDescription": "Reversed, The Hierophant encourages questioning established beliefs and finding your own spiritual path. Break free from restrictive traditions."
+    },
+    "lovers": {
+      "name": "The Lovers",
+      "uprightMeaning": "Love, harmony, relationships, values alignment",
+      "reversedMeaning": "Disharmony, imbalance, misalignment of values",
+      "uprightDescription": "The Lovers represents deep connections and harmony in relationships. A time of important choices guided by love and shared values.",
+      "reversedDescription": "When reversed, The Lovers indicates relationship conflicts or value misalignment. Work on communication and ensure your actions align with your beliefs."
+    },
+    "chariot": {
+      "name": "The Chariot",
+      "uprightMeaning": "Control, willpower, success, determination",
+      "reversedMeaning": "Self-discipline, opposition, lack of direction",
+      "uprightDescription": "The Chariot signifies victory through determination and focused willpower. Stay disciplined and maintain control to overcome obstacles.",
+      "reversedDescription": "Reversed, The Chariot suggests loss of control or conflicting directions. Regain focus and align your actions with your goals."
+    },
+    "strength": {
+      "name": "Strength",
+      "uprightMeaning": "Strength, courage, persuasion, influence, compassion",
+      "reversedMeaning": "Inner strength, self-doubt, low energy, raw emotion",
+      "uprightDescription": "Strength represents inner courage and gentle power. Face challenges with compassion and patience rather than force. Your gentle approach will prevail.",
+      "reversedDescription": "When reversed, Strength suggests self-doubt or lack of confidence. Focus on building inner strength and controlling emotional reactions."
+    },
+    "hermit": {
+      "name": "The Hermit",
+      "uprightMeaning": "Soul searching, introspection, inner guidance",
+      "reversedMeaning": "Isolation, loneliness, withdrawal",
+      "uprightDescription": "The Hermit calls for introspection and soul searching. Take time alone to reflect and seek inner wisdom. The answers you need are within.",
+      "reversedDescription": "Reversed, The Hermit may indicate excessive isolation or avoiding self-reflection. Balance solitude with connection to others."
+    },
+    "wheel_of_fortune": {
+      "name": "Wheel of Fortune",
+      "uprightMeaning": "Good luck, karma, life cycles, destiny, turning point",
+      "reversedMeaning": "Bad luck, lack of control, clinging to control, bad luck",
+      "uprightDescription": "The Wheel of Fortune represents cycles of change and destiny. A turning point approaches - embrace the changes and trust in the natural flow of life.",
+      "reversedDescription": "When reversed, you may be fighting against natural changes or experiencing a streak of bad luck. Accept what you cannot control and adapt."
+    },
+    "justice": {
+      "name": "Justice",
+      "uprightMeaning": "Justice, fairness, truth, cause and effect, law",
+      "reversedMeaning": "Unfairness, lack of accountability, dishonesty",
+      "uprightDescription": "Justice represents balance, truth, and fair decisions. Act with integrity and take responsibility for your actions. Fair outcomes will prevail.",
+      "reversedDescription": "Reversed, Justice indicates unfairness or lack of accountability. Examine your actions honestly and work to restore balance."
+    },
+    "hanged_man": {
+      "name": "The Hanged Man",
+      "uprightMeaning": "Suspension, restriction, letting go, sacrifice",
+      "reversedMeaning": "Delays, resistance, stalling, indecision",
+      "uprightDescription": "The Hanged Man represents willing sacrifice and new perspectives. Sometimes you must let go and view situations from a different angle to find solutions.",
+      "reversedDescription": "When reversed, you may be resisting necessary changes or feeling stuck. Stop fighting and allow natural transitions to occur."
+    },
+    "death": {
+      "name": "Death",
+      "uprightMeaning": "Endings, beginnings, change, transformation, transition",
+      "reversedMeaning": "Resistance to change, personal transformation, inner purging",
+      "uprightDescription": "Death represents transformation and new beginnings. While endings can be difficult, they make way for new growth and opportunities.",
+      "reversedDescription": "Reversed, Death suggests resistance to change or fear of transformation. Embrace the process of renewal and release what no longer serves you."
+    },
+    "temperance": {
+      "name": "Temperance",
+      "uprightMeaning": "Balance, moderation, patience, purpose",
+      "reversedMeaning": "Imbalance, excess, self-healing, re-alignment",
+      "uprightDescription": "Temperance represents balance and moderation. Take a measured approach and blend opposing forces harmoniously. Patience will bring the best results.",
+      "reversedDescription": "When reversed, Temperance indicates imbalance or excess. Focus on self-healing and finding your center again."
+    },
+    "devil": {
+      "name": "The Devil",
+      "uprightMeaning": "Bondage, addiction, sexuality, materialism",
+      "reversedMeaning": "Releasing limiting beliefs, exploring dark thoughts, detachment",
+      "uprightDescription": "The Devil represents bondage to material desires and negative patterns. Recognize what chains you and choose freedom over temptation.",
+      "reversedDescription": "Reversed, The Devil suggests breaking free from limitations and addictions. You have the power to release yourself from negative patterns."
+    },
+    "tower": {
+      "name": "The Tower",
+      "uprightMeaning": "Sudden change, upheaval, chaos, revelation, awakening",
+      "reversedMeaning": "Personal transformation, fear of change, averting disaster",
+      "uprightDescription": "The Tower represents sudden upheaval and dramatic change. While disruptive, this destruction clears the way for something better to be built.",
+      "reversedDescription": "When reversed, The Tower suggests internal transformation or successfully avoiding disaster. Use this time to rebuild on stronger foundations."
+    },
+    "star": {
+      "name": "The Star",
+      "uprightMeaning": "Hope, faith, purpose, renewal, spirituality",
+      "reversedMeaning": "Lack of faith, despair, self-trust, disconnection",
+      "uprightDescription": "The Star represents hope, healing, and spiritual guidance. After difficult times, renewal and inspiration return. Trust in the universe's plan.",
+      "reversedDescription": "Reversed, The Star indicates loss of faith or spiritual disconnection. Reconnect with your inner light and trust in better times ahead."
+    },
+    "moon": {
+      "name": "The Moon",
+      "uprightMeaning": "Illusion, fear, anxiety, subconscious, intuition",
+      "reversedMeaning": "Release of fear, repressed emotion, inner confusion",
+      "uprightDescription": "The Moon represents illusion and the power of the subconscious. Things may not be as they seem - trust your intuition to navigate uncertainty.",
+      "reversedDescription": "When reversed, The Moon suggests releasing fears and confronting illusions. Face your anxieties and trust your inner wisdom."
+    },
+    "sun": {
+      "name": "The Sun",
+      "uprightMeaning": "Positivity, fun, warmth, success, vitality",
+      "reversedMeaning": "Inner child, feeling down, overly optimistic",
+      "uprightDescription": "The Sun represents joy, success, and positive energy. A time of celebration and happiness. Let your inner light shine brightly.",
+      "reversedDescription": "Reversed, The Sun may indicate dampened spirits or false optimism. Reconnect with your inner child and find genuine reasons for joy."
+    },
+    "judgement": {
+      "name": "Judgement",
+      "uprightMeaning": "Judgement, rebirth, inner calling, absolution",
+      "reversedMeaning": "Self-doubt, inner critic, ignoring the call, harsh judgement",
+      "uprightDescription": "Judgement represents rebirth and answering your higher calling. A time of awakening and making important decisions about your life's direction.",
+      "reversedDescription": "When reversed, Judgement suggests self-doubt or ignoring your inner calling. Be gentle with yourself and listen to your higher purpose."
+    },
+    "world": {
+      "name": "The World",
+      "uprightMeaning": "Completion, accomplishment, travel, fulfillment",
+      "reversedMeaning": "Seeking personal closure, short-cut to success, lack of achievement",
+      "uprightDescription": "The World represents completion and achievement. You've reached an important milestone and can celebrate your accomplishments. New cycles await.",
+      "reversedDescription": "Reversed, The World suggests incomplete goals or seeking shortcuts. Focus on finishing what you've started before moving to new ventures."
+    }
+  },
+  "wands": {
+    "ace": {
+      "name": "Ace of Wands",
+      "uprightMeaning": "Inspiration, new opportunities, growth",
+      "reversedMeaning": "Lack of energy, delays, creative blocks",
+      "uprightDescription": "A spark of creative inspiration and new beginnings. Raw potential and passionate energy are available to fuel your ventures.",
+      "reversedDescription": "Creative blocks or delays in new projects. The energy is there but may need time to develop properly."
+    },
+    "two": {
+      "name": "Two of Wands",
+      "uprightMeaning": "Future planning, making decisions, leaving comfort zone",
+      "reversedMeaning": "Fear of change, lack of planning, bad planning",
+      "uprightDescription": "Planning for the future and making important decisions. You have the power to shape your destiny through careful planning.",
+      "reversedDescription": "Fear of change or poor planning may hinder progress. Take time to properly prepare before moving forward."
+    },
+    "three": {
+      "name": "Three of Wands",
+      "uprightMeaning": "Expansion, foresight, overseas opportunities",
+      "reversedMeaning": "Playing small, lack of foresight, unexpected delays",
+      "uprightDescription": "Expansion and growth opportunities await. Your foresight and planning will lead to success in new ventures.",
+      "reversedDescription": "Playing it too safe or lacking vision may limit opportunities. Be bolder in your approach."
+    },
+    "four": {
+      "name": "Four of Wands",
+      "uprightMeaning": "Celebration, joy, harmony, relaxation, homecoming",
+      "reversedMeaning": "Personal celebration, inner harmony, conflict with others",
+      "uprightDescription": "A time of celebration and achievement. Your hard work has paid off and you can enjoy the fruits of your labor with loved ones.",
+      "reversedDescription": "Focus on personal satisfaction rather than external validation. Inner peace matters more than others' approval."
+    },
+    "five": {
+      "name": "Five of Wands",
+      "uprightMeaning": "Conflict, disagreements, competition, tension",
+      "reversedMeaning": "Inner conflict, conflict avoidance, releasing tension",
+      "uprightDescription": "Competition and conflict arise, but this struggle leads to growth. Stand your ground while remaining open to different perspectives.",
+      "reversedDescription": "Internal struggles need attention. Avoid conflict for the sake of peace, but don't ignore important issues."
+    },
+    "six": {
+      "name": "Six of Wands",
+      "uprightMeaning": "Success, public recognition, progress, self-confidence",
+      "reversedMeaning": "Private achievement, personal definition of success, fall from grace",
+      "uprightDescription": "Victory and recognition come after overcoming challenges. Your confidence and leadership inspire others to follow.",
+      "reversedDescription": "Success may be more private or personal. Define achievement on your own terms rather than seeking external validation."
+    },
+    "seven": {
+      "name": "Seven of Wands",
+      "uprightMeaning": "Challenge, competition, perseverance",
+      "reversedMeaning": "Exhaustion, giving up, overwhelmed",
+      "uprightDescription": "Stand your ground against opposition. Your perseverance and determination will help you maintain your position.",
+      "reversedDescription": "Feeling overwhelmed by challenges. It may be time to reassess your position and conserve your energy."
+    },
+    "eight": {
+      "name": "Eight of Wands",
+      "uprightMeaning": "Speed, swift action, rapid progress, movement",
+      "reversedMeaning": "Delays, frustration, resisting change, internal alignment",
+      "uprightDescription": "Things move quickly now. Swift action and rapid progress lead to exciting developments. Strike while the iron is hot.",
+      "reversedDescription": "Delays and frustrations slow your progress. Use this time for internal reflection and planning."
+    },
+    "nine": {
+      "name": "Nine of Wands",
+      "uprightMeaning": "Resilience, courage, persistence, test of faith",
+      "reversedMeaning": "Inner resources, struggle, overwhelm, defensive",
+      "uprightDescription": "You're close to achieving your goal despite obstacles. Draw on your inner strength and keep pushing forward.",
+      "reversedDescription": "Exhaustion and defensive attitudes may hinder progress. Take time to rebuild your strength and confidence."
+    },
+    "ten": {
+      "name": "Ten of Wands",
+      "uprightMeaning": "Burden, extra responsibility, hard work, completion",
+      "reversedMeaning": "Doing it all, carrying the burden, delegation, release",
+      "uprightDescription": "Heavy responsibilities weigh you down, but completion is near. The burden will be worth the final achievement.",
+      "reversedDescription": "Consider delegating responsibilities or releasing what no longer serves you. You don't have to carry everything alone."
+    },
+    "page": {
+      "name": "Page of Wands",
+      "uprightMeaning": "Inspiration, ideas, discovery, limitless potential, free spirit",
+      "reversedMeaning": "Newly formed ideas, redirecting energy, self-limiting beliefs",
+      "uprightDescription": "Fresh inspiration and creative potential await exploration. Embrace your adventurous spirit and try new things.",
+      "reversedDescription": "New ideas are forming but need more development. Address self-limiting beliefs that hold you back."
+    },
+    "knight": {
+      "name": "Knight of Wands",
+      "uprightMeaning": "Energy, passion, inspired action, adventure, impulsiveness",
+      "reversedMeaning": "Passion project, haste, scattered energy, delays",
+      "uprightDescription": "Passionate energy drives bold action. Your enthusiasm is contagious, but temper impulsiveness with wisdom.",
+      "reversedDescription": "Scattered energy leads to delays. Focus your passion on one meaningful project rather than spreading yourself thin."
+    },
+    "queen": {
+      "name": "Queen of Wands",
+      "uprightMeaning": "Courage, confidence, independence, social butterfly, determination",
+      "reversedMeaning": "Self-respect, self-confidence, introversion, re-establishing confidence",
+      "uprightDescription": "Confident leadership and social grace attract others. Your independence and determination inspire confidence in others.",
+      "reversedDescription": "Focus on rebuilding self-confidence from within. Sometimes introversion helps you reconnect with your true power."
+    },
+    "king": {
+      "name": "King of Wands",
+      "uprightMeaning": "Natural leader, vision, entrepreneur, honor",
+      "reversedMeaning": "Impulsiveness, haste, ruthless, high expectations",
+      "uprightDescription": "Strong leadership and clear vision guide successful ventures. Your entrepreneurial spirit creates opportunities for others.",
+      "reversedDescription": "Impulsive decisions and high expectations may alienate others. Balance ambition with compassion and patience."
+    }
+  },
+  "cups": {
+    "ace": {
+      "name": "Ace of Cups",
+      "uprightMeaning": "Love, new relationships, compassion, creativity",
+      "reversedMeaning": "Self-love, intuition, repressed emotions",
+      "uprightDescription": "New emotional beginnings and an open heart. Love, creativity, and spiritual connections flow freely.",
+      "reversedDescription": "Focus on self-love and addressing repressed emotions. Inner healing is needed before external relationships can flourish."
+    },
+    "two": {
+      "name": "Two of Cups",
+      "uprightMeaning": "Unified love, partnership, mutual attraction",
+      "reversedMeaning": "Self-love, break-ups, disharmony",
+      "uprightDescription": "Deep emotional connection and partnership. Mutual respect and understanding create strong bonds.",
+      "reversedDescription": "Relationship challenges or the need to focus on self-love. Work on internal harmony before seeking external connections."
+    },
+    "three": {
+      "name": "Three of Cups",
+      "uprightMeaning": "Celebration, friendship, creativity, community",
+      "reversedMeaning": "Independence, alone time, creative blocks",
+      "uprightDescription": "Celebration and joy with friends and community. Creative collaborations and social connections bring happiness.",
+      "reversedDescription": "Need for independence or time alone. Creative blocks may require solitary reflection to overcome."
+    },
+    "four": {
+      "name": "Four of Cups",
+      "uprightMeaning": "Meditation, contemplation, apathy, reevaluation",
+      "reversedMeaning": "Retreat, withdrawal, checking in with yourself",
+      "uprightDescription": "A time for contemplation and inner reflection. New opportunities may not interest you as you reassess your values.",
+      "reversedDescription": "Deep introspection leads to important realizations. Trust your need for solitude and self-examination."
+    },
+    "five": {
+      "name": "Five of Cups",
+      "uprightMeaning": "Regret, failure, disappointment, pessimism",
+      "reversedMeaning": "Personal setbacks, self-forgiveness, moving on",
+      "uprightDescription": "Disappointment and loss bring sadness, but hope remains. Focus on what can still be salvaged rather than what's lost.",
+      "reversedDescription": "Beginning to heal from disappointment. Self-forgiveness opens the door to new possibilities."
+    },
+    "six": {
+      "name": "Six of Cups",
+      "uprightMeaning": "Revisiting the past, childhood memories, innocence, joy",
+      "reversedMeaning": "Living in the past, forgiveness, lacking playfulness",
+      "uprightDescription": "Nostalgic connections and innocent joy return. Childhood memories or old friends bring comfort and happiness.",
+      "reversedDescription": "Let go of past hurts and embrace forgiveness. Reconnect with your playful, innocent nature."
+    },
+    "seven": {
+      "name": "Seven of Cups",
+      "uprightMeaning": "Opportunities, choices, wishful thinking, illusion",
+      "reversedMeaning": "Alignment, personal values, overwhelmed by choices",
+      "uprightDescription": "Many options create confusion and unrealistic expectations. Ground your dreams in practical reality.",
+      "reversedDescription": "Clarity emerges about what truly matters. Align your choices with your authentic values and priorities."
+    },
+    "eight": {
+      "name": "Eight of Cups",
+      "uprightMeaning": "Disappointment, abandonment, withdrawal, escapism",
+      "reversedMeaning": "Trying one more time, indecision, aimless drifting",
+      "uprightDescription": "Walking away from unfulfilling situations requires courage. Trust your instincts about when it's time to move on.",
+      "reversedDescription": "Uncertainty about leaving prevents forward movement. Take time to clarify what you truly want."
+    },
+    "nine": {
+      "name": "Nine of Cups",
+      "uprightMeaning": "Contentment, satisfaction, gratitude, wish fulfillment",
+      "reversedMeaning": "Inner happiness, materialism, dissatisfaction",
+      "uprightDescription": "Emotional fulfillment and satisfaction with life's blessings. Your wishes are coming true through grateful acceptance.",
+      "reversedDescription": "True happiness comes from within rather than external achievements. Look beyond material success for fulfillment."
+    },
+    "ten": {
+      "name": "Ten of Cups",
+      "uprightMeaning": "Divine love, blissful relationships, harmony, alignment",
+      "reversedMeaning": "Disconnection, misaligned values, struggling relationships",
+      "uprightDescription": "Perfect emotional harmony and blessed relationships. Your values align with those you love most.",
+      "reversedDescription": "Relationship challenges stem from misaligned values. Work on reconnecting with what truly matters to you and others."
+    },
+    "page": {
+      "name": "Page of Cups",
+      "uprightMeaning": "Creative opportunities, intuitive messages, curiosity, possibility",
+      "reversedMeaning": "New ideas, doubting intuition, creative blocks",
+      "uprightDescription": "Intuitive messages and creative opportunities arrive. Trust your emotional wisdom and artistic inspirations.",
+      "reversedDescription": "Self-doubt blocks creative flow. Trust your intuitive insights even when logic argues against them."
+    },
+    "knight": {
+      "name": "Knight of Cups",
+      "uprightMeaning": "Creativity, romance, charm, imagination, adventure",
+      "reversedMeaning": "Overactive imagination, unrealistic, jealousy",
+      "uprightDescription": "Romantic adventures and creative pursuits capture your imagination. Follow your heart with passionate dedication.",
+      "reversedDescription": "Fantasy overshadows reality. Ground your romantic and creative dreams in practical action."
+    },
+    "queen": {
+      "name": "Queen of Cups",
+      "uprightMeaning": "Compassionate, caring, emotionally stable, intuitive",
+      "reversedMeaning": "Inner feelings, self-care, self-love",
+      "uprightDescription": "Deep compassion and emotional wisdom guide your relationships. Your intuitive nature provides comfort to others.",
+      "reversedDescription": "Focus on emotional self-care and inner healing. You cannot pour from an empty cup."
+    },
+    "king": {
+      "name": "King of Cups",
+      "uprightMeaning": "Emotionally balanced, compassionate leader, diplomat",
+      "reversedMeaning": "Self-compassion, inner feelings, moodiness",
+      "uprightDescription": "Emotional maturity and compassionate leadership create harmony. Your diplomatic skills resolve conflicts peacefully.",
+      "reversedDescription": "Emotional volatility disrupts relationships. Practice self-compassion and emotional regulation."
+    }
+  },
+  "swords": {
+    "ace": {
+      "name": "Ace of Swords",
+      "uprightMeaning": "Breakthrough, clarity, sharp mind",
+      "reversedMeaning": "Confusion, brutal truth, chaos",
+      "uprightDescription": "Mental breakthrough and clarity of thought. Truth cuts through confusion, bringing new understanding and insight.",
+      "reversedDescription": "Mental confusion or harsh truths that are difficult to accept. Take time to process new information carefully."
+    },
+    "two": {
+      "name": "Two of Swords",
+      "uprightMeaning": "Difficult decisions, weighing options, indecision",
+      "reversedMeaning": "Indecision, confusion, information overload",
+      "uprightDescription": "A difficult decision requires careful consideration. Weigh your options thoughtfully before choosing a path forward.",
+      "reversedDescription": "Overwhelmed by choices or avoiding a necessary decision. Seek clarity and trust your intuition."
+    },
+    "three": {
+      "name": "Three of Swords",
+      "uprightMeaning": "Heartbreak, emotional pain, sorrow, grief",
+      "reversedMeaning": "Recovery, healing, moving on",
+      "uprightDescription": "Emotional pain and heartbreak are part of the healing process. Allow yourself to grieve and process these difficult feelings.",
+      "reversedDescription": "Beginning to heal from emotional wounds. Recovery is possible through self-care and time."
+    },
+    "four": {
+      "name": "Four of Swords",
+      "uprightMeaning": "Rest, relaxation, meditation, contemplation, recuperation",
+      "reversedMeaning": "Exhaustion, burn-out, deep contemplation, stagnation",
+      "uprightDescription": "Rest and recuperation restore your mental energy. Take time for peaceful contemplation and healing reflection.",
+      "reversedDescription": "Mental exhaustion requires deeper rest. Don't rush back into action before you're truly ready."
+    },
+    "five": {
+      "name": "Five of Swords",
+      "uprightMeaning": "Conflict, disagreements, competition, defeat, winning at all costs",
+      "reversedMeaning": "Reconciliation, making amends, past resentment",
+      "uprightDescription": "Victory comes at a cost when achieved through conflict. Consider whether winning is worth the damage to relationships.",
+      "reversedDescription": "Time to make amends and heal past conflicts. Reconciliation requires humility and genuine effort."
+    },
+    "six": {
+      "name": "Six of Swords",
+      "uprightMeaning": "Transition, change, rite of passage, releasing baggage",
+      "reversedMeaning": "Personal transition, resistance to change, unfinished business",
+      "uprightDescription": "A difficult but necessary transition leads to calmer waters. Leave behind what no longer serves your journey.",
+      "reversedDescription": "Internal resistance makes change more difficult. Address unfinished business before moving forward."
+    },
+    "seven": {
+      "name": "Seven of Swords",
+      "uprightMeaning": "Betrayal, deception, getting away with something, acting strategically",
+      "reversedMeaning": "Imposter syndrome, self-deception, keeping secrets",
+      "uprightDescription": "Strategic thinking and careful planning help you navigate difficult situations, but beware of deceptive tactics.",
+      "reversedDescription": "Self-doubt and imposter syndrome undermine confidence. Be honest with yourself about your capabilities."
+    },
+    "eight": {
+      "name": "Eight of Swords",
+      "uprightMeaning": "Negative thinking, restricted freedom, imprisonment, victim mentality",
+      "reversedMeaning": "Self-limiting beliefs, inner critic, releasing negative thoughts",
+      "uprightDescription": "Mental restrictions and negative thinking create unnecessary limitations. You have more freedom than you realize.",
+      "reversedDescription": "Recognizing self-limiting beliefs is the first step to freedom. Challenge your inner critic with compassion."
+    },
+    "nine": {
+      "name": "Nine of Swords",
+      "uprightMeaning": "Anxiety, worry, fear, depression, nightmares",
+      "reversedMeaning": "Inner turmoil, deep-seated fears, secrets, releasing anxiety",
+      "uprightDescription": "Anxiety and worry consume your thoughts, but many fears are worse in imagination than reality. Seek support and perspective.",
+      "reversedDescription": "Deep fears surface for healing. Face your shadows with courage and professional support if needed."
+    },
+    "ten": {
+      "name": "Ten of Swords",
+      "uprightMeaning": "Painful endings, deep wounds, betrayal, loss, crisis",
+      "reversedMeaning": "Recovery, regeneration, resisting an inevitable end",
+      "uprightDescription": "A painful ending marks the completion of a difficult cycle. Rock bottom becomes the foundation for rebuilding.",
+      "reversedDescription": "Beginning to recover from devastating loss. Allow yourself to heal at your own pace."
+    },
+    "page": {
+      "name": "Page of Swords",
+      "uprightMeaning": "New ideas, curiosity, thirst for knowledge, new ways of communicating",
+      "reversedMeaning": "Self-expression, all talk and no action, haste",
+      "uprightDescription": "Intellectual curiosity and new ideas energize your thinking. Communicate your insights with enthusiasm and clarity.",
+      "reversedDescription": "Ideas without action lead nowhere. Focus your mental energy on practical applications of your insights."
+    },
+    "knight": {
+      "name": "Knight of Swords",
+      "uprightMeaning": "Ambitious, action-oriented, driven to succeed, fast thinking",
+      "reversedMeaning": "Restless, unfocused, lacking direction, unpredictable",
+      "uprightDescription": "Ambitious drive and quick thinking propel you toward goals. Channel your mental energy into focused action.",
+      "reversedDescription": "Scattered energy and lack of direction hinder progress. Take time to clarify your priorities and plans."
+    },
+    "queen": {
+      "name": "Queen of Swords",
+      "uprightMeaning": "Independent, unbiased judgement, clear boundaries, direct communication",
+      "reversedMeaning": "Overly-emotional, easily influenced, harsh judgement, lack of empathy",
+      "uprightDescription": "Clear thinking and direct communication cut through confusion. Your independent judgment serves truth and justice.",
+      "reversedDescription": "Emotional reactions cloud judgment. Practice empathy while maintaining healthy boundaries."
+    },
+    "king": {
+      "name": "King of Swords",
+      "uprightMeaning": "Mental clarity, intellectual power, authority, truth",
+      "reversedMeaning": "Quiet power, inner truth, misuse of power, manipulation",
+      "uprightDescription": "Intellectual authority and clear reasoning guide wise decisions. Your pursuit of truth serves the greater good.",
+      "reversedDescription": "Power without wisdom becomes manipulation. Use your intellectual gifts to serve rather than dominate others."
+    }
+  },
+  "pentacles": {
+    "ace": {
+      "name": "Ace of Pentacles",
+      "uprightMeaning": "Manifestation, new financial opportunity, prosperity",
+      "reversedMeaning": "Lost opportunity, lack of planning, poor financial decisions",
+      "uprightDescription": "New opportunities for material success and prosperity. A solid foundation for future abundance is being established.",
+      "reversedDescription": "Missed opportunities or poor financial planning. Review your approach to material resources and security."
+    },
+    "two": {
+      "name": "Two of Pentacles",
+      "uprightMeaning": "Multiple priorities, time management, prioritization",
+      "reversedMeaning": "Over-committed, disorganization, reprioritization",
+      "uprightDescription": "Juggling multiple responsibilities requires balance and flexibility. Prioritize what's most important and adapt as needed.",
+      "reversedDescription": "Feeling overwhelmed by too many commitments. It's time to reorganize and focus on what truly matters."
+    },
+    "three": {
+      "name": "Three of Pentacles",
+      "uprightMeaning": "Collaboration, learning, implementation",
+      "reversedMeaning": "Disharmony, misalignment, working alone",
+      "uprightDescription": "Successful collaboration and skill development. Working with others creates better results than going alone.",
+      "reversedDescription": "Team conflicts or preferring to work independently. Ensure everyone is aligned on goals and methods."
+    },
+    "four": {
+      "name": "Four of Pentacles",
+      "uprightMeaning": "Saving money, security, conservatism, scarcity, control",
+      "reversedMeaning": "Over-spending, greed, self-protection",
+      "uprightDescription": "Financial security through careful saving and conservative choices. Balance prudence with generosity and growth.",
+      "reversedDescription": "Excessive control or greed blocks abundance. Find balance between security and sharing your resources."
+    },
+    "five": {
+      "name": "Five of Pentacles",
+      "uprightMeaning": "Financial loss, poverty, lack mindset, isolation, worry",
+      "reversedMeaning": "Recovery, charity, improvement, spiritual poverty",
+      "uprightDescription": "Financial or emotional poverty creates feelings of isolation. Remember that help is available if you reach out.",
+      "reversedDescription": "Beginning to recover from hardship. Accept help graciously and focus on spiritual rather than material wealth."
+    },
+    "six": {
+      "name": "Six of Pentacles",
+      "uprightMeaning": "Generosity, charity, community, sharing, gratitude",
+      "reversedMeaning": "Self-care, unpaid debts, one-sided charity",
+      "uprightDescription": "Generous sharing creates abundance for all. Give and receive with gratitude and mutual respect.",
+      "reversedDescription": "Ensure charity flows both ways. Take care of your own needs before constantly giving to others."
+    },
+    "seven": {
+      "name": "Seven of Pentacles",
+      "uprightMeaning": "Long-term view, sustainable results, perseverance, investment",
+      "reversedMeaning": "Lack of long-term vision, limited success, impatience",
+      "uprightDescription": "Patient investment and long-term thinking yield sustainable results. Persevere through slow but steady progress.",
+      "reversedDescription": "Impatience undermines long-term success. Develop a clearer vision for sustainable growth."
+    },
+    "eight": {
+      "name": "Eight of Pentacles",
+      "uprightMeaning": "Apprenticeship, repetitive tasks, mastery, skill development",
+      "reversedMeaning": "Distractions, lack of focus, perfectionism",
+      "uprightDescription": "Dedicated practice and attention to detail develop true mastery. Focus on craftsmanship over speed.",
+      "reversedDescription": "Distractions or perfectionism hinder skill development. Find balance between excellence and progress."
+    },
+    "nine": {
+      "name": "Nine of Pentacles",
+      "uprightMeaning": "Abundance, luxury, self-sufficiency, financial independence",
+      "reversedMeaning": "Self-worth, over-investment in work, hustling",
+      "uprightDescription": "Financial independence and luxury come through disciplined effort. Enjoy the fruits of your labor with gratitude.",
+      "reversedDescription": "Success feels hollow without inner fulfillment. Remember that your worth isn't determined by achievement alone."
+    },
+    "ten": {
+      "name": "Ten of Pentacles",
+      "uprightMeaning": "Wealth, financial security, family, long-term success, contribution",
+      "reversedMeaning": "The dark side of wealth, financial failure, loneliness",
+      "uprightDescription": "Generational wealth and long-term security benefit your entire family. Your success contributes to collective prosperity.",
+      "reversedDescription": "Material success without meaning feels empty. Focus on relationships and legacy beyond financial achievement."
+    },
+    "page": {
+      "name": "Page of Pentacles",
+      "uprightMeaning": "Manifestation, financial opportunity, skill development",
+      "reversedMeaning": "Lack of progress, procrastination, learn from failure",
+      "uprightDescription": "New opportunities for financial or skill development appear. Approach learning with enthusiasm and dedication.",
+      "reversedDescription": "Procrastination or fear of failure blocks progress. Learn from setbacks and maintain momentum toward your goals."
+    },
+    "knight": {
+      "name": "Knight of Pentacles",
+      "uprightMeaning": "Hard work, productivity, routine, conservatism, methodical",
+      "reversedMeaning": "Self-discipline, boredom, feeling 'stuck', perfectionism",
+      "uprightDescription": "Steady, methodical work produces reliable results. Your conservative approach ensures stable progress.",
+      "reversedDescription": "Rigid routines may feel stifling. Balance discipline with flexibility and inject creativity into your work."
+    },
+    "queen": {
+      "name": "Queen of Pentacles",
+      "uprightMeaning": "Nurturing, practical, providing financially, a working parent",
+      "reversedMeaning": "Financial independence, self-care, work-home conflict",
+      "uprightDescription": "Practical nurturing creates abundance for yourself and others. Your care provides both emotional and material security.",
+      "reversedDescription": "Balance caring for others with your own needs. Financial independence strengthens your ability to help."
+    },
+    "king": {
+      "name": "King of Pentacles",
+      "uprightMeaning": "Financial success, luxury, self-discipline, abundance",
+      "reversedMeaning": "Financially inept, obsessed with wealth and status, stubborn",
+      "uprightDescription": "Disciplined effort and wise investments create lasting abundance. Your success enables generosity and security for others.",
+      "reversedDescription": "Obsession with wealth or status corrupts true success. Remember that the best things in life cannot be bought."
+    }
+  }
+}

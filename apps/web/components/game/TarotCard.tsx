@@ -5,7 +5,7 @@ import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { Card, CardOrientation } from '@/lib/store/gameStore';
+import { Card, CardOrientation, useGameStore } from '@/lib/store/gameStore';
 import { Sparkles, Moon, Sun, Flame, Droplets, Swords, Coins } from 'lucide-react';
 import { audioManager } from '@/lib/audio/AudioManager';
 import { getPlayerCardBack } from '@/lib/cardBacks';
@@ -37,13 +37,28 @@ export function TarotCard({
   const [isHovered, setIsHovered] = useState(false);
   const [playerCardBack, setPlayerCardBack] = useState<string>('/api/ui/themes/pixel-pack/sheets/card_ui_01.png');
   const isReversed = card.orientation === 'reversed';
+  const { useFateToFlip, playCard } = useGameStore();
 
   useEffect(() => {
     const cardBack = getPlayerCardBack();
     setPlayerCardBack(cardBack.image);
   }, []);
 
-  const canDrag = isInHand && isSelectable;
+  const { currentMatch } = useGameStore();
+  const reactionOpen = !!currentMatch?.reactionWindow?.active;
+  const canDrag = isInHand && isSelectable && !reactionOpen && (card.type === 'unit' || card.type === 'major' || (card.type === 'spell' && card.suit === 'major'));
+  
+  // Debug canDrag calculation
+  if (card.suit === 'major') {
+    console.log(`🔍 canDrag debug for ${card.name}:`, {
+      isInHand,
+      isSelectable, 
+      reactionOpen,
+      type: card.type,
+      suit: card.suit,
+      canDrag
+    });
+  }
 
   const {
     attributes,
@@ -96,51 +111,116 @@ export function TarotCard({
     return '/api/ui/themes/pixel-pack/others/card_ui_black_front.png';
   };
 
+  // Create custom handlers that don't interfere with drag
+  const customHandlers = canDrag ? {
+    // For draggable cards, only add double-click and right-click
+    onDoubleClick: (e: React.MouseEvent) => {
+      console.log('🎯 Double-click on draggable card:', card.name, 'onClick available:', !!onClick);
+      if (onClick) {
+        e.preventDefault();
+        e.stopPropagation();
+        requestAnimationFrame(() => {
+          audioManager.playRandom('cardReveal');
+          onClick();
+        });
+      }
+    }
+  } : card.suit === 'major' ? {
+    // For Major Arcana cards that lost draggability, still allow double-click for overlay
+    onDoubleClick: (e: React.MouseEvent) => {
+      console.log('🎯 Double-click on non-draggable Major Arcana:', card.name, 'onClick available:', !!onClick);
+      if (onClick) {
+        e.preventDefault();
+        e.stopPropagation();
+        requestAnimationFrame(() => {
+          audioManager.playRandom('cardReveal');
+          onClick();
+        });
+      }
+    }
+  } : {
+    // For non-draggable cards, add click handlers
+    onClick: (e: React.MouseEvent) => {
+      console.log('Click on non-draggable card:', card.name, 'actuallyDragging:', actuallyDragging);
+      if (!actuallyDragging) {
+        requestAnimationFrame(() => {
+          // Cards on board - click for overlay
+          if (isOnBoard && onClick) {
+            console.log('Showing overlay for board card:', card.name);
+            audioManager.playRandom('cardReveal');
+            onClick();
+            return;
+          }
+          
+          // Spell cards in hand - click to cast (exclude Major Arcana)
+          if (isInHand && card.type === 'spell' && card.suit !== 'major' && isSelectable && !reactionOpen) {
+            console.log('Casting spell:', card.name);
+            audioManager.playRandom('cardReveal');
+            playCard(card);
+            return;
+          }
+        });
+      }
+    }
+  };
+
+  // console.log('TarotCard render:', card.name, 'canDrag:', canDrag, 'isInHand:', isInHand, 'isOnBoard:', isOnBoard, 'type:', card.type);
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
+      {...customHandlers}
       className={cn(
         "relative cursor-pointer transition-all duration-150",
         actuallyDragging && "z-50 cursor-grabbing",
         className
       )}
       onMouseEnter={() => {
-        setIsHovered(true);
-        if (isInHand) audioManager.play('card_slide_01');
+        requestAnimationFrame(() => {
+          setIsHovered(true);
+          if (isInHand) audioManager.play('card_slide_01');
+        });
       }}
-      onMouseLeave={() => setIsHovered(false)}
-      onClick={() => {
-        if (onClick) {
-          audioManager.playRandom('cardPlace');
-          onClick();
-        }
+      onMouseLeave={() => {
+        requestAnimationFrame(() => {
+          setIsHovered(false);
+        });
       }}
+
       onContextMenu={(e) => {
+        // Don't interfere with dragging
+        if (actuallyDragging) {
+          return;
+        }
+
         e.preventDefault();
-        audioManager.playRandom('cardFlip');
-        onRightClick?.(e);
-        setIsFlipped(!isFlipped);
+        e.stopPropagation();
+
+        // Use RAF for smooth flip animation
+        requestAnimationFrame(() => {
+          audioManager.playRandom('cardFlip');
+          onRightClick?.(e);
+          setIsFlipped(!isFlipped);
+          // Note: Not using fate to flip - just visual flip
+          // useFateToFlip(card.id);
+        });
       }}
     >
       {/* Always-on overlays (outside flip/rotation) */}
-      {/* Attack (top-left) and Health (top-right), fixed regardless of card orientation */}
-      {card.type === 'unit' && (
-        <>
-          <div className="absolute top-1 left-1 z-40 pointer-events-none select-none">
-            <div className="bg-red-900/95 px-2 py-0.5 rounded border border-red-700 text-white text-xs font-bold shadow-md">
-              ⚔ {card.attack || 0}
-            </div>
-          </div>
-          <div className="absolute top-1 right-1 z-40 pointer-events-none select-none">
-            <div className="bg-blue-900/95 px-2 py-0.5 rounded border border-blue-700 text-white text-xs font-bold shadow-md">
-              ❤ {card.health || 0}
-            </div>
-          </div>
-        </>
-      )}
+      {/* Attack (top-left) and Health (top-right), fixed regardless of card orientation or type */}
+      <div className="absolute top-1 left-1 z-40 pointer-events-none select-none">
+        <div className="bg-red-900/95 px-2 py-0.5 rounded border border-red-700 text-white text-xs font-bold shadow-md">
+          ⚔ {card.attack ?? 0}
+        </div>
+      </div>
+      <div className="absolute top-1 right-1 z-40 pointer-events-none select-none">
+        <div className="bg-blue-900/95 px-2 py-0.5 rounded border border-blue-700 text-white text-xs font-bold shadow-md">
+          ❤ {card.health ?? 0}
+        </div>
+      </div>
       {/* Mana/Cost bottom-left, fixed regardless of card orientation */}
       <div className="absolute bottom-1 left-1 z-40 pointer-events-none select-none">
         <div className="bg-black/70 rounded-full w-7 h-7 flex items-center justify-center border border-white/20">
@@ -252,6 +332,15 @@ export function TarotCard({
                 <div className="w-3 h-3 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full" />
               )}
             </div>
+
+            {/* Info hint for draggable cards */}
+            {canDrag && isInHand && isHovered && (
+              <div className="absolute bottom-1 right-1 z-40 pointer-events-none select-none">
+                <div className="bg-black/80 px-1 py-0.5 rounded text-[10px] text-white/80">
+                  Double-click for info
+                </div>
+              </div>
+            )}
           </motion.div>
 
           {/* Card Back */}

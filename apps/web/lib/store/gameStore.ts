@@ -35,8 +35,9 @@ export interface Player {
   name: string;
   health: number;
   maxHealth: number;
-  fate: number;
-  maxFate: number;
+  fate: number; // Acts as Mana (LoR) for now
+  maxFate: number; // Acts as Max Mana (cap 10)
+  spellMana?: number; // Carryover mana usable for spells only (cap 3)
   deck: Card[];
   hand: Card[];
   discard: Card[];
@@ -63,6 +64,8 @@ export interface MatchState {
   turn: number;
   phase: GamePhase;
   activePlayer: string;
+  attackTokenOwner?: string; // LoR-style attack token
+  lastPassBy?: string | null; // Track consecutive passes
   players: Record<string, Player>;
   turnTimer?: number;
   reactionWindow?: {
@@ -80,6 +83,42 @@ export interface MatchState {
     playerId: string;
     data: any;
   };
+}
+
+// Debug helpers for tracking board removals
+function logBoardRemoval(playerId: string, slotIndex: number, card: Card, reason: string): void {
+  try {
+    console.log('[Board Removal]', {
+      playerId,
+      slotIndex,
+      cardId: card.id,
+      cardName: card.name,
+      suit: card.suit,
+      type: card.type,
+      reason,
+    });
+  } catch (_) {
+    // no-op
+  }
+}
+
+function logBoardDiff(prevBoard: BoardSlot[], nextBoard: BoardSlot[], playerId: string, context: string): void {
+  const len = Math.max(prevBoard.length, nextBoard.length, 6);
+  for (let i = 0; i < len; i++) {
+    const prevCard = prevBoard[i]?.card || null;
+    const nextCard = nextBoard[i]?.card || null;
+    if (prevCard && !nextCard) {
+      logBoardRemoval(playerId, i, prevCard, `diff:${context}`);
+    } else if (prevCard && nextCard && prevCard.id !== nextCard.id) {
+      console.log('[Board Replace]', {
+        playerId,
+        slotIndex: i,
+        from: { id: prevCard.id, name: prevCard.name },
+        to: { id: nextCard.id, name: nextCard.name },
+        context,
+      });
+    }
+  }
 }
 
 interface GameStore {
@@ -106,7 +145,8 @@ interface GameStore {
 
   // Game Actions
   playCard: (card: Card, targetSlot?: number, playerId?: string) => void;
-  endTurn: () => void;
+  startCombat: () => void;
+  endTurn: () => void; // Acts as Pass priority
   flipCard: (cardId: string, playerId?: string) => void;
   peekDestiny: () => void;
   forceDraw: () => void;
@@ -136,7 +176,27 @@ export const useGameStore = create<GameStore>()(
       // Actions
       setCurrentMatch: (match) => set({ currentMatch: match }),
       updateMatchState: (update) => set((state) => ({
-        currentMatch: state.currentMatch ? { ...state.currentMatch, ...update } : null
+        // Log board diffs when players/boards are being updated (helps catch unexpected removals)
+        currentMatch: (() => {
+          if (!state.currentMatch) return null;
+          try {
+            const prev = state.currentMatch;
+            const next = { ...prev, ...update } as MatchState;
+            if (update.players) {
+              const prevIds = Object.keys(prev.players || {});
+              for (const pid of prevIds) {
+                const prevBoard = prev.players[pid]?.board || [];
+                const nextBoard = (update.players as any)[pid]?.board || prev.players[pid]?.board || [];
+                if (nextBoard && prevBoard) {
+                  logBoardDiff(prevBoard, nextBoard, pid, 'updateMatchState');
+                }
+              }
+            }
+            return next;
+          } catch (_) {
+            return state.currentMatch ? { ...state.currentMatch, ...update } as MatchState : null;
+          }
+        })()
       })),
       setSelectedCard: (card) => set({ selectedCard: card }),
       setHoveredCard: (card) => set({ hoveredCard: card }),
@@ -169,104 +229,294 @@ export const useGameStore = create<GameStore>()(
           return;
         }
 
+        // Turn guard: only active player can initiate actions locally
+        if (state.currentMatch.activePlayer !== playerId) {
+          console.log('Not your turn. Active player is', state.currentMatch.activePlayer);
+          return;
+        }
+
         console.log('Current board:', player.board);
         console.log('Current hand:', player.hand.map(c => c.name));
 
-        // Check if player has enough fate
-        if (card.cost > player.fate) {
-          console.log('Not enough fate! Cost:', card.cost, 'Fate:', player.fate);
+        // LoR-style resource check: pay from fate (mana), and for spells, from spellMana if needed
+        const isSpell = card.type === 'spell';
+        const availableMana = player.fate + (isSpell ? (player.spellMana || 0) : 0);
+        if (card.cost > availableMana) {
+          console.log('Not enough mana! Cost:', card.cost, 'Mana:', player.fate, 'SpellMana:', player.spellMana || 0);
           return;
         }
 
         // Remove card from hand
         const updatedHand = player.hand.filter(c => c.id !== card.id);
 
-        // Add card to board if slot provided
+        // Board update path only for units; spells resolve instantly and go to discard
         const updatedBoard = [...player.board];
-        if (targetSlot !== undefined && targetSlot < updatedBoard.length) {
+        const updatedDiscard = [...player.discard];
+        if (card.type === 'unit' || card.type === 'major' || (card.type === 'spell' && card.suit === 'major')) {
+          if (targetSlot === undefined || targetSlot >= updatedBoard.length) {
+            console.log('Invalid slot for unit/major placement:', targetSlot);
+            return;
+          }
           if (updatedBoard[targetSlot].card) {
             console.log('Slot already occupied!');
             return;
           }
           updatedBoard[targetSlot] = { ...updatedBoard[targetSlot], card };
-          console.log('Card placed in slot', targetSlot);
+          console.log(card.type === 'major' ? 'Major Arcana placed in slot' : 'Unit placed in slot', targetSlot);
         } else {
-          console.log('Invalid slot:', targetSlot);
+          // Spell: resolve immediately (placeholder), then discard
+          console.log('Casting spell:', card.name);
+          updatedDiscard.push(card);
         }
 
-        // Update fate
-        const updatedFate = Math.max(0, player.fate - card.cost);
+        // Pay cost using mana then spell mana (spells only)
+        let remainingCost = card.cost;
+        let mana = player.fate;
+        let spellMana = player.spellMana || 0;
+        if (remainingCost > 0) {
+          const spendFromMana = Math.min(remainingCost, mana);
+          mana -= spendFromMana;
+          remainingCost -= spendFromMana;
+        }
+        if (isSpell && remainingCost > 0) {
+          const spendFromSpell = Math.min(remainingCost, spellMana);
+          spellMana -= spendFromSpell;
+          remainingCost -= spendFromSpell;
+        }
+        const updatedFate = mana;
 
-        // Update match state
+        // Determine opponent to pass priority
+        const playerIds = Object.keys(state.currentMatch.players);
+        const opponentId = playerIds.find(id => id !== playerId) || playerId;
+
+        // Update match state, open reaction window and pass priority to opponent
         set({
           currentMatch: {
             ...state.currentMatch,
+            activePlayer: opponentId,
+            lastPassBy: null,
+            reactionWindow: { active: true, respondingPlayer: opponentId },
             players: {
               ...state.currentMatch.players,
               [playerId]: {
                 ...player,
                 hand: updatedHand,
                 board: updatedBoard,
-                fate: updatedFate
+                fate: updatedFate,
+                spellMana,
+                discard: updatedDiscard
               }
             }
           }
         });
+
+        // Log diff for immediate local play
+        try {
+          const prevBoard = player.board;
+          logBoardDiff(prevBoard, updatedBoard, playerId, 'playCard');
+        } catch (_) { }
       },
 
-      endTurn: () => {
-        console.log('Ending turn');
+      startCombat: () => {
         const state = get();
         if (!state.currentMatch) return;
 
-        // For WebSocket-based games, send the end_turn message to server
-        // The server will handle fate increment and send back updated state
+        const match = state.currentMatch;
+        const attackerId = match.activePlayer;
+        const playerIds = Object.keys(match.players);
+        const defenderId = playerIds.find(id => id !== attackerId) || attackerId;
+        const attacker = match.players[attackerId];
+        const defender = match.players[defenderId];
+        if (!attacker || !defender) return;
+
+        // Helper functions
+        const suitBonus = (atkSuit: CardSuit, defSuit: CardSuit): number => {
+          if (atkSuit === 'major' || defSuit === 'major') return 0;
+          if (atkSuit === defSuit) return -1;
+          if (atkSuit === 'wands' && defSuit === 'cups') return 1;
+          if (atkSuit === 'swords' && defSuit === 'pentacles') return 1;
+          return 0;
+        };
+
+        const effectivePower = (card: Card | null | undefined, enemy: Card | null | undefined): number => {
+          if (!card) return 0;
+          const base = Math.max(0, card.attack || 0);
+          const orientationBonus = card.orientation === 'upright' ? 1 : 0;
+          const suitMod = enemy ? suitBonus(card.suit, enemy.suit) : 0;
+          return Math.max(0, base + orientationBonus + suitMod);
+        };
+
+        const nextPhase: GamePhase = 'combat';
+        // Enter combat phase for a brief moment to show UI lines
+        set({
+          currentMatch: {
+            ...match,
+            phase: nextPhase
+          }
+        });
+
+        // Resolve after short delay so UI can reflect phase
+        setTimeout(() => {
+          const latest = get().currentMatch;
+          if (!latest) return;
+
+          const atk = latest.players[attackerId];
+          const def = latest.players[defenderId];
+          if (!atk || !def) return;
+
+          const atkBoard = Array.from({ length: 6 }, (_, i) => atk.board[i] || { card: null, position: i });
+          const defBoard = Array.from({ length: 6 }, (_, i) => def.board[i] || { card: null, position: i });
+
+          const updatedAtkBoard = [...atkBoard];
+          const updatedDefBoard = [...defBoard];
+          let newAttackerHealth = atk.health;
+          let newDefenderHealth = def.health;
+          const attackerDiscard = [...(atk.discard || [])];
+          const defenderDiscard = [...(def.discard || [])];
+
+          for (let i = 0; i < 6; i++) {
+            const atkSlot = updatedAtkBoard[i];
+            const defSlot = updatedDefBoard[i];
+            const atkCard = (atkSlot?.card?.type === 'unit' || atkSlot?.card?.type === 'major' || (atkSlot?.card?.type === 'spell' && atkSlot?.card?.suit === 'major')) ? atkSlot.card : null;
+            const defCard = (defSlot?.card?.type === 'unit' || defSlot?.card?.type === 'major' || (defSlot?.card?.type === 'spell' && defSlot?.card?.suit === 'major')) ? defSlot.card : null;
+
+            if (!atkCard && !defCard) continue;
+
+            if (atkCard && defCard) {
+              // Both units strike simultaneously
+              const atkDmg = effectivePower(atkCard, defCard);
+              const defDmg = effectivePower(defCard, atkCard);
+
+              const defOrientBonus = defCard.orientation === 'reversed' ? 1 : 0;
+              const atkOrientBonus = atkCard.orientation === 'reversed' ? 1 : 0;
+              const defEffHealth = (defCard.health || 0) + defOrientBonus;
+              const atkEffHealth = (atkCard.health || 0) + atkOrientBonus;
+
+              const defNewHealth = Math.max(0, defEffHealth - atkDmg);
+              const atkNewHealth = Math.max(0, atkEffHealth - defDmg);
+
+              // Persist new health back to cards (without re-adding orientation buff)
+              if (defSlot.card) {
+                const baseNew = Math.max(0, defNewHealth - defOrientBonus);
+                if (baseNew <= 0) {
+                  logBoardRemoval(defenderId, i, defSlot.card, `lethal damage by lane ${i} attacker for ${atkDmg}`);
+                  defenderDiscard.push(defSlot.card);
+                  updatedDefBoard[i] = { ...defSlot, card: null };
+                } else {
+                  updatedDefBoard[i] = { ...defSlot, card: { ...defSlot.card, health: baseNew } };
+                }
+              }
+
+              if (atkSlot.card) {
+                const baseNew = Math.max(0, atkNewHealth - atkOrientBonus);
+                if (baseNew <= 0) {
+                  logBoardRemoval(attackerId, i, atkSlot.card, `lethal damage by lane ${i} blocker for ${defDmg}`);
+                  attackerDiscard.push(atkSlot.card);
+                  updatedAtkBoard[i] = { ...atkSlot, card: null };
+                } else {
+                  updatedAtkBoard[i] = { ...atkSlot, card: { ...atkSlot.card, health: baseNew } };
+                }
+              }
+            } else if (atkCard && !defCard) {
+              // Direct damage to defender nexus
+              const dmg = effectivePower(atkCard, null);
+              newDefenderHealth = Math.max(0, newDefenderHealth - dmg);
+            }
+          }
+
+          // Write back state and exit combat phase
+          set({
+            currentMatch: {
+              ...latest,
+              phase: 'main',
+              players: {
+                ...latest.players,
+                [attackerId]: {
+                  ...atk,
+                  health: newAttackerHealth,
+                  board: updatedAtkBoard,
+                  discard: attackerDiscard,
+                },
+                [defenderId]: {
+                  ...def,
+                  health: newDefenderHealth,
+                  board: updatedDefBoard,
+                  discard: defenderDiscard,
+                },
+              }
+            }
+          });
+        }, 500);
+      },
+
+      endTurn: () => {
+        // Acts as Pass Priority. If both players pass consecutively, end the round.
+        const state = get();
+        if (!state.currentMatch) return;
+
+        // For WebSocket-based games
         if (state.isConnected) {
-          // Import and use WebSocket endTurn if connected
           import('../websocket/GameWebSocket').then(({ gameWebSocket }) => {
             gameWebSocket.endTurn();
           });
           return;
         }
 
-        // Fallback for local games (demo mode)
-        const playerIds = Object.keys(state.currentMatch.players);
-        const currentIndex = playerIds.indexOf(state.currentMatch.activePlayer);
-        const nextIndex = (currentIndex + 1) % playerIds.length;
-        const nextPlayer = playerIds[nextIndex];
+        const match = state.currentMatch;
+        const playerIds = Object.keys(match.players);
+        const current = match.activePlayer;
+        const opponent = playerIds.find(id => id !== current) || current;
 
-        // Draw a card for the next player if they have cards in deck
-        const nextPlayerData = state.currentMatch.players[nextPlayer];
-        // Legends of Runeterra-style mana: at the start of a player's turn,
-        // increase their max mana by 1 (up to 10) and refill to full.
-        const newMaxFate = Math.min(10, (nextPlayerData.maxFate ?? 0) + 1);
-        const refilledFate = newMaxFate;
-        let updatedHand = [...nextPlayerData.hand];
-        let updatedDeck = [...nextPlayerData.deck];
-        if (updatedDeck.length > 0) {
-          const drawnCard = updatedDeck.shift();
-          if (drawnCard) {
-            updatedHand.push(drawnCard);
+        // If opponent passed last action too → end round
+        const bothPassed = match.lastPassBy === opponent;
+
+        if (bothPassed) {
+          // End Round: Attack token passes, both draw 1, +1 max mana (max 10), refill, convert leftover to spell mana (cap 3)
+          const newTokenOwner = match.attackTokenOwner && match.attackTokenOwner === current ? opponent : current;
+          const updatedPlayers: Record<string, Player> = { ...match.players };
+          for (const pid of playerIds) {
+            const p = updatedPlayers[pid];
+            const carry = Math.max(0, p.fate);
+            const newSpell = Math.min(3, (p.spellMana || 0) + carry);
+            const newMax = Math.min(10, (p.maxFate || 0) + 1);
+            let newHand = [...p.hand];
+            let newDeck = [...p.deck];
+            if (newDeck.length > 0) {
+              const drawn = newDeck.shift();
+              if (drawn) newHand.push(drawn);
+            }
+            updatedPlayers[pid] = {
+              ...p,
+              maxFate: newMax,
+              fate: newMax, // refill
+              spellMana: newSpell,
+              hand: newHand,
+              deck: newDeck,
+            };
           }
+
+          set({
+            currentMatch: {
+              ...match,
+              turn: match.turn + 1,
+              phase: 'main',
+              activePlayer: newTokenOwner || current,
+              attackTokenOwner: newTokenOwner || current,
+              lastPassBy: null,
+              reactionWindow: { active: false },
+              players: updatedPlayers,
+            }
+          });
+          return;
         }
 
+        // Otherwise, pass priority to opponent and mark last passer
         set({
           currentMatch: {
-            ...state.currentMatch,
-            activePlayer: nextPlayer,
-            turn: state.currentMatch.turn + 1,
-            phase: 'main', // Start in main phase so cards can be played
-            players: {
-              ...state.currentMatch.players,
-              [nextPlayer]: {
-                ...nextPlayerData,
-                maxFate: newMaxFate,
-                fate: refilledFate,
-                hand: updatedHand,
-                deck: updatedDeck
-                // Note: fate increment will be handled by server state updates
-              }
-            }
+            ...match,
+            activePlayer: opponent,
+            lastPassBy: current,
+            reactionWindow: match.reactionWindow?.active ? match.reactionWindow : { active: false },
           }
         });
       },
@@ -284,7 +534,7 @@ export const useGameStore = create<GameStore>()(
           if (card.id === cardId) {
             return {
               ...card,
-              orientation: card.orientation === 'upright' ? 'reversed' : 'upright'
+              orientation: (card.orientation === 'upright' ? 'reversed' : 'upright') as CardOrientation
             };
           }
           return card;
@@ -296,7 +546,7 @@ export const useGameStore = create<GameStore>()(
               ...slot,
               card: {
                 ...slot.card,
-                orientation: slot.card.orientation === 'upright' ? 'reversed' : 'upright'
+                orientation: (slot.card.orientation === 'upright' ? 'reversed' : 'upright') as CardOrientation
               }
             };
           }

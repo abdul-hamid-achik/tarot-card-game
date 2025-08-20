@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Settings, 
-  Volume2, 
-  VolumeX, 
+import {
+  Settings,
+  Volume2,
+  VolumeX,
   X,
   Music,
   Monitor,
@@ -20,39 +20,86 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { audioManager } from '@/lib/audio/AudioManager';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 export function SettingsMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const [volume, setVolume] = useState(70);
   const [isMuted, setIsMuted] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     // Check audio settings
     const enabled = localStorage.getItem('audioEnabled') === 'true';
+
+    console.log('🎵 Audio state check:', {
+      localStorage: enabled,
+      audioManagerEnabled: audioManager.isAudioEnabled(),
+      volume: audioManager.getVolume(),
+      muted: audioManager.isMuted()
+    });
+
+    // Sync the AudioManager's internal state with localStorage
+    if (enabled) {
+      // If audio is enabled in localStorage, set AudioManager state
+      // without playing test audio (since autoplay is already unlocked)
+      audioManager.setAudioEnabled(true);
+      console.log('✅ AudioManager state synced with localStorage');
+    }
+
     setAudioEnabled(enabled);
     setVolume(audioManager.getVolume() * 100);
     setIsMuted(audioManager.isMuted());
   }, []);
 
   const handleEnableAudio = async () => {
-    // Create a user gesture context for audio
-    const testAudio = new Audio();
-    testAudio.volume = 0.1;
-    
+    console.log('🎵 Attempting to enable audio...');
     try {
-      await testAudio.play();
-      testAudio.pause();
-      
-      // Audio is now enabled
+      // Optimistically update UI first
       setAudioEnabled(true);
-      localStorage.setItem('audioEnabled', 'true');
-      audioManager.setMuted(false);
-      
-      // Play a sound to confirm
-      await audioManager.playRandom('coinFlip');
+
+      // Use the AudioManager's enableAudio method
+      const success = await audioManager.enableAudio();
+
+      if (success) {
+        // Audio is now enabled
+        audioManager.setAudioEnabled(true);
+        audioManager.setMuted(false);
+
+        console.log('🎵 Audio successfully enabled:', {
+          localStorage: localStorage.getItem('audioEnabled'),
+          audioManagerEnabled: audioManager.isAudioEnabled()
+        });
+
+        // Play a sound to confirm
+        await audioManager.playRandom('coinFlip');
+
+        // Show toast notification
+        toast({
+          title: "Sound Enabled",
+          description: "Audio effects and music are now active.",
+        });
+      } else {
+        // Revert state on failure
+        setAudioEnabled(false);
+        audioManager.setAudioEnabled(false);
+        toast({
+          title: "Audio Error",
+          description: "Could not enable audio. Please try again.",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
-      console.warn('Could not enable audio:', error);
+      console.error('Could not enable audio:', error);
+      // Revert state on error
+      setAudioEnabled(false);
+      audioManager.setAudioEnabled(false);
+      toast({
+        title: "Audio Error",
+        description: "Could not enable audio. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -135,25 +182,48 @@ export function SettingsMenu() {
                   <div className="p-6 overflow-y-auto h-[calc(100%-48px)]">
                     {/* Audio Settings */}
                     <TabsContent value="audio" className="space-y-6 mt-0">
-                      {!audioEnabled ? (
-                        <Card className="bg-black/40 border-yellow-500/50 p-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h3 className="text-white font-bold mb-1">Enable Audio</h3>
-                              <p className="text-sm text-gray-400">
-                                Click to enable sound effects and music
-                              </p>
-                            </div>
-                            <PixelButton
-                              onClick={handleEnableAudio}
-                              variant="blue"
-                              size="md"
-                            >
-                              ENABLE
-                            </PixelButton>
-                          </div>
-                        </Card>
-                      ) : (
+                      {/* Enable Audio Switch - Always Visible */}
+                      <div className="flex items-center justify-between p-4 bg-black/20 rounded-lg border border-white/10">
+                        <div className="flex-1">
+                          <Label htmlFor="enable-audio" className="text-white font-medium">
+                            Enable Audio
+                          </Label>
+                          <p className="text-sm text-gray-400 mt-1">
+                            Allow sound effects and music to play
+                          </p>
+                        </div>
+                        <Switch
+                          id="enable-audio"
+                          checked={audioEnabled}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              // Enable audio (async operation)
+                              handleEnableAudio().catch((error) => {
+                                console.error('Failed to enable audio:', error);
+                                // Revert switch state on error
+                                setAudioEnabled(false);
+                                toast({
+                                  title: "Audio Error",
+                                  description: "Failed to enable audio. Please try again.",
+                                  variant: "destructive",
+                                });
+                              });
+                            } else {
+                              // Disable audio (synchronous operation)
+                              setAudioEnabled(false);
+                              audioManager.setAudioEnabled(false);
+                              audioManager.setMuted(true);
+                              toast({
+                                title: "Audio Disabled",
+                                description: "Sound effects and music are now disabled.",
+                              });
+                            }
+                          }}
+                        />
+                      </div>
+
+                      {/* Detailed Audio Controls - Only when enabled */}
+                      {audioEnabled && (
                         <>
                           <div className="space-y-4">
                             <div className="flex items-center justify-between">
@@ -184,7 +254,7 @@ export function SettingsMenu() {
                             <Switch
                               id="music"
                               checked={true}
-                              onCheckedChange={() => {}}
+                              onCheckedChange={() => { }}
                             />
                           </div>
 
@@ -193,8 +263,39 @@ export function SettingsMenu() {
                             <Switch
                               id="sfx"
                               checked={true}
-                              onCheckedChange={() => {}}
+                              onCheckedChange={() => { }}
                             />
+                          </div>
+
+                          {/* Test Audio Button */}
+                          <div className="mt-4 p-3 bg-black/30 rounded-lg border border-white/10">
+                            <div className="flex items-center justify-between mb-2">
+                              <Label className="text-white text-sm">Test Audio</Label>
+                              <PixelButton
+                                onClick={async () => {
+                                  try {
+                                    await audioManager.playRandom('coinFlip');
+                                    toast({
+                                      title: "Test Sound",
+                                      description: "You should hear a coin flip sound!",
+                                    });
+                                  } catch (error) {
+                                    toast({
+                                      title: "Test Failed",
+                                      description: "Audio test failed. Check console for details.",
+                                      variant: "destructive",
+                                    });
+                                  }
+                                }}
+                                variant="blue"
+                                size="sm"
+                              >
+                                PLAY TEST
+                              </PixelButton>
+                            </div>
+                            <p className="text-xs text-gray-400">
+                              Click to test if audio is working properly
+                            </p>
                           </div>
                         </>
                       )}
@@ -207,7 +308,7 @@ export function SettingsMenu() {
                         <Switch
                           id="animations"
                           checked={true}
-                          onCheckedChange={() => {}}
+                          onCheckedChange={() => { }}
                         />
                       </div>
 
@@ -216,7 +317,7 @@ export function SettingsMenu() {
                         <Switch
                           id="particles"
                           checked={true}
-                          onCheckedChange={() => {}}
+                          onCheckedChange={() => { }}
                         />
                       </div>
 
@@ -225,7 +326,7 @@ export function SettingsMenu() {
                         <Switch
                           id="quality"
                           checked={false}
-                          onCheckedChange={() => {}}
+                          onCheckedChange={() => { }}
                         />
                       </div>
                     </TabsContent>
@@ -237,7 +338,7 @@ export function SettingsMenu() {
                         <Switch
                           id="hints"
                           checked={true}
-                          onCheckedChange={() => {}}
+                          onCheckedChange={() => { }}
                         />
                       </div>
 
@@ -246,7 +347,7 @@ export function SettingsMenu() {
                         <Switch
                           id="confirm"
                           checked={false}
-                          onCheckedChange={() => {}}
+                          onCheckedChange={() => { }}
                         />
                       </div>
 
@@ -255,7 +356,7 @@ export function SettingsMenu() {
                         <Switch
                           id="timer"
                           checked={true}
-                          onCheckedChange={() => {}}
+                          onCheckedChange={() => { }}
                         />
                       </div>
                     </TabsContent>
