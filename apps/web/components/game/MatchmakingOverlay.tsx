@@ -43,14 +43,14 @@ export function MatchmakingOverlay({ isOpen, onCancel, deckId }: MatchmakingOver
     setSearchingMatch(true);
     setSearchTime(0);
 
-    // WebSocket disabled for Vercel deployment
+
 
     // Start matchmaking via API
     try {
       const response = await fetch('/api/match/queue', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           userId: 'player1', // This should come from auth
           deckId: deckId || 'default-deck'
         }),
@@ -71,7 +71,7 @@ export function MatchmakingOverlay({ isOpen, onCancel, deckId }: MatchmakingOver
 
   const cancelMatchmaking = () => {
     setSearchingMatch(false);
-    // WebSocket disconnect removed for Vercel deployment
+
     onCancel();
   };
 
@@ -108,7 +108,7 @@ export function MatchmakingOverlay({ isOpen, onCancel, deckId }: MatchmakingOver
                   <Users className="w-12 h-12 text-purple-400" />
                 </div>
               </motion.div>
-              
+
               {/* Pulsing Ring */}
               <motion.div
                 className="absolute inset-0 rounded-full border-4 border-purple-400"
@@ -118,7 +118,7 @@ export function MatchmakingOverlay({ isOpen, onCancel, deckId }: MatchmakingOver
             </div>
 
             <h2 className="text-2xl font-bold text-white mb-2">Finding Opponent</h2>
-            
+
             {/* Search Time */}
             <div className="text-sm text-gray-400 mb-4">
               Searching for {formatTime(searchTime)}
@@ -126,8 +126,8 @@ export function MatchmakingOverlay({ isOpen, onCancel, deckId }: MatchmakingOver
 
             {/* Progress Bar */}
             <div className="w-full mb-4">
-              <Progress 
-                value={(searchTime / estimatedTime) * 100} 
+              <Progress
+                value={(searchTime / estimatedTime) * 100}
                 className="h-2"
               />
               <div className="flex justify-between text-xs text-gray-400 mt-1">
@@ -143,11 +143,11 @@ export function MatchmakingOverlay({ isOpen, onCancel, deckId }: MatchmakingOver
                 <div className="text-sm text-gray-300">
                   <p className="font-semibold mb-1">Quick Tip:</p>
                   <p className="text-xs">
-                    {searchTime < 10 
+                    {searchTime < 10
                       ? "Remember to flip your cards for different effects!"
                       : searchTime < 20
-                      ? "Complete Arcana Trials for instant victory!"
-                      : "Fate points can be used to manipulate card orientations!"}
+                        ? "Complete Arcana Trials for instant victory!"
+                        : "Fate points can be used to manipulate card orientations!"}
                   </p>
                 </div>
               </div>
@@ -162,7 +162,7 @@ export function MatchmakingOverlay({ isOpen, onCancel, deckId }: MatchmakingOver
               >
                 Cancel Search
               </Button>
-              
+
               {searchTime > 30 && (
                 <Button
                   onClick={() => {

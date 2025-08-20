@@ -125,7 +125,7 @@ function logBoardDiff(prevBoard: BoardSlot[], nextBoard: BoardSlot[], playerId: 
 interface GameStore {
   // Match State
   currentMatch: MatchState | null;
-  isConnected: boolean;
+
   isSearchingMatch: boolean;
 
   // UI State
@@ -156,8 +156,7 @@ interface GameStore {
   useFateToFlip: (cardId: string, playerId?: string) => void;
 
   // Connection
-  connect: () => void;
-  disconnect: () => void;
+
   setSearchingMatch: (searching: boolean) => void;
 }
 
@@ -166,7 +165,7 @@ export const useGameStore = create<GameStore>()(
     subscribeWithSelector((set, get) => ({
       // Initial State
       currentMatch: null,
-      isConnected: false,
+
       isSearchingMatch: false,
       selectedCard: null,
       hoveredCard: null,
@@ -212,7 +211,7 @@ export const useGameStore = create<GameStore>()(
           gameLogger.logAction('play_card', { cardName: card.name, targetSlot, playerId }, false, 'No current match');
           return;
         }
-        
+
         gameLogger.setContext({
           matchId: state.currentMatch.matchId,
           playerId,
@@ -220,9 +219,7 @@ export const useGameStore = create<GameStore>()(
           phase: state.currentMatch.phase
         });
 
-        // WebSocket functionality removed for Vercel deployment - using local/demo mode
-
-        // Fallback for local games (demo mode)
+        // Local game logic
         const player = state.currentMatch.players[playerId];
         if (!player) {
           gameLogger.logAction('play_card', { cardName: card.name, playerId }, false, 'Player not found');
@@ -290,10 +287,10 @@ export const useGameStore = create<GameStore>()(
           remainingCost -= spendFromSpell;
         }
         const updatedFate = mana;
-        
+
         // Log the card play with resource changes
         withGameLogging.cardPlay(gameLogger, card, playerId, targetSlot, player.fate, updatedFate);
-        
+
         // Log resource changes
         if (player.fate !== updatedFate) {
           gameLogger.logResourceChange({
@@ -304,7 +301,7 @@ export const useGameStore = create<GameStore>()(
             reason: `Played ${card.name}`
           });
         }
-        
+
         if (isSpell && player.spellMana !== spellMana) {
           gameLogger.logResourceChange({
             resource: 'spellMana',
@@ -358,13 +355,13 @@ export const useGameStore = create<GameStore>()(
         const attacker = match.players[attackerId];
         const defender = match.players[defenderId];
         if (!attacker || !defender) return;
-        
+
         gameLogger.setContext({
           matchId: match.matchId,
           turn: match.turn,
           phase: match.phase
         });
-        
+
         gameLogger.logCombatStart();
 
         // Helper functions
@@ -385,10 +382,10 @@ export const useGameStore = create<GameStore>()(
         };
 
         const nextPhase: GamePhase = 'combat';
-        
+
         // Log phase transition
         withGameLogging.phaseChange(gameLogger, match.phase, nextPhase, 'Combat initiated');
-        
+
         // Enter combat phase for a brief moment to show UI lines
         set({
           currentMatch: {
@@ -415,7 +412,7 @@ export const useGameStore = create<GameStore>()(
           let newDefenderHealth = def.health;
           const attackerDiscard = [...(atk.discard || [])];
           const defenderDiscard = [...(def.discard || [])];
-          
+
           let combatSummary = {
             playerDamage: 0,
             opponentDamage: 0,
@@ -438,7 +435,7 @@ export const useGameStore = create<GameStore>()(
               // Calculate new health after damage (no orientation bonus for health)
               const defNewHealth = Math.max(0, (defCard.health || 0) - atkDmg);
               const atkNewHealth = Math.max(0, (atkCard.health || 0) - defDmg);
-              
+
               // Log the unit clash
               gameLogger.logCombat({
                 subType: 'UNIT_CLASH',
@@ -493,7 +490,7 @@ export const useGameStore = create<GameStore>()(
               const dmg = effectivePower(atkCard, null);
               const oldDefenderHealth = newDefenderHealth;
               newDefenderHealth = Math.max(0, newDefenderHealth - dmg);
-              
+
               gameLogger.logCombat({
                 subType: 'DIRECT_DAMAGE',
                 attacker: {
@@ -505,7 +502,7 @@ export const useGameStore = create<GameStore>()(
                 },
                 damage: dmg
               });
-              
+
               withGameLogging.healthChange(gameLogger, 'player', defenderId, 'Player', oldDefenderHealth, newDefenderHealth, atkCard.name, 'Direct combat damage');
               combatSummary.opponentDamage += dmg;
             }
@@ -514,7 +511,7 @@ export const useGameStore = create<GameStore>()(
           // Log combat end
           gameLogger.logCombatEnd(combatSummary);
           withGameLogging.phaseChange(gameLogger, 'combat', 'main', 'Combat resolved');
-          
+
           // Write back state and exit combat phase
           set({
             currentMatch: {
@@ -544,14 +541,12 @@ export const useGameStore = create<GameStore>()(
         // Acts as Pass Priority. If both players pass consecutively, end the round.
         const state = get();
         if (!state.currentMatch) return;
-        
+
         gameLogger.setContext({
           matchId: state.currentMatch.matchId,
           turn: state.currentMatch.turn,
           phase: state.currentMatch.phase
         });
-
-        // WebSocket functionality removed for Vercel deployment - using local/demo mode
 
         const match = state.currentMatch;
         const playerIds = Object.keys(match.players);
@@ -560,7 +555,7 @@ export const useGameStore = create<GameStore>()(
 
         // If opponent passed last action too → end round
         const bothPassed = match.lastPassBy === opponent;
-        
+
         gameLogger.logPlayerPass(current, bothPassed);
 
         if (bothPassed) {
@@ -568,7 +563,7 @@ export const useGameStore = create<GameStore>()(
           const attackTokenOwner = match.attackTokenOwner || current;
           const hasAttackers = Object.values(match.players[attackTokenOwner]?.board || {}).some((slot: any) => slot?.card);
           const hasBlockers = Object.values(match.players[opponent]?.board || {}).some((slot: any) => slot?.card);
-          
+
           gameLogger.logAction('end_round_check', {
             attackTokenOwner,
             hasAttackers,
@@ -594,7 +589,7 @@ export const useGameStore = create<GameStore>()(
           // Otherwise, end the round normally
           const newTokenOwner = match.attackTokenOwner && match.attackTokenOwner === current ? opponent : current;
           const updatedPlayers: Record<string, Player> = { ...match.players };
-          
+
           gameLogger.logGameState('TURN_END', {
             oldTokenOwner: match.attackTokenOwner,
             newTokenOwner,
@@ -607,7 +602,7 @@ export const useGameStore = create<GameStore>()(
             const newMax = Math.min(10, (p.maxFate || 0) + 1);
             let newHand = [...p.hand];
             let newDeck = [...p.deck];
-            
+
             // Log resource changes
             if (p.maxFate !== newMax) {
               gameLogger.logResourceChange({
@@ -619,7 +614,7 @@ export const useGameStore = create<GameStore>()(
                 reason: 'Turn progression'
               });
             }
-            
+
             if (p.fate !== newMax) {
               gameLogger.logResourceChange({
                 playerId: pid,
@@ -630,7 +625,7 @@ export const useGameStore = create<GameStore>()(
                 reason: 'Turn refill'
               });
             }
-            
+
             if ((p.spellMana || 0) !== newSpell) {
               gameLogger.logResourceChange({
                 playerId: pid,
@@ -641,7 +636,7 @@ export const useGameStore = create<GameStore>()(
                 reason: 'Carryover mana'
               });
             }
-            
+
             // Draw card
             if (newDeck.length > 0) {
               const drawn = newDeck.shift();
@@ -657,7 +652,7 @@ export const useGameStore = create<GameStore>()(
             } else {
               gameLogger.logAction('draw_card', { playerId: pid }, false, 'Empty deck');
             }
-            
+
             updatedPlayers[pid] = {
               ...p,
               maxFate: newMax,
@@ -670,7 +665,7 @@ export const useGameStore = create<GameStore>()(
 
           gameLogger.logTurnStart(newTokenOwner || current, match.turn + 1, 'main');
           withGameLogging.phaseChange(gameLogger, match.phase, 'main', 'New turn started');
-          
+
           set({
             currentMatch: {
               ...match,
@@ -692,7 +687,7 @@ export const useGameStore = create<GameStore>()(
           to: opponent,
           phase: match.phase
         }, true);
-        
+
         set({
           currentMatch: {
             ...match,
@@ -712,7 +707,7 @@ export const useGameStore = create<GameStore>()(
           gameLogger.logAction('flip_card', { cardId, playerId }, false, 'Player not found');
           return;
         }
-        
+
         gameLogger.setContext({
           matchId: state.currentMatch.matchId,
           playerId,
@@ -725,7 +720,7 @@ export const useGameStore = create<GameStore>()(
         let cardName = '';
         let oldOrientation = '';
         let newOrientation = '';
-        
+
         const updatedHand = player.hand.map(card => {
           if (card.id === cardId) {
             cardFound = true;
@@ -758,7 +753,7 @@ export const useGameStore = create<GameStore>()(
           }
           return slot;
         });
-        
+
         if (cardFound) {
           gameLogger.logAction('flip_card', {
             cardId,
@@ -816,12 +811,12 @@ export const useGameStore = create<GameStore>()(
 
       peekDestiny: () => {
         console.log('Peeking at destiny');
-        // WebSocket integration will go here
+
       },
 
       forceDraw: () => {
         console.log('Forcing draw');
-        // WebSocket integration will go here
+
       },
 
       initializeMatch: (matchData) => {
@@ -835,10 +830,10 @@ export const useGameStore = create<GameStore>()(
           players: {},
           ...matchData
         } as MatchState;
-        
+
         gameLogger.clearBuffer(); // Start fresh for new match
         gameLogger.logMatchStart(matchState);
-        
+
         set({ currentMatch: matchState });
       },
 
@@ -854,9 +849,7 @@ export const useGameStore = create<GameStore>()(
         });
       },
 
-      // Connection
-      connect: () => set({ isConnected: false }), // WebSocket disabled for Vercel
-      disconnect: () => set({ isConnected: false }),
+
       setSearchingMatch: (searching) => set({ isSearchingMatch: searching }),
     }))
   )

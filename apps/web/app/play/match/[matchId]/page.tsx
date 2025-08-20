@@ -184,11 +184,10 @@ export default function MatchPage() {
       setCurrentMatch(mockMatch);
     }
 
-    // WebSocket functionality removed for Vercel deployment
+
 
     return () => {
       // Cleanup on unmount
-      // gameWebSocket.disconnect();
     };
   }, [matchId]);
 

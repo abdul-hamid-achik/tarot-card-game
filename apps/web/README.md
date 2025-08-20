@@ -17,25 +17,6 @@ For local development with Docker:
 DATABASE_URL=postgresql://postgres:password@localhost:55432/tarot_dev
 ```
 
-For production with Neon:
-```env
-DATABASE_URL=postgresql://username:password@your-project.us-east-1.aws.neon.tech/neondb?sslmode=require
-```
-
-### 2. Local Development with Docker
-
-Start the local Neon database using the official `neondatabase/neon_local` Docker image:
-
-```bash
-# Start neon_local
-docker-compose up -d neon-local
-
-# Check the connection string in the logs
-docker-compose logs neon-local
-```
-
-The `neondatabase/neon_local:latest` image is the official Docker image verified on Docker Hub.
-
 ### 3. Database Setup
 
 Install dependencies:

@@ -9,10 +9,13 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "drizzle-orm": "^0.31.3"
+    "drizzle-orm": "^0.31.3",
+    "postgres": "^3.4.3",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/node": "^20.12.12",
+    "drizzle-kit": "^0.18.1",
     "typescript": "^5.4.5"
   }
 }
