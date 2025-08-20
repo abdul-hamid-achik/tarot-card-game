@@ -1,8 +1,12 @@
 {
+  "buildCommand": "npm run build:deps && next build",
   "functions": {
     "app/api/**/*.ts": {
       "maxDuration": 10
     }
+  },
+  "github": {
+    "enabled": true
   },
   "env": {
     "POSTGRES_URL": "@postgres-url",

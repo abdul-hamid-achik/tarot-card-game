@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
+    "build:deps": "npm run -w @tarot/db build && npm run -w @tarot/game-logger build && npm run -w @tarot/game-sim build",
     "start": "next start -p 3000",
     "test": "playwright test",
     "db:generate": "drizzle-kit generate",

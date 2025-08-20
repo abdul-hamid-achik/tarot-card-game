@@ -1,5 +1,5 @@
 import { MatchState } from './types';
-import { applyIntent, checkVictory } from './sim';
+import { applyIntent, checkVictory, createInitialState } from './sim';
 import { createSeededRandom } from './rng';
 
 export interface TarotAIConfig {
@@ -35,7 +35,7 @@ export class TarotAI {
    */
   public chooseAction(state: MatchState, playerId: string): AIDecision {
     const analysis = this.analyzeGameState(state, playerId);
-    
+
     // Different strategies based on difficulty
     switch (this.difficulty) {
       case 'easy':
@@ -65,14 +65,15 @@ export class TarotAI {
       playerFate: player.fate,
       opponentFate: opponent.fate,
       playerHand: player.hand,
+      opponentHand: opponent.hand,
       playerLanes: player.lanes,
       opponentLanes: opponent.lanes,
-      arcanaTrials: state.arcanaTrials || { sun: 0, moon: 0, judgement: 0 },
-      majorArcanaCharge: state.majorArcanaCharge?.[playerId] || 0,
+      arcanaTrials: (state.trials as any)?.[playerId] || { sun: 0, moon: 0, judgement: 0 },
+      majorArcanaCharge: 0, // TODO: implement major arcana charge tracking
       turn: state.turn,
       reactionWindowOpen: state.reactionWindow?.open || false,
-      spreadSlots: state.spreadSlots || { past: null, present: null, future: null },
-      cardOrientations: state.cardOrientations || {},
+      spreadSlots: (state.spread as any)?.[playerId] || { past: null, present: null, future: null },
+      cardOrientations: state.orientations || {},
       threatLevel: this.calculateThreatLevel(state, playerId, opponentId),
       winConditionProgress: this.evaluateWinConditions(state, playerId)
     };
@@ -83,7 +84,7 @@ export class TarotAI {
    */
   private easyStrategy(state: MatchState, playerId: string, analysis: GameAnalysis): AIDecision {
     const hand = analysis.playerHand;
-    
+
     if (hand.length === 0) {
       return {
         action: 'end_turn',
@@ -131,7 +132,7 @@ export class TarotAI {
 
     // Basic card evaluation
     const bestPlay = this.evaluateCardPlays(state, playerId, analysis);
-    
+
     if (bestPlay) {
       return bestPlay;
     }
@@ -195,7 +196,7 @@ export class TarotAI {
   private expertStrategy(state: MatchState, playerId: string, analysis: GameAnalysis): AIDecision {
     // Deck archetype recognition and specialized strategies
     const deckType = this.identifyDeckArchetype(analysis.playerHand);
-    
+
     switch (deckType) {
       case 'wands_aggro':
         return this.executeWandsAggro(state, playerId, analysis);
@@ -271,7 +272,7 @@ export class TarotAI {
 
     for (const cardId of analysis.playerHand) {
       const cardValue = this.evaluateCard(cardId, state, analysis);
-      
+
       for (let lane = 0; lane < 6; lane++) {
         const laneValue = this.evaluateLane(lane, analysis);
         const totalValue = cardValue * laneValue;
@@ -288,7 +289,7 @@ export class TarotAI {
 
     // Sort by confidence and return best play
     plays.sort((a, b) => b.confidence - a.confidence);
-    
+
     if (plays.length > 0 && plays[0].confidence > 0.5) {
       return plays[0];
     }
@@ -305,7 +306,7 @@ export class TarotAI {
     // Major Arcana are more valuable
     if (cardId.startsWith('major_')) {
       value += 0.2;
-      
+
       // Even more valuable when charge is high
       if (analysis.majorArcanaCharge >= 70) {
         value += 0.3;
@@ -355,12 +356,12 @@ export class TarotAI {
     threat += Math.max(0, healthDiff / 30) * 0.3;
 
     // Board presence
-    const opponentCards = opponent.lanes.filter(l => l).length;
+    const opponentCards = opponent.lanes.filter((l: any) => l).length;
     threat += (opponentCards / 6) * 0.3;
 
     // Trial progress
-    const trials = state.arcanaTrials || { sun: 0, moon: 0, judgement: 0 };
-    const maxTrial = Math.max(trials.sun, trials.moon, trials.judgement);
+    const trials = (state.trials as any)?.[opponentId] || { sun: 0, moon: 0, judgement: 0 };
+    const maxTrial = Math.max(trials.sun || 0, trials.moon || 0, trials.judgement || 0);
     threat += (maxTrial / 100) * 0.4;
 
     return Math.min(threat, 1);
@@ -372,11 +373,11 @@ export class TarotAI {
   private executeWandsAggro(state: MatchState, playerId: string, analysis: GameAnalysis): AIDecision {
     // Aggressive strategy - maximize damage
     const wandsCards = analysis.playerHand.filter(c => c.includes('wands'));
-    
+
     if (wandsCards.length > 0) {
       // Find empty opponent lane for direct damage
       const emptyLane = this.findEmptyOpponentLane(analysis);
-      
+
       return {
         action: 'play_card',
         cardId: wandsCards[0],
@@ -392,7 +393,7 @@ export class TarotAI {
   private executeCupsControl(state: MatchState, playerId: string, analysis: GameAnalysis): AIDecision {
     // Control strategy - heal and outlast
     const cupsCards = analysis.playerHand.filter(c => c.includes('cups'));
-    
+
     if (analysis.playerHealth < 20 && cupsCards.length > 0) {
       return {
         action: 'play_card',
@@ -418,10 +419,10 @@ export class TarotAI {
   private executeSwordsCounter(state: MatchState, playerId: string, analysis: GameAnalysis): AIDecision {
     // Counter strategy - react to opponent plays
     const swordsCards = analysis.playerHand.filter(c => c.includes('swords'));
-    
+
     // Counter strongest opponent lane
     const strongestLane = this.findStrongestOpponentLane(analysis);
-    
+
     if (swordsCards.length > 0 && strongestLane !== -1) {
       return {
         action: 'play_card',
@@ -438,11 +439,11 @@ export class TarotAI {
   private executePentaclesDefense(state: MatchState, playerId: string, analysis: GameAnalysis): AIDecision {
     // Defensive strategy - build shields and survive
     const pentaclesCards = analysis.playerHand.filter(c => c.includes('pentacles'));
-    
+
     if (pentaclesCards.length > 0) {
       // Protect weakest lane
       const weakestLane = this.findWeakestPlayerLane(analysis);
-      
+
       return {
         action: 'play_card',
         cardId: pentaclesCards[0],
@@ -458,7 +459,7 @@ export class TarotAI {
   private executeMajorUltimate(state: MatchState, playerId: string, analysis: GameAnalysis): AIDecision {
     // Ultimate strategy - charge and unleash Major Arcana
     const majorCards = analysis.playerHand.filter(c => c.startsWith('major_'));
-    
+
     // Play Major Arcana to charge
     if (majorCards.length > 0) {
       if (analysis.majorArcanaCharge >= 90) {
@@ -470,7 +471,7 @@ export class TarotAI {
           reasoning: 'Activating Major Arcana Ultimate!'
         };
       }
-      
+
       return {
         action: 'play_card',
         cardId: majorCards[0],
@@ -489,10 +490,10 @@ export class TarotAI {
   private getPlayerState(state: MatchState, playerId: string): any {
     // Extract player state from match state
     return {
-      health: state.players?.[playerId]?.health || 30,
-      fate: state.fate?.[playerId] || 0,
-      hand: state.hands?.[playerId]?.hand || [],
-      lanes: state.battlefield?.[playerId] || Array(6).fill(null)
+      health: (state.players as any)?.[playerId]?.health || 30,
+      fate: (state.fate as any)?.[playerId] || 0,
+      hand: (state.hands as any)?.[playerId]?.hand || [],
+      lanes: (state.battlefield as any)?.[playerId] || Array(6).fill(null)
     };
   }
 
@@ -529,14 +530,14 @@ export class TarotAI {
     // Find opponent's strongest card
     let strongest = -1;
     let maxPower = 0;
-    
+
     for (let i = 0; i < 6; i++) {
       if (analysis.opponentLanes[i]?.power > maxPower) {
         strongest = i;
         maxPower = analysis.opponentLanes[i].power;
       }
     }
-    
+
     return strongest;
   }
 
@@ -551,28 +552,28 @@ export class TarotAI {
 
   private evaluateLane(lane: number, analysis: GameAnalysis): number {
     let value = 0.5;
-    
+
     // Empty lanes are valuable
     if (!analysis.playerLanes[lane]) {
       value += 0.2;
     }
-    
+
     // Lanes opposite to opponent cards are important
     if (analysis.opponentLanes[lane]) {
       value += 0.15;
     }
-    
+
     return value;
   }
 
   private canWinThisTurn(state: MatchState, playerId: string, analysis: GameAnalysis): boolean {
     // Check if we can achieve any victory condition this turn
-    
+
     // Health victory
     if (analysis.opponentHealth <= 5) {
       return true;
     }
-    
+
     // Trials victory
     const trials = analysis.arcanaTrials;
     const completedTrials = [trials.sun >= 100, trials.moon >= 100, trials.judgement >= 100]
@@ -580,35 +581,35 @@ export class TarotAI {
     if (completedTrials >= 2) {
       return true;
     }
-    
+
     return false;
   }
 
   private opponentCanWinNextTurn(state: MatchState, playerId: string, analysis: GameAnalysis): boolean {
     // Check if opponent is close to victory
-    
+
     if (analysis.playerHealth <= 10) {
       return true;
     }
-    
+
     const trials = analysis.arcanaTrials;
     const highTrials = [trials.sun >= 90, trials.moon >= 90, trials.judgement >= 90]
       .filter(t => t).length;
     if (highTrials >= 2) {
       return true;
     }
-    
+
     return false;
   }
 
   private executeWinningMove(state: MatchState, playerId: string, analysis: GameAnalysis): AIDecision {
     // Execute the move that wins the game
-    
+
     // Find highest damage card
-    const damageCards = analysis.playerHand.filter(c => 
+    const damageCards = analysis.playerHand.filter(c =>
       c.includes('wands') || c.includes('swords')
     );
-    
+
     if (damageCards.length > 0) {
       return {
         action: 'play_card',
@@ -618,13 +619,13 @@ export class TarotAI {
         reasoning: 'Executing winning move!'
       };
     }
-    
+
     return this.hardStrategy(state, playerId, analysis);
   }
 
   private executeDefensiveMove(state: MatchState, playerId: string, analysis: GameAnalysis): AIDecision {
     // Prevent opponent from winning
-    
+
     // Heal if possible
     const healCards = analysis.playerHand.filter(c => c.includes('cups'));
     if (healCards.length > 0) {
@@ -636,7 +637,7 @@ export class TarotAI {
         reasoning: 'Emergency healing to prevent loss'
       };
     }
-    
+
     // Shield if possible
     const shieldCards = analysis.playerHand.filter(c => c.includes('pentacles'));
     if (shieldCards.length > 0) {
@@ -648,7 +649,7 @@ export class TarotAI {
         reasoning: 'Emergency shield to block damage'
       };
     }
-    
+
     // Use fate defensively
     if (analysis.playerFate >= 3 && analysis.reactionWindowOpen) {
       return {
@@ -657,27 +658,27 @@ export class TarotAI {
         reasoning: 'Divine Intervention to prevent loss'
       };
     }
-    
+
     return this.hardStrategy(state, playerId, analysis);
   }
 
   private optimizeTrialProgress(state: MatchState, playerId: string, analysis: GameAnalysis): AIDecision | null {
     const trials = analysis.arcanaTrials;
-    
+
     // Focus on the closest trial to completion
     let targetTrial = 'sun';
     let maxProgress = trials.sun;
-    
+
     if (trials.moon > maxProgress) {
       targetTrial = 'moon';
       maxProgress = trials.moon;
     }
-    
+
     if (trials.judgement > maxProgress) {
       targetTrial = 'judgement';
       maxProgress = trials.judgement;
     }
-    
+
     // Play cards that advance the target trial
     if (targetTrial === 'sun') {
       const fireCards = analysis.playerHand.filter(c => c.includes('wands'));
@@ -691,14 +692,14 @@ export class TarotAI {
         };
       }
     }
-    
+
     return null;
   }
 
   private optimizeSpreadPlacement(state: MatchState, playerId: string, analysis: GameAnalysis): AIDecision | null {
     const turn = analysis.turn;
     const spread = analysis.spreadSlots;
-    
+
     // Past bonus (turns 1-3)
     if (turn <= 3 && !spread.past) {
       const bestCard = this.findBestSpreadCard(analysis.playerHand);
@@ -712,7 +713,7 @@ export class TarotAI {
         };
       }
     }
-    
+
     // Present bonus (turns 4-6)
     if (turn >= 4 && turn <= 6 && !spread.present) {
       const bestCard = this.findBestSpreadCard(analysis.playerHand);
@@ -726,7 +727,7 @@ export class TarotAI {
         };
       }
     }
-    
+
     // Future bonus (turns 7+)
     if (turn >= 7 && !spread.future) {
       const bestCard = this.findBestSpreadCard(analysis.playerHand);
@@ -740,25 +741,25 @@ export class TarotAI {
         };
       }
     }
-    
+
     return null;
   }
 
   private findElementalCombo(state: MatchState, playerId: string, analysis: GameAnalysis): AIDecision | null {
     // Look for elemental advantage opportunities
-    
+
     // Check opponent's last played card element
     const opponentCards = analysis.opponentLanes.filter(l => l);
     if (opponentCards.length === 0) return null;
-    
+
     const lastOpponentElement = this.getCardElement(opponentCards[0]?.cardId);
     const counterElement = this.getCounterElement(lastOpponentElement);
-    
+
     // Find cards with counter element
-    const counterCards = analysis.playerHand.filter(c => 
+    const counterCards = analysis.playerHand.filter(c =>
       this.getCardElement(c) === counterElement
     );
-    
+
     if (counterCards.length > 0) {
       return {
         action: 'play_card',
@@ -768,7 +769,7 @@ export class TarotAI {
         reasoning: `Playing ${counterElement} to counter ${lastOpponentElement}`
       };
     }
-    
+
     return null;
   }
 
@@ -782,7 +783,7 @@ export class TarotAI {
     // Major Arcana are best for spread slots
     const majorCard = hand.find(c => c.startsWith('major_'));
     if (majorCard) return majorCard;
-    
+
     // Otherwise any card
     return hand.length > 0 ? hand[0] : null;
   }
@@ -825,23 +826,25 @@ export class TarotAI {
       pentacles: 0,
       major: 0
     };
-    
+
     for (const card of hand) {
       const suit = this.getCardSuit(card);
-      suitCounts[suit]++;
+      if (suit && suit in suitCounts) {
+        suitCounts[suit as keyof typeof suitCounts]++;
+      }
     }
-    
+
     // Find dominant suit
     let maxSuit = 'balanced';
     let maxCount = 0;
-    
+
     for (const [suit, count] of Object.entries(suitCounts)) {
       if (count > maxCount) {
         maxCount = count;
         maxSuit = suit;
       }
     }
-    
+
     // Map to archetype
     switch (maxSuit) {
       case 'wands': return 'wands_aggro';
@@ -856,11 +859,12 @@ export class TarotAI {
   private evaluateWinConditions(state: MatchState, playerId: string): WinConditionProgress {
     const player = this.getPlayerState(state, playerId);
     const opponent = this.getPlayerState(state, this.getOpponentId(state, playerId));
-    const trials = state.arcanaTrials || { sun: 0, moon: 0, judgement: 0 };
-    
+    const opponentId = this.getOpponentId(state, playerId);
+    const trials = (state.trials as any)?.[opponentId] || { sun: 0, moon: 0, judgement: 0 };
+
     return {
       healthVictory: (30 - opponent.health) / 30,
-      trialsVictory: Math.max(trials.sun, trials.moon, trials.judgement) / 100,
+      trialsVictory: Math.max(trials.sun || 0, trials.moon || 0, trials.judgement || 0) / 100,
       deckOutVictory: opponent.hand.length === 0 ? 1 : 0
     };
   }
@@ -916,7 +920,7 @@ export function createTarotAI(config: Partial<TarotAIConfig> = {}, seed = 'ai-se
     personality: config.personality || 'balanced',
     deck: config.deck
   };
-  
+
   return new TarotAI(fullConfig, seed);
 }
 
@@ -929,47 +933,67 @@ export async function playAgainstAI(
   seed = 'match-seed'
 ): Promise<{ winner: string; turns: number; finalState: MatchState }> {
   const ai = createTarotAI(aiConfig, seed);
-  
+
   let state = createInitialState({
-    players: [
-      { id: 'human', name: 'Human Player' },
-      { id: 'ai', name: 'AI Opponent' }
-    ],
-    rngSeed: seed
+    matchId: 'ai-match-' + Date.now(),
+    seed: seed,
+    players: ['human', 'ai']
   });
-  
+
   let turns = 0;
   const maxTurns = 100;
-  
+
   while (turns < maxTurns) {
     const currentPlayer = state.turn % 2 === 0 ? 'human' : 'ai';
-    
+
     if (currentPlayer === 'ai') {
       const decision = ai.chooseAction(state, 'ai');
-      
+
       // Convert AI decision to intent
-      const intent = {
-        type: decision.action,
-        playerId: 'ai',
-        cardId: decision.cardId,
-        laneIndex: decision.laneIndex,
-        targetId: decision.targetId
-      };
-      
+      let intent: any;
+      switch (decision.action) {
+        case 'play_card':
+          intent = {
+            type: 'play_card' as const,
+            playerId: 'ai',
+            cardId: decision.cardId!,
+            target: decision.targetId
+          };
+          break;
+        case 'draw':
+          intent = {
+            type: 'draw' as const,
+            playerId: 'ai',
+            cardId: decision.cardId!
+          };
+          break;
+        case 'end_turn':
+          intent = {
+            type: 'end_turn' as const,
+            playerId: 'ai'
+          };
+          break;
+        default:
+          intent = {
+            type: 'end_turn' as const,
+            playerId: 'ai'
+          };
+      }
+
       state = applyIntent(state, intent);
     } else {
       // Human turn would be handled by UI
       // For now, simulate with random play
       state = applyIntent(state, { type: 'end_turn', playerId: 'human' });
     }
-    
+
     const winner = checkVictory(state);
     if (winner) {
       return { winner, turns, finalState: state };
     }
-    
+
     turns++;
   }
-  
+
   return { winner: 'draw', turns, finalState: state };
 }
