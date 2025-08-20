@@ -1,5 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
+import { gameLogger } from '@tarot/game-logger';
 
 export type Scale = '1x' | '2x' | '5x';
 
@@ -60,18 +61,50 @@ function parseMajor(cardId: string): number | null {
 }
 
 export function resolveDeckBRelativeFile(cardId: string): string | null {
+    gameLogger.logAction('asset_resolve_deck_b_start', {
+        cardId,
+        isMinor: isMinor(cardId),
+        isMajor: parseMajor(cardId) !== null
+    }, true, 'Starting Deck B asset resolution');
+
     if (isMinor(cardId)) {
         const minor = parseMinor(cardId);
-        if (!minor) return null;
+        if (!minor) {
+            gameLogger.logAction('asset_resolve_deck_b_failed', {
+                cardId,
+                reason: 'invalid_minor_format'
+            }, false, 'Failed to parse minor card format');
+            return null;
+        }
         const { suit, rank } = minor;
         const rankSlug = rankSlugByNumber[rank] ?? rank; // keep court ranks as-is
-        return `${rankSlug}_of_${suit}.png`;
+        const result = `${rankSlug}_of_${suit}.png`;
+        gameLogger.logAction('asset_resolve_deck_b_success', {
+            cardId,
+            suit,
+            rank,
+            rankSlug,
+            result
+        }, true, 'Successfully resolved Deck B minor card asset');
+        return result;
     }
     const ordinal = parseMajor(cardId);
     if (ordinal !== null) {
         const slug = majorSlugsByOrdinal[ordinal];
-        return `${ordinal}_${slug}.png`;
+        const result = `${ordinal}_${slug}.png`;
+        gameLogger.logAction('asset_resolve_deck_b_success', {
+            cardId,
+            ordinal,
+            slug,
+            result
+        }, true, 'Successfully resolved Deck B major card asset');
+        return result;
     }
+
+    gameLogger.logAction('asset_resolve_deck_b_failed', {
+        cardId,
+        reason: 'unrecognized_format'
+    }, false, 'Failed to resolve Deck B asset - unrecognized format');
     return null;
 }
 
@@ -82,9 +115,24 @@ export function getRepoRootFromWebAppCwd(cwd: string): string {
 
 export function resolveAbsoluteImagePathForDeckB(cardId: string): string | null {
     const rel = resolveDeckBRelativeFile(cardId);
-    if (!rel) return null;
+    if (!rel) {
+        gameLogger.logAction('asset_resolve_deck_b_abs_failed', {
+            cardId,
+            reason: 'no_relative_path'
+        }, false, 'Failed to get relative path for Deck B absolute resolution');
+        return null;
+    }
     const repoRoot = getRepoRootFromWebAppCwd(process.cwd());
-    return path.join(repoRoot, 'decks', 'B', rel);
+    const absPath = path.join(repoRoot, 'decks', 'B', rel);
+
+    gameLogger.logAction('asset_resolve_deck_b_abs_success', {
+        cardId,
+        relativePath: rel,
+        absolutePath: absPath,
+        repoRoot
+    }, true, 'Successfully resolved absolute path for Deck B asset');
+
+    return absPath;
 }
 
 export interface DeckManifestCardEntry {
@@ -111,10 +159,32 @@ export interface DeckManifest {
 export function loadDeckManifest(deckId: string): DeckManifest | null {
     const repoRoot = getRepoRootFromWebAppCwd(process.cwd());
     const manifestPath = path.join(repoRoot, 'packages', 'assets', 'decks', deckId, 'deck.json');
+
+    gameLogger.logAction('asset_load_manifest_start', {
+        deckId,
+        manifestPath,
+        repoRoot
+    }, true, 'Starting deck manifest load');
+
     try {
         const text = fs.readFileSync(manifestPath, 'utf8');
-        return JSON.parse(text) as DeckManifest;
-    } catch {
+        const manifest = JSON.parse(text) as DeckManifest;
+
+        gameLogger.logAction('asset_load_manifest_success', {
+            deckId,
+            cardCount: manifest.cards.length,
+            displayName: manifest.displayName,
+            defaultScale: manifest.defaultScale
+        }, true, 'Successfully loaded deck manifest');
+
+        return manifest;
+    } catch (error) {
+        gameLogger.logAction('asset_load_manifest_failed', {
+            deckId,
+            manifestPath,
+            error: error instanceof Error ? error.message : 'Unknown error'
+        }, false, 'Failed to load deck manifest');
+
         return null;
     }
 }
@@ -129,18 +199,62 @@ export function resolveAbsoluteImagePathFromManifest(
     cardId: string,
     preferredScale: Scale = '2x'
 ): string | null {
+    gameLogger.logAction('asset_resolve_manifest_start', {
+        deckId,
+        cardId,
+        preferredScale
+    }, true, 'Starting manifest-based asset resolution');
+
     const manifest = loadDeckManifest(deckId);
-    if (!manifest) return null;
+    if (!manifest) {
+        gameLogger.logAction('asset_resolve_manifest_failed', {
+            deckId,
+            cardId,
+            reason: 'manifest_not_found'
+        }, false, 'Failed to load manifest for asset resolution');
+        return null;
+    }
+
     const entry = manifest.cards.find((c) => c.id === cardId);
-    if (!entry || !entry.images) return null;
+    if (!entry || !entry.images) {
+        gameLogger.logAction('asset_resolve_manifest_failed', {
+            deckId,
+            cardId,
+            reason: 'card_entry_not_found',
+            entryFound: !!entry,
+            hasImages: !!entry?.images
+        }, false, 'Card entry not found or has no images in manifest');
+        return null;
+    }
+
     const scales: Scale[] = [preferredScale, '2x', '1x', '5x'];
     for (const sc of scales) {
         const rel = entry.images[sc];
         if (rel) {
             const base = getDeckManifestBaseDir(deckId);
-            return path.join(base, rel);
+            const absPath = path.join(base, rel);
+
+            gameLogger.logAction('asset_resolve_manifest_success', {
+                deckId,
+                cardId,
+                scale: sc,
+                relativePath: rel,
+                absolutePath: absPath,
+                preferredScale,
+                fallbackUsed: sc !== preferredScale
+            }, true, 'Successfully resolved asset path from manifest');
+
+            return absPath;
         }
     }
+
+    gameLogger.logAction('asset_resolve_manifest_failed', {
+        deckId,
+        cardId,
+        reason: 'no_suitable_scale_found',
+        availableScales: Object.keys(entry.images)
+    }, false, 'No suitable scale found in manifest images');
+
     return null;
 }
 
@@ -177,25 +291,69 @@ function findDeckCFolderForMajorSlug(slug: string): string | null {
 }
 
 export function resolveAbsoluteImagePathForDeckMarigold(cardId: string, preferredScale: Scale = '2x'): string | null {
+    gameLogger.logAction('asset_resolve_marigold_start', {
+        cardId,
+        preferredScale
+    }, true, 'Starting Deck Marigold asset resolution');
+
     const ordinal = parseMajor(cardId);
-    if (ordinal === null) return null; // majors only for Deck C
+    if (ordinal === null) {
+        gameLogger.logAction('asset_resolve_marigold_failed', {
+            cardId,
+            reason: 'not_major_arcana'
+        }, false, 'Deck Marigold only supports Major Arcana cards');
+        return null; // majors only for Deck C
+    }
+
     const targetSlug = majorSlugsByOrdinal[ordinal];
     const folder = findDeckCFolderForMajorSlug(targetSlug);
-    if (!folder) return null;
+    if (!folder) {
+        gameLogger.logAction('asset_resolve_marigold_failed', {
+            cardId,
+            ordinal,
+            targetSlug,
+            reason: 'folder_not_found'
+        }, false, 'Could not find folder for Major Arcana slug');
+        return null;
+    }
+
     // Prefer <folder>_<scale>.png in order: preferred, 2x, 1x, 5x, plain .png
     const baseName = path.basename(folder);
     const candidates: string[] = [];
     const scales: Scale[] = [preferredScale, '2x', '1x', '5x'];
     for (const sc of scales) candidates.push(path.join(folder, `${baseName}_${sc}.png`));
     candidates.push(path.join(folder, `${baseName}.png`));
+
     for (const abs of candidates) {
         try {
             const st = fs.statSync(abs);
-            if (st.isFile()) return abs;
+            if (st.isFile()) {
+                gameLogger.logAction('asset_resolve_marigold_success', {
+                    cardId,
+                    ordinal,
+                    targetSlug,
+                    folder,
+                    baseName,
+                    resolvedPath: abs,
+                    preferredScale,
+                    usedScale: abs.includes('_') ? abs.split('_').pop()?.replace('.png', '') : 'default'
+                }, true, 'Successfully resolved Deck Marigold asset path');
+                return abs;
+            }
         } catch {
             // continue
         }
     }
+
+    gameLogger.logAction('asset_resolve_marigold_failed', {
+        cardId,
+        ordinal,
+        targetSlug,
+        folder,
+        candidates,
+        reason: 'no_file_found'
+    }, false, 'No suitable image file found for Deck Marigold asset');
+
     return null;
 }
 

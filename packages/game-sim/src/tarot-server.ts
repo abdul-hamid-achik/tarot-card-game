@@ -8,6 +8,13 @@ import { createInitialState, applyIntent, checkVictory } from './sim.js';
 import { initializeTarotState, processTarotIntent, type TarotMatchState, type TarotIntent } from './tarot-extensions.js';
 import type { MatchState } from './types.js';
 
+// Simple logging for game simulation
+const logGame = (action: string, data: any, success: boolean = true) => {
+	const timestamp = new Date().toISOString();
+	const level = success ? 'INFO' : 'ERROR';
+	console.log(`[${timestamp}] [GAME] [${level}] ${action}:`, data);
+};
+
 interface Player {
 	id: string;
 	ws: any;
@@ -28,33 +35,48 @@ export class TarotGameServer {
 	private playerQueue: Player[] = [];
 	private nextMatchId = 1;
 	private nextPlayerId = 1;
-	
+
 	constructor(port: number = 8765) {
+		logGame('SERVER_INIT', { port });
 		this.wss = new WebSocketServer({ port });
 		this.setupWebSocketHandlers();
+		logGame('SERVER_START', { port, message: 'Tarot Game Server listening on port' });
 		console.log(`Tarot Game Server listening on port ${port}`);
 	}
-	
+
 	private setupWebSocketHandlers() {
+		logGame('WS_HANDLERS_SETUP', { message: 'Setting up WebSocket event handlers' });
+
 		this.wss.on('connection', (ws) => {
 			const playerId = `player_${this.nextPlayerId++}`;
+			logGame('WS_PLAYER_CONNECT', { playerId, totalPlayers: this.nextPlayerId - 1 });
 			console.log(`Player connected: ${playerId}`);
-			
+
 			ws.on('message', (data) => {
 				try {
 					const message = JSON.parse(data.toString());
+					logGame('WS_MESSAGE_RECEIVED', {
+						playerId,
+						messageType: message.type,
+						messageSize: data.length
+					});
 					this.handleMessage(ws, playerId, message);
 				} catch (error) {
+					logGame('WS_MESSAGE_ERROR', {
+						playerId,
+						error: error instanceof Error ? error.message : 'Unknown error'
+					}, false);
 					console.error('Invalid message:', error);
 					ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
 				}
 			});
-			
+
 			ws.on('close', () => {
+				logGame('WS_PLAYER_DISCONNECT', { playerId });
 				console.log(`Player disconnected: ${playerId}`);
 				this.handleDisconnect(playerId);
 			});
-			
+
 			// Send welcome message
 			ws.send(JSON.stringify({
 				type: 'connected',
@@ -63,30 +85,30 @@ export class TarotGameServer {
 			}));
 		});
 	}
-	
+
 	private handleMessage(ws: any, playerId: string, message: any) {
 		switch (message.type) {
 			case 'queue':
 				this.handleQueue(ws, playerId, message);
 				break;
-				
+
 			case 'ready':
 				this.handleReady(playerId, message);
 				break;
-				
+
 			case 'intent':
 				this.handleIntent(playerId, message);
 				break;
-				
+
 			case 'spectate':
 				this.handleSpectate(ws, message.matchId);
 				break;
-				
+
 			default:
 				ws.send(JSON.stringify({ type: 'error', message: `Unknown message type: ${message.type}` }));
 		}
 	}
-	
+
 	private handleQueue(ws: any, playerId: string, message: any) {
 		const player: Player = {
 			id: playerId,
@@ -94,13 +116,27 @@ export class TarotGameServer {
 			deck: message.deck || [],
 			ready: false
 		};
-		
+
+		logGame('GAME_PLAYER_QUEUE', {
+			playerId,
+			deckSize: player.deck.length,
+			queueSize: this.playerQueue.length + 1
+		});
+
 		this.playerQueue.push(player);
-		
+
 		// Check if we can start a match
 		if (this.playerQueue.length >= 2) {
+			logGame('GAME_START_MATCH_AUTO', {
+				queueSize: this.playerQueue.length,
+				reason: 'minimum_players_reached'
+			});
 			this.startMatch();
 		} else {
+			logGame('GAME_PLAYER_QUEUED', {
+				playerId,
+				queuePosition: this.playerQueue.length
+			});
 			ws.send(JSON.stringify({
 				type: 'queued',
 				position: this.playerQueue.length,
@@ -108,30 +144,37 @@ export class TarotGameServer {
 			}));
 		}
 	}
-	
+
 	private startMatch() {
 		const player1 = this.playerQueue.shift()!;
 		const player2 = this.playerQueue.shift()!;
-		
+
 		const matchId = `match_${this.nextMatchId++}`;
 		const seed = `seed_${Date.now()}`;
-		
+
+		logGame('GAME_MATCH_INIT', {
+			matchId,
+			seed,
+			player1: { id: player1.id, deckSize: player1.deck.length },
+			player2: { id: player2.id, deckSize: player2.deck.length }
+		});
+
 		// Create initial state
 		const baseState = createInitialState({
 			matchId,
 			seed,
 			players: [player1.id, player2.id]
 		});
-		
+
 		// Initialize Tarot-specific state
 		const tarotState = initializeTarotState(baseState);
-		
+
 		// Set up decks
 		tarotState.decks = {
 			[player1.id]: { draw: [...player1.deck], discard: [] },
 			[player2.id]: { draw: [...player2.deck], discard: [] }
 		};
-		
+
 		// Create match
 		const match: Match = {
 			id: matchId,
@@ -142,9 +185,15 @@ export class TarotGameServer {
 			]),
 			spectators: new Set()
 		};
-		
+
 		this.matches.set(matchId, match);
-		
+
+		logGame('GAME_MATCH_CREATED', {
+			matchId,
+			totalMatches: this.matches.size,
+			remainingQueue: this.playerQueue.length
+		});
+
 		// Notify players
 		const matchStartMessage = {
 			type: 'match_start',
@@ -153,19 +202,29 @@ export class TarotGameServer {
 			yourId: player1.id,
 			opponentId: player2.id
 		};
-		
+
+		logGame('GAME_PLAYER_NOTIFIED', {
+			matchId,
+			playerId: player1.id,
+			messageType: 'match_start'
+		});
 		player1.ws.send(JSON.stringify(matchStartMessage));
-		
+
+		logGame('GAME_PLAYER_NOTIFIED', {
+			matchId,
+			playerId: player2.id,
+			messageType: 'match_start'
+		});
 		player2.ws.send(JSON.stringify({
 			...matchStartMessage,
 			state: this.sanitizeStateForPlayer(tarotState, player2.id),
 			yourId: player2.id,
 			opponentId: player1.id
 		}));
-		
+
 		console.log(`Match started: ${matchId} with players ${player1.id} vs ${player2.id}`);
 	}
-	
+
 	private handleReady(playerId: string, message: any) {
 		// Find match containing this player
 		const match = this.findMatchByPlayer(playerId);
@@ -173,11 +232,11 @@ export class TarotGameServer {
 			console.error(`No match found for player ${playerId}`);
 			return;
 		}
-		
+
 		const player = match.players.get(playerId);
 		if (player) {
 			player.ready = true;
-			
+
 			// Check if both players are ready
 			const allReady = Array.from(match.players.values()).every(p => p.ready);
 			if (allReady) {
@@ -185,7 +244,7 @@ export class TarotGameServer {
 			}
 		}
 	}
-	
+
 	private startGameplay(match: Match) {
 		// Draw initial hands
 		const drawCount = 7;
@@ -198,25 +257,25 @@ export class TarotGameServer {
 				}) as TarotMatchState;
 			}
 		}
-		
+
 		// Broadcast initial state
 		this.broadcastState(match);
-		
+
 		// Start turn timer
 		this.startTurnTimer(match);
 	}
-	
+
 	private handleIntent(playerId: string, message: any) {
 		const match = this.findMatchByPlayer(playerId);
 		if (!match) {
 			console.error(`No match found for player ${playerId}`);
 			return;
 		}
-		
+
 		// Validate it's the player's turn (or a fast action)
 		const currentPlayer = match.state.players[match.state.turn % match.state.players.length];
 		const isFastAction = ['flip_orientation', 'peek', 'force_draw', 'block_flip'].includes(message.intent.type);
-		
+
 		if (currentPlayer !== playerId && !isFastAction) {
 			const player = match.players.get(playerId);
 			if (player) {
@@ -227,16 +286,16 @@ export class TarotGameServer {
 			}
 			return;
 		}
-		
+
 		// Apply intent
 		const intent: TarotIntent = {
 			...message.intent,
 			playerId
 		};
-		
+
 		try {
 			match.state = processTarotIntent(match.state, intent);
-			
+
 			// Check for victory
 			const winner = checkVictory(match.state);
 			if (winner) {
@@ -256,7 +315,7 @@ export class TarotGameServer {
 			}
 		}
 	}
-	
+
 	private handleSpectate(ws: any, matchId: string) {
 		const match = this.matches.get(matchId);
 		if (!match) {
@@ -266,9 +325,9 @@ export class TarotGameServer {
 			}));
 			return;
 		}
-		
+
 		match.spectators.add(ws);
-		
+
 		// Send current state
 		ws.send(JSON.stringify({
 			type: 'spectate_start',
@@ -276,11 +335,11 @@ export class TarotGameServer {
 			state: match.state
 		}));
 	}
-	
+
 	private handleDisconnect(playerId: string) {
 		// Remove from queue
 		this.playerQueue = this.playerQueue.filter(p => p.id !== playerId);
-		
+
 		// Check if in active match
 		const match = this.findMatchByPlayer(playerId);
 		if (match) {
@@ -293,7 +352,7 @@ export class TarotGameServer {
 					}));
 				}
 			}
-			
+
 			// End match with opponent as winner
 			const opponent = Array.from(match.players.keys()).find(id => id !== playerId);
 			if (opponent) {
@@ -301,7 +360,7 @@ export class TarotGameServer {
 			}
 		}
 	}
-	
+
 	private broadcastState(match: Match) {
 		// Send to players
 		for (const [playerId, player] of match.players) {
@@ -310,7 +369,7 @@ export class TarotGameServer {
 				state: this.sanitizeStateForPlayer(match.state, playerId)
 			}));
 		}
-		
+
 		// Send to spectators
 		for (const spectator of match.spectators) {
 			spectator.send(JSON.stringify({
@@ -319,11 +378,11 @@ export class TarotGameServer {
 			}));
 		}
 	}
-	
+
 	private sanitizeStateForPlayer(state: TarotMatchState, playerId: string): any {
 		// Hide opponent's hand and deck
 		const sanitized = { ...state };
-		
+
 		// Hide other players' hands
 		if (sanitized.hands) {
 			const hands = { ...sanitized.hands as any };
@@ -336,7 +395,7 @@ export class TarotGameServer {
 			}
 			sanitized.hands = hands;
 		}
-		
+
 		// Hide deck contents (just show counts)
 		if (sanitized.decks) {
 			const decks = { ...sanitized.decks as any };
@@ -350,10 +409,10 @@ export class TarotGameServer {
 			}
 			sanitized.decks = decks;
 		}
-		
+
 		return sanitized;
 	}
-	
+
 	private endMatch(match: Match, winner: string) {
 		// Calculate rewards
 		const rewards = {
@@ -361,7 +420,7 @@ export class TarotGameServer {
 			experience: 50,
 			cards: [] as string[]
 		};
-		
+
 		// Send results to players
 		for (const [playerId, player] of match.players) {
 			player.ws.send(JSON.stringify({
@@ -372,12 +431,12 @@ export class TarotGameServer {
 				finalState: match.state
 			}));
 		}
-		
+
 		// Clean up
 		this.matches.delete(match.id);
 		console.log(`Match ended: ${match.id}, winner: ${winner}`);
 	}
-	
+
 	private startTurnTimer(match: Match) {
 		// Implement turn timer (e.g., 90 seconds per turn)
 		// Auto-end turn if timer expires
@@ -390,7 +449,7 @@ export class TarotGameServer {
 			}
 		}, 90000);
 	}
-	
+
 	private findMatchByPlayer(playerId: string): Match | undefined {
 		for (const match of this.matches.values()) {
 			if (match.players.has(playerId)) {

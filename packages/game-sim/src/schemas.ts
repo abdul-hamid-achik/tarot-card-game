@@ -10,6 +10,7 @@ export const CardSchema = z.object({
   suit: z.enum(['wands', 'cups', 'swords', 'pentacles', 'major']),
   cost: z.number().int().min(0),
   type: z.enum(['spell', 'unit', 'artifact']),
+  spellSpeed: z.enum(['burst', 'fast', 'slow']).optional(), // For spells only
   upright: CardEffectSchema,
   reversed: CardEffectSchema,
   tags: z.array(z.string()).default([]),
@@ -36,7 +37,19 @@ export const MatchStateSchema = z.object({
   battlefield: z.record(z.unknown()),
   hands: z.record(z.unknown()),
   phase: z.enum(['draw', 'main', 'combat', 'end']).optional(),
+  // Priority and pass tracking
+  priorityPlayer: z.string().optional(),
+  passedPlayers: z.array(z.string()).optional(),
+  attackTokenOwner: z.string().optional(),
+  // Reaction and spell stack
   reactionWindow: z.object({ open: z.boolean(), responded: z.record(z.boolean()), originPlayerId: z.string().optional() }).optional(),
+  spellStack: z.array(z.object({ 
+    id: z.string(), 
+    playerId: z.string(), 
+    cardId: z.string(),
+    spellSpeed: z.enum(['burst', 'fast', 'slow']).optional(),
+    targets: z.array(z.string()).optional()
+  })).optional(),
   triggerQueue: z.array(z.object({ id: z.string(), playerId: z.string().optional() })).optional(),
   trials: z.record(z.record(z.union([z.number(), z.boolean()]))).optional(),
   orientations: z.record(z.enum(['upright', 'reversed'])).optional(),
@@ -56,6 +69,11 @@ export const IntentPlayCardSchema = z.object({
   target: z.string().optional(),
 });
 
+export const IntentPassSchema = z.object({
+  type: z.literal('pass'),
+  playerId: z.string(),
+});
+
 export const IntentEndTurnSchema = z.object({
   type: z.literal('end_turn'),
   playerId: z.string(),
@@ -69,6 +87,7 @@ export const IntentDrawSchema = z.object({
 
 export const IntentSchema = z.discriminatedUnion('type', [
   IntentPlayCardSchema,
+  IntentPassSchema,
   IntentEndTurnSchema,
   IntentDrawSchema,
 ]);
@@ -99,6 +118,7 @@ export const IntentBlockFlipSchema = z.object({
 
 export const ExtendedIntentSchema = z.discriminatedUnion('type', [
   IntentPlayCardSchema,
+  IntentPassSchema,
   IntentEndTurnSchema,
   IntentDrawSchema,
   IntentFlipOrientationSchema,
@@ -111,6 +131,10 @@ export const ExtendedIntentSchema = z.discriminatedUnion('type', [
     pastId: z.string().optional(),
     presentId: z.string().optional(),
     futureId: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal('initiate_combat'),
+    playerId: z.string(),
   }),
 ]);
 

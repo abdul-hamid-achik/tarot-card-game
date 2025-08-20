@@ -1,3 +1,5 @@
+import { gameLogger } from '@tarot/game-logger';
+
 class AudioManager {
   private sounds: Map<string, HTMLAudioElement[]> = new Map();
   private audioPool: HTMLAudioElement[] = []; // Pool of reusable audio elements
@@ -49,6 +51,14 @@ class AudioManager {
         basePath: this.basePath,
         userAgent: navigator.userAgent
       });
+
+      gameLogger.logAction('audio_manager_init', {
+        isSafari: this.isSafari,
+        basePath: this.basePath,
+        poolSize: this.poolSize,
+        userAgent: navigator.userAgent
+      }, true, 'AudioManager initialized');
+
       this.initialize();
       this.initializeAudioPool();
       this.setupSafariUserInteractionTracking();
@@ -84,10 +94,20 @@ class AudioManager {
 
   // Enable audio with proper user interaction
   async enableAudio(): Promise<boolean> {
-    if (this.audioEnabled) return true;
+    if (this.audioEnabled) {
+      gameLogger.logAction('audio_already_enabled', {
+        audioEnabled: this.audioEnabled
+      }, true, 'Audio system is already enabled');
+      return true;
+    }
 
     try {
       console.log('🎵 Enabling audio system...');
+
+      gameLogger.logAction('audio_enable_start', {
+        isSafari: this.isSafari,
+        currentAudioEnabled: this.audioEnabled
+      }, true, 'Starting audio system enable process');
 
       // Resume audio context if it's suspended (required by modern browsers)
       if (typeof window !== 'undefined' && window.AudioContext) {
@@ -150,6 +170,10 @@ class AudioManager {
       if (!unlockSuccessful) {
         // Last resort: create a user interaction dependent unlock
         console.warn('🎵 Standard autoplay unlock failed, will unlock on user interaction');
+        gameLogger.logAction('audio_enable_failed', {
+          reason: 'autoplay_unlock_failed',
+          isSafari: this.isSafari
+        }, false, 'Audio system enable failed - autoplay unlock unsuccessful');
         this.audioEnabled = false;
         localStorage.removeItem('audioEnabled');
         return false;
@@ -158,9 +182,18 @@ class AudioManager {
       this.audioEnabled = true;
       localStorage.setItem('audioEnabled', 'true');
       console.log('🎵 Audio system enabled successfully');
+
+      gameLogger.logAction('audio_enable_success', {
+        isSafari: this.isSafari,
+        audioEnabled: this.audioEnabled
+      }, true, 'Audio system enabled successfully');
       return true;
     } catch (error) {
       console.error('🎵 Failed to enable audio:', error);
+      gameLogger.logAction('audio_enable_error', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        isSafari: this.isSafari
+      }, false, 'Audio system enable failed with error');
       this.audioEnabled = false;
       localStorage.removeItem('audioEnabled');
       return false;
@@ -298,6 +331,12 @@ class AudioManager {
     if (typeof window === 'undefined') return;
     if (!this.initialized) this.initialize();
     if (this.muted || !this.audioEnabled) {
+      gameLogger.logAction('audio_play_skipped', {
+        soundName,
+        muted: this.muted,
+        audioEnabled: this.audioEnabled,
+        reason: this.muted ? 'muted' : 'audio_disabled'
+      }, false, 'Audio play skipped due to audio being disabled or muted');
       return;
     }
 
@@ -335,6 +374,13 @@ class AudioManager {
       }
 
       console.log('🎵 Playing sound:', soundName);
+
+      gameLogger.logAction('audio_play_start', {
+        soundName,
+        isSafari: this.isSafari,
+        volume: this.volume,
+        fileExtension: this.isSafari ? 'mp3' : 'wav'
+      }, true, 'Starting audio play');
 
       // Get an available audio element from the pool
       const audio = this.getAvailableAudioElement();
@@ -431,8 +477,21 @@ class AudioManager {
       this.playTimestamps.push(now);
 
       console.log('🎵 Successfully played:', soundName);
+
+      gameLogger.logAction('audio_play_success', {
+        soundName,
+        isSafari: this.isSafari,
+        volume: this.volume
+      }, true, 'Audio played successfully');
     } catch (error) {
       console.error('🎵 Error playing sound:', soundName, error);
+
+      gameLogger.logAction('audio_play_error', {
+        soundName,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        isSafari: this.isSafari,
+        volume: this.volume
+      }, false, 'Audio play failed with error');
     }
   }
 
@@ -509,6 +568,7 @@ class AudioManager {
   // Volume control
   setVolume(volume: number): void {
     if (typeof window === 'undefined') return;
+    const oldVolume = this.volume;
     this.volume = Math.max(0, Math.min(1, volume));
     localStorage.setItem('gameVolume', this.volume.toString());
 
@@ -516,6 +576,12 @@ class AudioManager {
     this.audioPool.forEach(audio => {
       audio.volume = this.volume;
     });
+
+    gameLogger.logAction('audio_volume_changed', {
+      oldVolume,
+      newVolume: this.volume,
+      audioEnabled: this.audioEnabled
+    }, true, 'Audio volume changed');
   }
 
   // Check if audio is enabled
@@ -526,8 +592,15 @@ class AudioManager {
   // Mute control
   setMuted(muted: boolean): void {
     if (typeof window === 'undefined') return;
+    const oldMuted = this.muted;
     this.muted = muted;
     localStorage.setItem('gameMuted', muted.toString());
+
+    gameLogger.logAction('audio_mute_changed', {
+      oldMuted,
+      newMuted: this.muted,
+      audioEnabled: this.audioEnabled
+    }, !muted, 'Audio mute state changed');
   }
 
   toggleMute(): void {

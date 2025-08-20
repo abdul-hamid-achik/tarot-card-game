@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { PixelButton } from '@/components/ui/pixel-button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { UserProfile } from '@/components/auth/UserProfile';
+import { UserProfile, UserStatus } from '@/components/auth/UserProfile';
 import {
   Swords,
   Trophy,
@@ -120,6 +120,11 @@ export function MainMenu() {
         {/* User Profile */}
         <div className="absolute top-4 right-4">
           <UserProfile />
+        </div>
+
+        {/* User Status */}
+        <div className="absolute top-4 left-4">
+          <UserStatus />
         </div>
 
         {/* Header */}

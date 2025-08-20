@@ -1,24 +1,81 @@
-name: CI
+name: CI & Deploy to Vercel
 
 on:
   push:
-    branches: [ main, master ]
-  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
-  build-and-test:
+  test:
+    name: Test & Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '22'
           cache: 'npm'
-      - name: Install
-        run: npm install --ignore-scripts
-      - name: Lint
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
         run: npm run lint
-      - name: Build
-        run: npm run build --if-present
-      - name: Test
-        run: npm test
+
+      - name: Build packages
+        run: npm run build:deps
+
+      - name: Run tests
+        run: npm run test
+
+      - name: Build web app
+        run: npm run -w @tarot/web build
+
+      - name: Build docs app
+        run: npm run -w @tarot/docs build
+
+      - name: Run web E2E tests
+        run: npm run -w @tarot/web test
+        env:
+          CI: true
+
+  deploy:
+    name: Deploy to Vercel
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Deploy Web App to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
+          working-directory: ./apps/web
+          vercel-args: '--prod'
+
+      - name: Deploy Docs to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_DOCS_PROJECT_ID }}
+          working-directory: ./apps/docs
+          vercel-args: '--prod'

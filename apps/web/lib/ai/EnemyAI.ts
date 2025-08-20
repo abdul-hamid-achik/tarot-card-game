@@ -1,4 +1,5 @@
 import { Card, CardSuit, GamePhase, BoardSlot } from '@/lib/store/gameStore';
+import { gameLogger } from '@tarot/game-logger';
 
 export type AIPersonality = 'aggressive' | 'defensive' | 'balanced' | 'chaotic' | 'strategic';
 export type AIDifficulty = 'novice' | 'apprentice' | 'adept' | 'master' | 'legendary';
@@ -6,7 +7,7 @@ export type AIDifficulty = 'novice' | 'apprentice' | 'adept' | 'master' | 'legen
 export interface AIConfig {
   personality: AIPersonality;
   difficulty: AIDifficulty;
-  
+
   // Decision weights (0-1)
   aggressionLevel: number;      // Preference for attacking
   defenseLevel: number;          // Preference for defense
@@ -14,7 +15,7 @@ export interface AIConfig {
   cardPlayRate: number;         // How many cards to play per turn
   reactionSpeed: number;        // Time to make decisions (ms)
   mistakeChance: number;        // Chance to make suboptimal plays
-  
+
   // Strategic preferences
   preferredSuits?: CardSuit[];
   trialFocus: boolean;          // Focus on completing trials
@@ -133,7 +134,7 @@ export const enemyTemplates: Enemy[] = [
     defeatLine: "I wasn't... fast enough...",
     victoryLine: "Speed beats strength every time."
   },
-  
+
   // Region 2 - Apprentice/Adept Enemies
   {
     id: 'mystic_scholar',
@@ -195,7 +196,7 @@ export const enemyTemplates: Enemy[] = [
     defeatLine: "The flames... extinguished...",
     victoryLine: "You got burned!"
   },
-  
+
   // Region 3 - Master/Legendary Bosses
   {
     id: 'arcanum_master',
@@ -263,16 +264,24 @@ export class EnemyAI {
   private enemy: Enemy;
   private config: AIConfig;
   private lastPlayTime: number = 0;
-  
+
   constructor(enemy: Enemy) {
     this.enemy = enemy;
     this.config = { ...enemy.config };
-    
+
     // Apply difficulty modifiers
     const difficultyMods = difficultyPresets[enemy.difficulty];
     this.config = { ...this.config, ...difficultyMods };
+
+    gameLogger.logAction('ai_initialized', {
+      enemyId: enemy.id,
+      name: enemy.name,
+      personality: enemy.personality,
+      difficulty: enemy.difficulty,
+      config: this.config
+    }, true, 'AI opponent initialized');
   }
-  
+
   // Evaluate board state and return a score
   private evaluateBoardState(
     myBoard: BoardSlot[],
@@ -281,15 +290,15 @@ export class EnemyAI {
     enemyHealth: number
   ): number {
     let score = 0;
-    
+
     // Health advantage
     score += (myHealth - enemyHealth) * 2;
-    
+
     // Board presence
     const myUnits = myBoard.filter(slot => slot.card).length;
     const enemyUnits = enemyBoard.filter(slot => slot.card).length;
     score += (myUnits - enemyUnits) * 5;
-    
+
     // Total stats on board
     const myStats = myBoard.reduce((sum, slot) => {
       if (slot.card?.type === 'unit') {
@@ -297,19 +306,19 @@ export class EnemyAI {
       }
       return sum;
     }, 0);
-    
+
     const enemyStats = enemyBoard.reduce((sum, slot) => {
       if (slot.card?.type === 'unit') {
         return sum + (slot.card.attack || 0) + (slot.card.health || 0);
       }
       return sum;
     }, 0);
-    
+
     score += (myStats - enemyStats);
-    
+
     return score;
   }
-  
+
   // Decide which card to play
   async decideCardToPlay(
     hand: Card[],
@@ -318,34 +327,58 @@ export class EnemyAI {
     enemyBoard: BoardSlot[],
     phase: GamePhase
   ): Promise<{ card: Card; targetSlot?: number } | null> {
+    gameLogger.logAction('ai_decide_card_start', {
+      enemyId: this.enemy.id,
+      enemyName: this.enemy.name,
+      handSize: hand.length,
+      availableFate,
+      phase,
+      personality: this.config.personality
+    }, true, 'AI starting card decision process');
+
     // Simulate thinking time
     await new Promise(resolve => setTimeout(resolve, this.config.reactionSpeed));
-    
+
     // Check if we should play a card based on play rate
     if (Math.random() > this.config.cardPlayRate) {
+      gameLogger.logAction('ai_skip_play', {
+        enemyId: this.enemy.id,
+        reason: 'play_rate_check_failed',
+        cardPlayRate: this.config.cardPlayRate
+      }, true, 'AI chose not to play a card');
       return null;
     }
-    
+
     // Filter playable cards
     const playableCards = hand.filter(card => card.cost <= availableFate);
     if (playableCards.length === 0) return null;
-    
+
     // Apply mistake chance
     if (Math.random() < this.config.mistakeChance) {
       // Make a random play
       const randomCard = playableCards[Math.floor(Math.random() * playableCards.length)];
       const emptySlots = board.map((slot, i) => !slot.card ? i : -1).filter(i => i >= 0);
       const targetSlot = emptySlots[Math.floor(Math.random() * emptySlots.length)];
+
+      gameLogger.logAction('ai_mistake_play', {
+        enemyId: this.enemy.id,
+        enemyName: this.enemy.name,
+        mistakeChance: this.config.mistakeChance,
+        selectedCard: randomCard.name,
+        targetSlot,
+        availableCards: playableCards.length
+      }, false, 'AI made suboptimal play due to mistake chance');
+
       return { card: randomCard, targetSlot };
     }
-    
+
     // Strategic card selection based on personality
     let selectedCard: Card | null = null;
     let bestScore = -Infinity;
-    
+
     for (const card of playableCards) {
       let score = 0;
-      
+
       // Personality-based scoring
       switch (this.config.personality) {
         case 'aggressive':
@@ -353,49 +386,65 @@ export class EnemyAI {
           score -= (card.health || 0) * 0.5;
           if (card.type === 'spell' && card.description?.includes('damage')) score += 10;
           break;
-          
+
         case 'defensive':
           score += (card.health || 0) * 3;
           score += (card.attack || 0) * 0.5;
           if (card.description?.includes('heal') || card.description?.includes('taunt')) score += 10;
           break;
-          
+
         case 'strategic':
           // Prefer cards that match trials or have synergy
           if (this.config.trialFocus && card.suit === 'major') score += 15;
           if (card.type === 'spell') score += 5;
           score += (card.cost / availableFate) * 5; // Efficient fate usage
           break;
-          
+
         case 'chaotic':
           // Random preferences that change
           score = Math.random() * 20;
           break;
-          
+
         case 'balanced':
           score += (card.attack || 0) * 2;
           score += (card.health || 0) * 2;
           score += card.cost; // Value higher cost cards
           break;
       }
-      
+
       // Suit preferences
       if (this.config.preferredSuits?.includes(card.suit)) {
         score += 5;
       }
-      
+
       if (score > bestScore) {
         bestScore = score;
         selectedCard = card;
       }
     }
-    
-    if (!selectedCard) return null;
-    
+
+    if (!selectedCard) {
+      gameLogger.logAction('ai_no_card_selected', {
+        enemyId: this.enemy.id,
+        enemyName: this.enemy.name,
+        playableCards: playableCards.length,
+        reason: 'no_card_met_criteria'
+      }, false, 'AI could not find suitable card to play');
+      return null;
+    }
+
     // Find best slot for placement
     const emptySlots = board.map((slot, i) => !slot.card ? i : -1).filter(i => i >= 0);
-    if (emptySlots.length === 0) return null;
-    
+    if (emptySlots.length === 0) {
+      gameLogger.logAction('ai_no_slot_available', {
+        enemyId: this.enemy.id,
+        enemyName: this.enemy.name,
+        selectedCard: selectedCard.name,
+        reason: 'board_full'
+      }, false, 'AI could not find slot for card placement');
+      return null;
+    }
+
     // Strategic placement
     let targetSlot = emptySlots[0];
     if (this.config.boardControl) {
@@ -404,41 +453,121 @@ export class EnemyAI {
     } else {
       targetSlot = emptySlots[Math.floor(Math.random() * emptySlots.length)];
     }
-    
+
+    gameLogger.logAction('ai_card_selected', {
+      enemyId: this.enemy.id,
+      enemyName: this.enemy.name,
+      selectedCard: selectedCard.name,
+      cardSuit: selectedCard.suit,
+      cardType: selectedCard.type,
+      targetSlot,
+      emptySlots: emptySlots.length,
+      personality: this.config.personality,
+      strategicPlacement: this.config.boardControl
+    }, true, 'AI successfully selected and placed a card');
+
     return { card: selectedCard, targetSlot };
   }
-  
+
   // Decide whether to use fate
   shouldUseFate(currentFate: number, maxFate: number): boolean {
-    if (currentFate === 0) return false;
-    
+    if (currentFate === 0) {
+      gameLogger.logAction('ai_fate_check', {
+        enemyId: this.enemy.id,
+        enemyName: this.enemy.name,
+        currentFate,
+        maxFate,
+        result: false,
+        reason: 'no_fate_available'
+      }, true, 'AI cannot use fate - none available');
+      return false;
+    }
+
     // Check fate usage preference
-    if (Math.random() > this.config.fateUsage) return false;
-    
+    if (Math.random() > this.config.fateUsage) {
+      gameLogger.logAction('ai_fate_check', {
+        enemyId: this.enemy.id,
+        enemyName: this.enemy.name,
+        currentFate,
+        maxFate,
+        fateUsage: this.config.fateUsage,
+        result: false,
+        reason: 'usage_preference'
+      }, true, 'AI chose not to use fate based on usage preference');
+      return false;
+    }
+
     // More likely to use fate when full
     const fateRatio = currentFate / maxFate;
-    return Math.random() < fateRatio;
+    const willUse = Math.random() < fateRatio;
+
+    gameLogger.logAction('ai_fate_check', {
+      enemyId: this.enemy.id,
+      enemyName: this.enemy.name,
+      currentFate,
+      maxFate,
+      fateRatio,
+      fateUsage: this.config.fateUsage,
+      result: willUse,
+      reason: willUse ? 'ratio_check_passed' : 'ratio_check_failed'
+    }, willUse, `AI ${willUse ? 'will' : 'will not'} use fate`);
+
+    return willUse;
   }
-  
+
   // Get a taunt line
   getTauntLine(): string {
-    return this.enemy.tauntLines[Math.floor(Math.random() * this.enemy.tauntLines.length)];
+    const tauntLine = this.enemy.tauntLines[Math.floor(Math.random() * this.enemy.tauntLines.length)];
+
+    gameLogger.logAction('ai_taunt', {
+      enemyId: this.enemy.id,
+      enemyName: this.enemy.name,
+      tauntLine,
+      personality: this.config.personality,
+      availableTaunts: this.enemy.tauntLines.length
+    }, true, 'AI generated taunt line');
+
+    return tauntLine;
   }
-  
+
   // React to player actions
   async reactToPlayerAction(
     action: string,
     gameState: any
   ): Promise<any> {
+    gameLogger.logAction('ai_react_start', {
+      enemyId: this.enemy.id,
+      enemyName: this.enemy.name,
+      action,
+      personality: this.config.personality,
+      difficulty: this.config.difficulty
+    }, true, 'AI reacting to player action');
+
     // Quick reactions for higher difficulty
     await new Promise(resolve => setTimeout(resolve, this.config.reactionSpeed / 2));
-    
+
     // Analyze if we should respond
     if (action === 'play_card' && this.config.personality === 'defensive') {
       // Consider counter-play
+      gameLogger.logAction('ai_counter_play', {
+        enemyId: this.enemy.id,
+        enemyName: this.enemy.name,
+        triggerAction: action,
+        personality: this.config.personality,
+        reason: 'defensive_personality'
+      }, true, 'AI considering counter-play due to defensive personality');
+
       return { type: 'consider_counter' };
     }
-    
+
+    gameLogger.logAction('ai_no_reaction', {
+      enemyId: this.enemy.id,
+      enemyName: this.enemy.name,
+      action,
+      personality: this.config.personality,
+      reason: 'no_matching_conditions'
+    }, true, 'AI chose not to react to player action');
+
     return null;
   }
 }
