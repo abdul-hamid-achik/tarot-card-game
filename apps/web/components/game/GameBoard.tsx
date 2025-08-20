@@ -284,6 +284,24 @@ export function GameBoard() {
             <div className="absolute bottom-8 right-8 flex gap-3">
               {isMyTurn ? (
                 <>
+                  {currentMatch.phase === 'draw' && (
+                    <PixelButton
+                      size="lg"
+                      variant="blue"
+                      onClick={() => {
+                        gameLogger.logAction('continue_to_main', {
+                          playerId: currentPlayerId,
+                          phase: currentMatch.phase
+                        }, true);
+                        endTurn(); // This will transition from draw to main
+                        audioManager.playRandom('turnChange');
+                      }}
+                      className="animate-pulse"
+                    >
+                      CONTINUE
+                    </PixelButton>
+                  )}
+
                   {currentMatch.phase === 'main' && (
                     <PixelButton
                       size="lg"
@@ -351,6 +369,24 @@ export function GameBoard() {
                       }}
                     >
                       END TURN
+                    </PixelButton>
+                  )}
+
+                  {currentMatch.phase === 'end' && (
+                    <PixelButton
+                      size="lg"
+                      variant="green"
+                      onClick={() => {
+                        gameLogger.logAction('start_new_turn', {
+                          playerId: currentPlayerId,
+                          phase: currentMatch.phase
+                        }, true);
+                        endTurn(); // This will transition from end to draw (new turn)
+                        audioManager.playRandom('turnChange');
+                      }}
+                      className="animate-pulse"
+                    >
+                      START NEW TURN
                     </PixelButton>
                   )}
                 </>

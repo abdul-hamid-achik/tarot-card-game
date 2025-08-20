@@ -553,6 +553,78 @@ export const useGameStore = create<GameStore>()(
         const current = match.activePlayer;
         const opponent = playerIds.find(id => id !== current) || current;
 
+        // Handle phase transitions
+        if (match.phase === 'draw') {
+          // Move from draw phase to main phase
+          gameLogger.logPhaseTransition(match.phase, 'main');
+          withGameLogging.phaseChange(gameLogger, match.phase, 'main', 'Draw phase completed');
+          set({
+            currentMatch: {
+              ...match,
+              phase: 'main',
+              lastPassBy: null,
+              reactionWindow: { active: false },
+            }
+          });
+          return;
+        }
+
+        if (match.phase === 'end') {
+          // Move from end phase to new turn (draw phase)
+          const newTokenOwner = match.attackTokenOwner && match.attackTokenOwner === current ? opponent : current;
+          const updatedPlayers: Record<string, Player> = { ...match.players };
+
+          // Update resources and draw cards for new turn
+          for (const pid of playerIds) {
+            const p = updatedPlayers[pid];
+            const carry = Math.max(0, p.fate);
+            const newSpell = Math.min(3, (p.spellMana || 0) + carry);
+            const newMax = Math.min(10, (p.maxFate || 0) + 1);
+            let newHand = [...p.hand];
+            let newDeck = [...p.deck];
+
+            // Draw card
+            if (newDeck.length > 0) {
+              const drawn = newDeck.shift();
+              if (drawn) {
+                newHand.push(drawn);
+                gameLogger.logAction('draw_card', {
+                  playerId: pid,
+                  cardName: drawn.name,
+                  handSize: newHand.length,
+                  deckSize: newDeck.length
+                }, true, 'Turn draw');
+              }
+            }
+
+            updatedPlayers[pid] = {
+              ...p,
+              maxFate: newMax,
+              fate: newMax,
+              spellMana: newSpell,
+              hand: newHand,
+              deck: newDeck,
+            };
+          }
+
+          gameLogger.logTurnStart(newTokenOwner || current, match.turn + 1, 'draw');
+          withGameLogging.phaseChange(gameLogger, match.phase, 'draw', 'New turn started');
+
+          set({
+            currentMatch: {
+              ...match,
+              turn: match.turn + 1,
+              phase: 'draw',
+              activePlayer: newTokenOwner || current,
+              attackTokenOwner: newTokenOwner || current,
+              lastPassBy: null,
+              reactionWindow: { active: false },
+              players: updatedPlayers,
+            }
+          });
+          return;
+        }
+
         // If opponent passed last action too → end round
         const bothPassed = match.lastPassBy === opponent;
 
@@ -572,7 +644,7 @@ export const useGameStore = create<GameStore>()(
           });
 
           // If attack token owner has units and opponent has units, go to combat phase
-          if (hasAttackers && hasBlockers && attackTokenOwner === current) {
+          if (hasAttackers && hasBlockers && attackTokenOwner === current && match.phase === 'main') {
             withGameLogging.phaseChange(gameLogger, match.phase, 'combat', 'Both players passed, units present');
             set({
               currentMatch: {
