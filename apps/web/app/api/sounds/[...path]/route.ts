@@ -4,14 +4,28 @@ import path from 'node:path';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(_req: Request, { params }: { params: { path: string[] } }) {
+export async function GET(req: Request, { params }: { params: { path: string[] } }) {
     const repoRoot = path.resolve(process.cwd(), '..', '..');
     const soundsRoot = path.join(repoRoot, 'packages', 'assets', 'sounds');
     const safeRel = params.path.join('/');
-    const abs = path.join(soundsRoot, safeRel);
+
+    // Check if this is a Safari browser (based on user agent)
+    const userAgent = req.headers.get('user-agent') || '';
+    const isSafari = /^((?!chrome|android).)*safari/i.test(userAgent);
+
+    let abs = path.join(soundsRoot, safeRel);
     if (!abs.startsWith(soundsRoot)) {
         return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
     }
+
+    // For Safari, try to serve MP3 version if it exists and requested file is WAV
+    if (isSafari && abs.endsWith('.wav')) {
+        const mp3Path = abs.replace('.wav', '.mp3');
+        if (fs.existsSync(mp3Path)) {
+            abs = mp3Path;
+        }
+    }
+
     try {
         const stat = fs.statSync(abs);
         if (!stat.isFile()) throw new Error('Not a file');

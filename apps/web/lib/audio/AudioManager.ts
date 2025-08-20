@@ -5,6 +5,7 @@ class AudioManager {
   private volume: number = 0.7;
   private muted: boolean = false;
   private basePath: string = '/api/sounds/effects/';
+  private isSafari: boolean = false;
   private initialized: boolean = false;
   private audioEnabled: boolean = false;
 
@@ -43,8 +44,10 @@ class AudioManager {
   constructor() {
     // Only access localStorage on client side
     if (typeof window !== 'undefined') {
+      this.isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
       this.initialize();
       this.initializeAudioPool();
+      this.setupSafariUserInteractionTracking();
     }
   }
 
@@ -92,17 +95,56 @@ class AudioManager {
         }
       }
 
-      // Create a silent test audio to unlock autoplay
-      const testAudio = new Audio();
-      testAudio.volume = 0.01; // Very quiet
-      testAudio.muted = true;
+      // Safari-specific handling: Create multiple test audio attempts
+      const testAudios: HTMLAudioElement[] = [];
 
-      // Try to play a silent sound to unlock autoplay
-      const playPromise = testAudio.play();
-      if (playPromise !== undefined) {
-        await playPromise;
-        testAudio.pause();
-        testAudio.remove();
+      // Try different approaches for Safari compatibility
+      for (let i = 0; i < 3; i++) {
+        const testAudio = new Audio();
+        testAudio.volume = 0.001; // Extremely quiet for Safari
+        testAudio.muted = true;
+        testAudio.preload = 'auto';
+
+        // For Safari, we need to handle the audio differently
+        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+        if (isSafari) {
+          // Safari specific handling
+          testAudio.setAttribute('playsinline', 'playsinline');
+          testAudio.setAttribute('webkit-playsinline', 'webkit-playsinline');
+          testAudio.crossOrigin = 'anonymous';
+
+          // Try loading a very short silent sound
+          testAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IAAAAAEAAQAiAAAAEAAAAAEACABkYXRhAgAAAAEA';
+        }
+
+        testAudios.push(testAudio);
+      }
+
+      // Try to play silent sounds to unlock autoplay (Safari requires this)
+      let unlockSuccessful = false;
+      for (const testAudio of testAudios) {
+        try {
+          const playPromise = testAudio.play();
+          if (playPromise !== undefined) {
+            await playPromise;
+            testAudio.pause();
+            testAudio.remove();
+            unlockSuccessful = true;
+            console.log('🎵 Autoplay unlocked successfully');
+            break;
+          }
+        } catch (playError) {
+          console.warn('🎵 Test audio play failed:', playError);
+          testAudio.remove();
+        }
+      }
+
+      if (!unlockSuccessful) {
+        // Last resort: create a user interaction dependent unlock
+        console.warn('🎵 Standard autoplay unlock failed, will unlock on user interaction');
+        this.audioEnabled = false;
+        localStorage.removeItem('audioEnabled');
+        return false;
       }
 
       this.audioEnabled = true;
@@ -142,12 +184,100 @@ class AudioManager {
     this.initialized = true;
   }
 
+  // Safari fallback method for audio playback
+  private async handleSafariFallback(audio: HTMLAudioElement, soundName: string): Promise<void> {
+    // Check if we have a recent user interaction
+    const lastInteraction = parseInt(localStorage.getItem('lastUserInteraction') || '0');
+    const now = Date.now();
+    const timeSinceInteraction = now - lastInteraction;
+
+    if (timeSinceInteraction > 5000) { // 5 seconds
+      console.warn('🎵 No recent user interaction for Safari audio');
+      return;
+    }
+
+    // Try alternative audio loading for Safari
+    try {
+      // Create a new audio element specifically for Safari
+      const safariAudio = new Audio();
+      safariAudio.setAttribute('playsinline', 'playsinline');
+      safariAudio.setAttribute('webkit-playsinline', 'webkit-playsinline');
+      safariAudio.crossOrigin = 'anonymous';
+      safariAudio.volume = this.volume;
+      safariAudio.muted = false;
+
+      // Try loading with fetch first (Safari sometimes needs this)
+      const response = await fetch(`${this.basePath}${soundName}.wav`);
+      const arrayBuffer = await response.arrayBuffer();
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+      // Create a source and play it
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContext.destination);
+      source.start(0);
+
+      console.log('🎵 Safari fallback successful for:', soundName);
+    } catch (fallbackError) {
+      console.error('🎵 Safari Web Audio fallback failed:', fallbackError);
+    }
+  }
+
+  // Track user interactions for Safari
+  private setupSafariUserInteractionTracking(): void {
+    if (typeof window === 'undefined') return;
+
+    const trackInteraction = () => {
+      localStorage.setItem('lastUserInteraction', Date.now().toString());
+    };
+
+    // Track various user interaction events
+    const events = ['click', 'touchstart', 'keydown', 'scroll'];
+    events.forEach(event => {
+      document.addEventListener(event, trackInteraction, { passive: true });
+    });
+  }
+
+  // Debug method to help troubleshoot Safari audio issues
+  public debugAudioStatus(): void {
+    if (typeof window === 'undefined') return;
+
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    const lastInteraction = parseInt(localStorage.getItem('lastUserInteraction') || '0');
+    const timeSinceInteraction = Date.now() - lastInteraction;
+
+    console.log('🎵 Audio Debug Info:', {
+      isSafari,
+      audioEnabled: this.audioEnabled,
+      audioEnabledInStorage: localStorage.getItem('audioEnabled'),
+      volume: this.volume,
+      muted: this.muted,
+      fileFormat: this.isSafari ? 'MP3 (Safari optimized)' : 'WAV (standard)',
+      lastUserInteraction: new Date(lastInteraction).toLocaleString(),
+      timeSinceInteraction: `${Math.round(timeSinceInteraction / 1000)}s ago`,
+      userAgent: navigator.userAgent,
+      audioContextState: (window.AudioContext || (window as any).webkitAudioContext)
+        ? 'Available'
+        : 'Not Available'
+    });
+  }
+
   // Preload a sound
   private async preloadSound(soundName: string): Promise<void> {
     if (typeof window === 'undefined') return;
     if (this.sounds.has(soundName)) return;
 
-    const audio = new Audio(`${this.basePath}${soundName}.wav`);
+    // Use MP3 for Safari, WAV for others
+    const fileExtension = this.isSafari ? 'mp3' : 'wav';
+    const audio = new Audio(`${this.basePath}${soundName}.${fileExtension}`);
+
+    if (this.isSafari) {
+      audio.setAttribute('playsinline', 'playsinline');
+      audio.setAttribute('webkit-playsinline', 'webkit-playsinline');
+      audio.crossOrigin = 'anonymous';
+    }
+
     audio.volume = this.volume;
     audio.preload = 'auto';
 
@@ -160,7 +290,6 @@ class AudioManager {
     if (typeof window === 'undefined') return;
     if (!this.initialized) this.initialize();
     if (this.muted || !this.audioEnabled) {
-      console.log('🎵 Audio play skipped:', { soundName, muted: this.muted, audioEnabled: this.audioEnabled });
       return;
     }
 
@@ -202,20 +331,39 @@ class AudioManager {
       // Get an available audio element from the pool
       const audio = this.getAvailableAudioElement();
 
-      // Set the source and volume
-      audio.src = `${this.basePath}${soundName}.wav`;
+      // Safari-specific audio setup
+      if (this.isSafari) {
+        // Safari requires these attributes for audio to work properly
+        audio.setAttribute('playsinline', 'playsinline');
+        audio.setAttribute('webkit-playsinline', 'webkit-playsinline');
+        audio.crossOrigin = 'anonymous';
+      }
+
+      // Set the source and volume - prefer MP3 for Safari, WAV for others
+      const fileExtension = this.isSafari ? 'mp3' : 'wav';
+      audio.src = `${this.basePath}${soundName}.${fileExtension}`;
       audio.volume = this.volume;
       audio.currentTime = 0;
       audio.muted = false;
 
-      // Wait for the audio to be loadable
+      // Wait for the audio to be loadable with Safari-specific timeout
       const canPlay = await new Promise<boolean>((resolve) => {
+        const timeout = setTimeout(() => {
+          console.warn('🎵 Audio load timeout for:', soundName);
+          resolve(false);
+        }, this.isSafari ? 2000 : 1000); // Longer timeout for Safari
+
         const onCanPlay = () => {
+          clearTimeout(timeout);
           audio.removeEventListener('canplay', onCanPlay);
+          audio.removeEventListener('error', onError);
           resolve(true);
         };
-        const onError = () => {
+        const onError = (event: Event) => {
+          clearTimeout(timeout);
+          audio.removeEventListener('canplay', onCanPlay);
           audio.removeEventListener('error', onError);
+          console.warn('🎵 Audio load error:', soundName, event);
           resolve(false);
         };
 
@@ -231,18 +379,39 @@ class AudioManager {
         return;
       }
 
-      // Play the sound
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        await playPromise.catch(error => {
-          // Handle autoplay policy issues
-          if (error.name === 'NotAllowedError' || error.name === 'NotSupportedError') {
-            console.warn('🎵 Audio play blocked by browser. User interaction required.');
-            this.audioEnabled = false;
-            return;
+      // Play the sound with Safari-specific error handling
+      try {
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          await playPromise.catch(error => {
+            // Handle autoplay policy issues
+            if (error.name === 'NotAllowedError' || error.name === 'NotSupportedError') {
+              console.warn('🎵 Audio play blocked by browser. User interaction required.');
+              console.warn('🎵 Error details:', {
+                name: error.name,
+                message: error.message,
+                browser: navigator.userAgent,
+                audioEnabled: this.audioEnabled,
+                isSafari: this.isSafari
+              });
+              this.audioEnabled = false;
+              return;
+            }
+            console.warn('🎵 Failed to play sound:', soundName, error);
+          });
+        }
+      } catch (playError) {
+        console.error('🎵 Play method threw error:', soundName, playError);
+        // For Safari, try a different approach
+        if (this.isSafari) {
+          console.log('🎵 Attempting Safari fallback for:', soundName);
+          try {
+            // Force a user interaction check
+            await this.handleSafariFallback(audio, soundName);
+          } catch (fallbackError) {
+            console.error('🎵 Safari fallback failed:', fallbackError);
           }
-          console.warn('🎵 Failed to play sound:', soundName, error);
-        });
+        }
       }
 
       // Mark timestamps for throttling

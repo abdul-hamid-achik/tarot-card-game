@@ -15,6 +15,8 @@ import { CardOverlay } from './CardOverlay';
 import { PixelButton } from '@/components/ui/pixel-button';
 import { cn } from '@/lib/utils';
 import { audioManager } from '@/lib/audio/AudioManager';
+import { gameLogger } from '@tarot/game-logger';
+import { GameLogViewer, DebugToggle } from '@/components/debug/GameLogViewer';
 
 export function GameBoard() {
   const {
@@ -24,18 +26,52 @@ export function GameBoard() {
     playCard,
     startCombat,
     endTurn,
-    validDropZones
+    validDropZones,
+    updateMatchState
   } = useGameStore();
+
+  // Helper function to check if player can take actions
+  const canPlayerTakeActions = (player: any) => {
+    if (!player) return false;
+
+    // Check if player has fate (mana) remaining
+    const hasMana = player.fate > 0;
+
+    // Check if player has spell mana remaining
+    const hasSpellMana = (player.spellMana || 0) > 0;
+
+    // Check if player has any playable cards in hand
+    const hasPlayableCards = player.hand?.some((card: any) =>
+      card.cost <= (player.fate + (player.spellMana || 0))
+    ) || false;
+
+    // Check if player has any units on board that could perform actions
+    const hasActiveUnits = player.board?.some((slot: any) =>
+      slot.card && slot.card.type === 'unit'
+    ) || false;
+
+    return hasMana || hasSpellMana || hasPlayableCards || hasActiveUnits;
+  };
 
   const [activePlayer, setActivePlayer] = useState<string | null>(null);
   const [showSpellStack, setShowSpellStack] = useState(false);
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [showCardOverlay, setShowCardOverlay] = useState(false);
+  const [showDebugLog, setShowDebugLog] = useState(false);
 
   useEffect(() => {
     // Preload common game sounds
     audioManager.preloadGameSounds();
-  }, []);
+    
+    // Set up game logging context when match changes
+    if (currentMatch) {
+      gameLogger.setContext({
+        matchId: currentMatch.matchId,
+        turn: currentMatch.turn,
+        phase: currentMatch.phase
+      });
+    }
+  }, [currentMatch]);
 
   const handleCardClick = (card: Card) => {
     requestAnimationFrame(() => {
@@ -53,9 +89,13 @@ export function GameBoard() {
 
   const handleDragStart = (event: DragStartEvent) => {
     const card = event.active.data.current as Card;
-    console.log('🎯 DRAG START:', card?.name, 'ID:', event.active.id);
     requestAnimationFrame(() => {
       if (card) {
+        gameLogger.logAction('drag_start', {
+          cardId: card.id,
+          cardName: card.name,
+          cardType: card.type
+        }, true);
         setDraggedCard(card);
       }
     });
@@ -63,21 +103,37 @@ export function GameBoard() {
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    console.log('🎯 DRAG END. Over:', over?.id, 'Data:', over?.data?.current);
     requestAnimationFrame(() => {
-
       if (over && draggedCard) {
         // Check if this is a player slot (not opponent slot)
         const isPlayerSlot = over.data.current?.isPlayerSlot;
         const targetSlot = over.data.current?.slot;
 
-        console.log('Drop attempt - isPlayerSlot:', isPlayerSlot, 'targetSlot:', targetSlot);
+        gameLogger.logAction('drag_end', {
+          cardId: draggedCard.id,
+          cardName: draggedCard.name,
+          overId: over.id,
+          isPlayerSlot,
+          targetSlot
+        }, true);
 
         if (isPlayerSlot && targetSlot !== undefined) {
-          console.log('Dropping card on slot:', targetSlot, 'Card:', draggedCard.name);
+          gameLogger.logAction('card_drop_success', {
+            cardName: draggedCard.name,
+            targetSlot
+          }, true);
           playCard(draggedCard, targetSlot);
           audioManager.playRandom('cardPlace');
+        } else {
+          gameLogger.logAction('card_drop_invalid', {
+            cardName: draggedCard.name,
+            reason: !isPlayerSlot ? 'Not player slot' : 'Invalid slot'
+          }, false);
         }
+      } else {
+        gameLogger.logAction('drag_end_no_target', {
+          cardName: draggedCard?.name || 'unknown'
+        });
       }
 
       setDraggedCard(null);
@@ -161,15 +217,24 @@ export function GameBoard() {
               onCardClick={handleCardClick}
             />
 
-            {/* Phase Indicator */}
-            <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
-              <div className="bg-black/50 backdrop-blur-sm rounded-lg p-3 border border-white/20">
-                <div className="text-white text-sm font-bold mb-1">Phase</div>
+            {/* Phase Indicator - Made more prominent */}
+            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 z-50">
+              <div className="bg-black/80 backdrop-blur-md rounded-xl p-4 border-2 border-white/30 shadow-2xl">
+                <div className="text-white text-sm font-bold mb-2 text-center">CURRENT PHASE</div>
                 <div className={cn(
-                  "text-lg capitalize font-bold",
-                  currentMatch.phase === 'main' ? "text-green-400" : "text-yellow-400"
+                  "text-2xl capitalize font-bold text-center tracking-wide",
+                  currentMatch.phase === 'main' ? "text-green-400 drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" :
+                    currentMatch.phase === 'combat' ? "text-red-400 drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]" :
+                      currentMatch.phase === 'draw' ? "text-blue-400 drop-shadow-[0_0_10px_rgba(59,130,246,0.8)]" :
+                        "text-yellow-400 drop-shadow-[0_0_10px_rgba(234,179,8,0.8)]"
                 )}>
                   {currentMatch.phase}
+                </div>
+                <div className="text-white/70 text-xs mt-1 text-center">
+                  {currentMatch.phase === 'main' ? 'Play cards & take actions' :
+                    currentMatch.phase === 'combat' ? 'Units attack each other' :
+                      currentMatch.phase === 'draw' ? 'Draw cards & prepare' :
+                        'End phase & cleanup'}
                 </div>
               </div>
             </div>
@@ -215,25 +280,89 @@ export function GameBoard() {
               />
             </div>
 
-            {/* Action Button: ATTACK when you own the token, otherwise PASS */}
+            {/* Action Buttons - Proper phase-based logic */}
             <div className="absolute bottom-8 right-8 flex gap-3">
-              <PixelButton
-                size="lg"
-                variant={isMyTurn && hasAttackToken ? "red" : isMyTurn ? "gold" : "default"}
-                onClick={() => {
-                  if (!isMyTurn) return;
-                  if (hasAttackToken) {
-                    startCombat();
-                    audioManager.playRandom('turnChange');
-                  } else {
-                    endTurn();
-                  }
-                }}
-                disabled={!isMyTurn}
-                className={cn(isMyTurn && "animate-pulse")}
-              >
-                {isMyTurn ? (hasAttackToken ? "ATTACK" : "PASS") : "OPPONENT'S TURN"}
-              </PixelButton>
+              {isMyTurn ? (
+                <>
+                  {currentMatch.phase === 'main' && (
+                    <PixelButton
+                      size="lg"
+                      variant="gold"
+                      onClick={() => {
+                        gameLogger.logAction('end_turn_button', {
+                          playerId: currentPlayerId,
+                          phase: currentMatch.phase,
+                          canTakeActions: canPlayerTakeActions(currentPlayer)
+                        }, true);
+                        endTurn();
+                        audioManager.playRandom('turnChange');
+                      }}
+                      className="animate-pulse"
+                    >
+                      {canPlayerTakeActions(currentPlayer) ? "PASS TURN" : "END TURN"}
+                    </PixelButton>
+                  )}
+
+                  {currentMatch.phase === 'combat' && hasAttackToken && (
+                    <>
+                      <PixelButton
+                        size="lg"
+                        variant="red"
+                        onClick={() => {
+                          gameLogger.logAction('combat_button', {
+                            playerId: currentPlayerId,
+                            hasAttackToken
+                          }, true);
+                          startCombat();
+                          audioManager.playRandom('turnChange');
+                        }}
+                        className="animate-pulse"
+                      >
+                        RESOLVE COMBAT
+                      </PixelButton>
+                      <PixelButton
+                        size="md"
+                        variant="default"
+                        onClick={() => {
+                          gameLogger.logAction('skip_combat', {
+                            playerId: currentPlayerId
+                          }, true);
+                          // Skip to end phase without combat
+                          updateMatchState({
+                            phase: 'end'
+                          });
+                        }}
+                      >
+                        SKIP COMBAT
+                      </PixelButton>
+                    </>
+                  )}
+
+                  {currentMatch.phase === 'combat' && !hasAttackToken && (
+                    <PixelButton
+                      size="lg"
+                      variant="gold"
+                      onClick={() => {
+                        gameLogger.logAction('end_turn_no_attack_token', {
+                          playerId: currentPlayerId
+                        }, true);
+                        endTurn();
+                        audioManager.playRandom('turnChange');
+                      }}
+                    >
+                      END TURN
+                    </PixelButton>
+                  )}
+                </>
+              ) : (
+                <PixelButton
+                  size="lg"
+                  variant="default"
+                  disabled={true}
+                >
+                  OPPONENT'S TURN
+                </PixelButton>
+              )}
             </div>
 
             {/* Trials Display - Positioned higher to not overlap with cards */}
@@ -281,6 +410,18 @@ export function GameBoard() {
         card={selectedCard}
         isOpen={showCardOverlay}
         onClose={handleCloseOverlay}
+      />
+
+      {/* Debug Components */}
+      <GameLogViewer
+        isVisible={showDebugLog}
+        onToggle={() => setShowDebugLog(false)}
+        maxEvents={100}
+      />
+      
+      <DebugToggle
+        isVisible={showDebugLog}
+        onToggle={() => setShowDebugLog(!showDebugLog)}
       />
     </DndContext>
   );

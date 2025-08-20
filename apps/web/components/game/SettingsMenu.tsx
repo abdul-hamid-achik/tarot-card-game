@@ -50,11 +50,14 @@ export function SettingsMenu() {
       // Optimistically update UI first
       setAudioEnabled(true);
 
+      // Check if Safari and provide specific guidance
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
       // Use the AudioManager's enableAudio method
-      console.log('🎵 Attempting to enable audio...');
+      console.log('🎵 Attempting to enable audio...', { isSafari });
       const success = await audioManager.enableAudio();
 
-      console.log('🎵 Audio successfully enabled');
+      console.log('🎵 Audio enable result:', success);
       if (success) {
         // Audio is now enabled
         audioManager.setAudioEnabled(true);
@@ -65,21 +68,34 @@ export function SettingsMenu() {
           audioManagerEnabled: audioManager.isAudioEnabled()
         });
 
-        // Play a sound to confirm
-        await audioManager.playRandom('coinFlip');
+        // Play a sound to confirm with delay for Safari
+        if (isSafari) {
+          setTimeout(async () => {
+            await audioManager.playRandom('coinFlip');
+          }, 100);
+        } else {
+          await audioManager.playRandom('coinFlip');
+        }
 
         // Show toast notification
         toast({
           title: "Sound Enabled",
-          description: "Audio effects and music are now active.",
+          description: isSafari
+            ? "Audio effects enabled. You may need to interact with the page for sounds to play."
+            : "Audio effects and music are now active.",
         });
       } else {
         // Revert state on failure
         setAudioEnabled(false);
         audioManager.setAudioEnabled(false);
+
+        const errorMessage = isSafari
+          ? "Safari requires user interaction to enable audio. Try clicking 'Test Audio' after enabling."
+          : "Could not enable audio. Please try again.";
+
         toast({
           title: "Audio Error",
-          description: "Could not enable audio. Please try again.",
+          description: errorMessage,
           variant: "destructive",
         });
       }
@@ -88,9 +104,15 @@ export function SettingsMenu() {
       // Revert state on error
       setAudioEnabled(false);
       audioManager.setAudioEnabled(false);
+
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      const errorMessage = isSafari
+        ? "Safari audio requires user interaction. Please try again after clicking on the page."
+        : "Could not enable audio. Please try again.";
+
       toast({
         title: "Audio Error",
-        description: "Could not enable audio. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -267,15 +289,29 @@ export function SettingsMenu() {
                               <PixelButton
                                 onClick={async () => {
                                   try {
+                                    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+                                    if (isSafari) {
+                                      // Record this as a user interaction for Safari
+                                      localStorage.setItem('lastUserInteraction', Date.now().toString());
+                                      console.log('🎵 Safari user interaction recorded');
+                                    }
+
                                     await audioManager.playRandom('coinFlip');
                                     toast({
                                       title: "Test Sound",
-                                      description: "You should hear a coin flip sound!",
+                                      description: isSafari
+                                        ? "You should hear a coin flip sound! (Safari may need this interaction)"
+                                        : "You should hear a coin flip sound!",
                                     });
                                   } catch (error) {
+                                    console.error('Test audio failed:', error);
+                                    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
                                     toast({
                                       title: "Test Failed",
-                                      description: "Audio test failed. Check console for details.",
+                                      description: isSafari
+                                        ? "Safari audio test failed. Try enabling audio first, then test again."
+                                        : "Audio test failed. Check console for details.",
                                       variant: "destructive",
                                     });
                                   }
@@ -287,7 +323,35 @@ export function SettingsMenu() {
                               </PixelButton>
                             </div>
                             <p className="text-xs text-gray-400">
-                              Click to test if audio is working properly
+                              {(() => {
+                                const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+                                return isSafari
+                                  ? "Click to test audio (Safari requires user interaction)"
+                                  : "Click to test if audio is working properly";
+                              })()}
+                            </p>
+                          </div>
+
+                          {/* Debug Info Button */}
+                          <div className="mt-2 p-2 bg-black/20 rounded-lg border border-white/5">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-white text-xs">Debug Audio</Label>
+                              <PixelButton
+                                onClick={() => {
+                                  audioManager.debugAudioStatus();
+                                  toast({
+                                    title: "Debug Info",
+                                    description: "Check browser console for audio debug information.",
+                                  });
+                                }}
+                                variant="default"
+                                size="sm"
+                              >
+                                DEBUG
+                              </PixelButton>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Print audio status to console for troubleshooting
                             </p>
                           </div>
                         </>

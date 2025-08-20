@@ -9,6 +9,7 @@ import { Card, CardOrientation, useGameStore } from '@/lib/store/gameStore';
 import { Sparkles, Moon, Sun, Flame, Droplets, Swords, Coins } from 'lucide-react';
 import { audioManager } from '@/lib/audio/AudioManager';
 import { getPlayerCardBack } from '@/lib/cardBacks';
+import { gameLogger } from '@tarot/game-logger';
 
 interface TarotCardProps {
   card: Card;
@@ -36,8 +37,38 @@ export function TarotCard({
   const [isFlipped, setIsFlipped] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [playerCardBack, setPlayerCardBack] = useState<string>('/api/ui/themes/pixel-pack/sheets/card_ui_01.png');
+  const [previousHealth, setPreviousHealth] = useState(card.health);
+  const [healthChange, setHealthChange] = useState<number | null>(null);
   const isReversed = card.orientation === 'reversed';
   const { useFateToFlip, playCard } = useGameStore();
+
+  // Track health changes for animation
+  useEffect(() => {
+    const currentHealth = card.health ?? 0;
+    const prevHealth = previousHealth ?? 0;
+
+    if (currentHealth !== prevHealth && prevHealth > 0) { // Only animate if previous health was set (not initial load)
+      const change = currentHealth - prevHealth;
+
+      // Small delay to let combat animation finish
+      const showTimer = setTimeout(() => {
+        setHealthChange(change);
+        setPreviousHealth(currentHealth);
+
+        // Clear the change indicator after animation
+        const clearTimer = setTimeout(() => {
+          setHealthChange(null);
+        }, 1500);
+
+        return () => clearTimeout(clearTimer);
+      }, 500);
+
+      return () => clearTimeout(showTimer);
+    } else if (currentHealth !== prevHealth) {
+      // Just update the previous health without animation for initial load
+      setPreviousHealth(currentHealth);
+    }
+  }, [card.health, previousHealth]);
 
   useEffect(() => {
     const cardBack = getPlayerCardBack();
@@ -103,11 +134,16 @@ export function TarotCard({
   const customHandlers = canDrag ? {
     // For draggable cards, only add double-click and right-click
     onDoubleClick: (e: React.MouseEvent) => {
-      console.log('🎯 Double-click on draggable card:', card.name, 'onClick available:', !!onClick);
       if (onClick) {
         e.preventDefault();
         e.stopPropagation();
         requestAnimationFrame(() => {
+          gameLogger.logAction('card_double_click', {
+            cardId: card.id,
+            cardName: card.name,
+            location: isInHand ? 'hand' : 'board',
+            isDraggable: true
+          }, true);
           audioManager.playRandom('cardReveal');
           onClick();
         });
@@ -116,11 +152,17 @@ export function TarotCard({
   } : card.suit === 'major' ? {
     // For Major Arcana cards that lost draggability, still allow double-click for overlay
     onDoubleClick: (e: React.MouseEvent) => {
-      console.log('🎯 Double-click on non-draggable Major Arcana:', card.name, 'onClick available:', !!onClick);
       if (onClick) {
         e.preventDefault();
         e.stopPropagation();
         requestAnimationFrame(() => {
+          gameLogger.logAction('card_double_click', {
+            cardId: card.id,
+            cardName: card.name,
+            location: isInHand ? 'hand' : 'board',
+            isDraggable: false,
+            cardType: 'major'
+          }, true);
           audioManager.playRandom('cardReveal');
           onClick();
         });
@@ -129,12 +171,15 @@ export function TarotCard({
   } : {
     // For non-draggable cards, add click handlers
     onClick: (e: React.MouseEvent) => {
-      console.log('Click on non-draggable card:', card.name, 'actuallyDragging:', actuallyDragging);
       if (!actuallyDragging) {
         requestAnimationFrame(() => {
           // Cards on board - click for overlay
           if (isOnBoard && onClick) {
-            console.log('Showing overlay for board card:', card.name);
+            gameLogger.logAction('card_click_overlay', {
+              cardId: card.id,
+              cardName: card.name,
+              location: 'board'
+            }, true);
             audioManager.playRandom('cardReveal');
             onClick();
             return;
@@ -142,7 +187,12 @@ export function TarotCard({
 
           // Spell cards in hand - click to cast (exclude Major Arcana)
           if (isInHand && card.type === 'spell' && card.suit !== 'major' && isSelectable && !reactionOpen) {
-            console.log('Casting spell:', card.name);
+            gameLogger.logAction('spell_click_cast', {
+              cardId: card.id,
+              cardName: card.name,
+              suit: card.suit,
+              cost: card.cost
+            }, true);
             audioManager.playRandom('cardReveal');
             playCard(card);
             return;
@@ -189,6 +239,13 @@ export function TarotCard({
 
         // Use RAF for smooth flip animation
         requestAnimationFrame(() => {
+          gameLogger.logAction('card_right_click_flip', {
+            cardId: card.id,
+            cardName: card.name,
+            fromFlipped: isFlipped,
+            toFlipped: !isFlipped,
+            location: isInHand ? 'hand' : 'board'
+          }, true);
           audioManager.playRandom('cardFlip');
           onRightClick?.(e);
           setIsFlipped(!isFlipped);
@@ -205,8 +262,27 @@ export function TarotCard({
         </div>
       </div>
       <div className="absolute top-1 right-1 z-40 pointer-events-none select-none">
-        <div className="bg-blue-900/95 px-2 py-0.5 rounded border border-blue-700 text-white text-xs font-bold shadow-md">
+        <div className={cn(
+          "px-2 py-0.5 rounded border text-white text-xs font-bold shadow-md relative",
+          healthChange && healthChange < 0
+            ? "bg-red-600/95 border-red-700 animate-pulse"
+            : "bg-blue-900/95 border-blue-700"
+        )}>
           ❤ {card.health ?? 0}
+          {/* Health change indicator */}
+          {healthChange && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0, y: -10 }}
+              animate={{ opacity: 1, scale: 1.5, y: 0 }}
+              exit={{ opacity: 0, scale: 0, y: 10 }}
+              className={cn(
+                "absolute -top-6 -right-6 text-sm font-bold",
+                healthChange > 0 ? "text-green-400" : "text-red-400"
+              )}
+            >
+              {healthChange > 0 ? `+${healthChange}` : healthChange}
+            </motion.div>
+          )}
         </div>
       </div>
       {/* Mana/Cost bottom-left, fixed regardless of card orientation */}
