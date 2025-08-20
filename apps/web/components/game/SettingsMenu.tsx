@@ -33,19 +33,11 @@ export function SettingsMenu() {
     // Check audio settings
     const enabled = localStorage.getItem('audioEnabled') === 'true';
 
-    console.log('🎵 Audio state check:', {
-      localStorage: enabled,
-      audioManagerEnabled: audioManager.isAudioEnabled(),
-      volume: audioManager.getVolume(),
-      muted: audioManager.isMuted()
-    });
-
     // Sync the AudioManager's internal state with localStorage
     if (enabled) {
       // If audio is enabled in localStorage, set AudioManager state
       // without playing test audio (since autoplay is already unlocked)
       audioManager.setAudioEnabled(true);
-      console.log('✅ AudioManager state synced with localStorage');
     }
 
     setAudioEnabled(enabled);
@@ -54,14 +46,15 @@ export function SettingsMenu() {
   }, []);
 
   const handleEnableAudio = async () => {
-    console.log('🎵 Attempting to enable audio...');
     try {
       // Optimistically update UI first
       setAudioEnabled(true);
 
       // Use the AudioManager's enableAudio method
+      console.log('🎵 Attempting to enable audio...');
       const success = await audioManager.enableAudio();
 
+      console.log('🎵 Audio successfully enabled');
       if (success) {
         // Audio is now enabled
         audioManager.setAudioEnabled(true);

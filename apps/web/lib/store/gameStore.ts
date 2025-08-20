@@ -383,38 +383,33 @@ export const useGameStore = create<GameStore>()(
             if (!atkCard && !defCard) continue;
 
             if (atkCard && defCard) {
-              // Both units strike simultaneously
+              // Both units strike simultaneously (mutual damage like Legends of Runeterra)
               const atkDmg = effectivePower(atkCard, defCard);
               const defDmg = effectivePower(defCard, atkCard);
 
-              const defOrientBonus = defCard.orientation === 'reversed' ? 1 : 0;
-              const atkOrientBonus = atkCard.orientation === 'reversed' ? 1 : 0;
-              const defEffHealth = (defCard.health || 0) + defOrientBonus;
-              const atkEffHealth = (atkCard.health || 0) + atkOrientBonus;
+              // Calculate new health after damage (no orientation bonus for health)
+              const defNewHealth = Math.max(0, (defCard.health || 0) - atkDmg);
+              const atkNewHealth = Math.max(0, (atkCard.health || 0) - defDmg);
 
-              const defNewHealth = Math.max(0, defEffHealth - atkDmg);
-              const atkNewHealth = Math.max(0, atkEffHealth - defDmg);
-
-              // Persist new health back to cards (without re-adding orientation buff)
+              // Handle defender card - destroy if health <= 0
               if (defSlot.card) {
-                const baseNew = Math.max(0, defNewHealth - defOrientBonus);
-                if (baseNew <= 0) {
-                  logBoardRemoval(defenderId, i, defSlot.card, `lethal damage by lane ${i} attacker for ${atkDmg}`);
+                if (defNewHealth <= 0) {
+                  logBoardRemoval(defenderId, i, defSlot.card, `destroyed by lane ${i} attacker dealing ${atkDmg} damage`);
                   defenderDiscard.push(defSlot.card);
                   updatedDefBoard[i] = { ...defSlot, card: null };
                 } else {
-                  updatedDefBoard[i] = { ...defSlot, card: { ...defSlot.card, health: baseNew } };
+                  updatedDefBoard[i] = { ...defSlot, card: { ...defSlot.card, health: defNewHealth } };
                 }
               }
 
+              // Handle attacker card - destroy if health <= 0
               if (atkSlot.card) {
-                const baseNew = Math.max(0, atkNewHealth - atkOrientBonus);
-                if (baseNew <= 0) {
-                  logBoardRemoval(attackerId, i, atkSlot.card, `lethal damage by lane ${i} blocker for ${defDmg}`);
+                if (atkNewHealth <= 0) {
+                  logBoardRemoval(attackerId, i, atkSlot.card, `destroyed by lane ${i} blocker dealing ${defDmg} damage`);
                   attackerDiscard.push(atkSlot.card);
                   updatedAtkBoard[i] = { ...atkSlot, card: null };
                 } else {
-                  updatedAtkBoard[i] = { ...atkSlot, card: { ...atkSlot.card, health: baseNew } };
+                  updatedAtkBoard[i] = { ...atkSlot, card: { ...atkSlot.card, health: atkNewHealth } };
                 }
               }
             } else if (atkCard && !defCard) {

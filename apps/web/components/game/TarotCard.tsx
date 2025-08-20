@@ -47,18 +47,6 @@ export function TarotCard({
   const { currentMatch } = useGameStore();
   const reactionOpen = !!currentMatch?.reactionWindow?.active;
   const canDrag = isInHand && isSelectable && !reactionOpen && (card.type === 'unit' || card.type === 'major' || (card.type === 'spell' && card.suit === 'major'));
-  
-  // Debug canDrag calculation
-  if (card.suit === 'major') {
-    console.log(`🔍 canDrag debug for ${card.name}:`, {
-      isInHand,
-      isSelectable, 
-      reactionOpen,
-      type: card.type,
-      suit: card.suit,
-      canDrag
-    });
-  }
 
   const {
     attributes,
@@ -151,7 +139,7 @@ export function TarotCard({
             onClick();
             return;
           }
-          
+
           // Spell cards in hand - click to cast (exclude Major Arcana)
           if (isInHand && card.type === 'spell' && card.suit !== 'major' && isSelectable && !reactionOpen) {
             console.log('Casting spell:', card.name);
