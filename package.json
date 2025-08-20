@@ -11,22 +11,29 @@
     "node": ">=22"
   },
   "scripts": {
+    "compose:up": "dotenv -- docker compose up -d",
     "build": "npm run -w @tarot/game-logger build && npm run -w @tarot/game-sim build && npm run -w @tarot/db build && npm run -w @tarot/ws-stub build && npm run -w @tarot/web build && npm run -w @tarot/docs build",
     "test": "npm run -w @tarot/game-sim test && echo 'Run web E2E locally with: npm run -w @tarot/web dev & npx -w @tarot/web playwright test'",
-    "dev": "npm run -w @tarot/web dev",
-    "docs": "npm run -w @tarot/docs dev",
+    "dev": "dotenv -- npm run -w @tarot/web dev",
+    "docs": "dotenv -- npm run -w @tarot/docs dev",
+    "db:generate": "dotenv -- drizzle-kit generate",
+    "db:push": "dotenv -- drizzle-kit push",
+    "db:studio": "dotenv -- drizzle-kit studio",
+    "db:seed": "dotenv -- tsx packages/db/seed.ts",
     "test:watch": "npm run -w @tarot/game-sim test:watch",
     "lint": "eslint . --ext .ts,.tsx --max-warnings=0",
     "format": "prettier --write .",
-    "e2e:web": "npx -w @tarot/web playwright test",
-    "export": "cd clients/godot/project && godot --headless --export-release Web && mkdir -p ../../../apps/web/public/godot && cp -r builds/web/* ../../../apps/web/public/godot/"
+    "e2e:web": "npx -w @tarot/web playwright test"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^7.6.0",
     "@typescript-eslint/parser": "^7.6.0",
+    "dotenv-cli": "^10.0.0",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.29.1",
+    "drizzle-kit": "^0.30.1",
+    "drizzle-seed": "^0.1.0",
     "prettier": "^3.2.5"
   }
 }

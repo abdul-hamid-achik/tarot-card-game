@@ -1,4 +1,4 @@
-import { pgTable, text, integer, serial } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer } from 'drizzle-orm/pg-core';
 import { z } from 'zod';
 
 // Zod schemas for validation

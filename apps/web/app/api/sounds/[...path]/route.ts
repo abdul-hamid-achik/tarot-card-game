@@ -20,7 +20,7 @@ export async function GET(req: Request, { params }: { params: { path: string[] }
 
     // For Safari, try to serve MP3 version if it exists and requested file is WAV
     if (isSafari && abs.endsWith('.wav')) {
-        const mp3Path = abs.replace('.wav', '.mp3');
+        const mp3Path = abs.replace('.wav', '.mp3').replace('/effects/', '/effects-mp3/');
         if (fs.existsSync(mp3Path)) {
             abs = mp3Path;
         }

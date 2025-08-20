@@ -4,7 +4,6 @@ class AudioManager {
   private poolSize: number = 6; // Allow more overlapping sounds
   private volume: number = 0.7;
   private muted: boolean = false;
-  private basePath: string = '/api/sounds/effects/';
   private isSafari: boolean = false;
   private initialized: boolean = false;
   private audioEnabled: boolean = false;
@@ -45,10 +44,19 @@ class AudioManager {
     // Only access localStorage on client side
     if (typeof window !== 'undefined') {
       this.isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      console.log('🎵 AudioManager initialized:', {
+        isSafari: this.isSafari,
+        basePath: this.basePath,
+        userAgent: navigator.userAgent
+      });
       this.initialize();
       this.initializeAudioPool();
       this.setupSafariUserInteractionTracking();
     }
+  }
+
+  private get basePath(): string {
+    return `/api/sounds/${this.isSafari ? 'effects-mp3' : 'effects'}/`;
   }
 
   // Initialize the audio element pool
@@ -105,17 +113,17 @@ class AudioManager {
         testAudio.muted = true;
         testAudio.preload = 'auto';
 
-        // For Safari, we need to handle the audio differently
+        // Set up audio element for all browsers
         const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
         if (isSafari) {
           // Safari specific handling
           testAudio.setAttribute('playsinline', 'playsinline');
           testAudio.setAttribute('webkit-playsinline', 'webkit-playsinline');
           testAudio.crossOrigin = 'anonymous';
-
-          // Try loading a very short silent sound
-          testAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IAAAAAEAAQAiAAAAEAAAAAEACABkYXRhAgAAAAEA';
         }
+
+        // Try loading a very short silent sound for all browsers
+        testAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IAAAAAEAAQAiAAAAEAAAAAEACABkYXRhAgAAAAEA';
 
         testAudios.push(testAudio);
       }
@@ -341,7 +349,9 @@ class AudioManager {
 
       // Set the source and volume - prefer MP3 for Safari, WAV for others
       const fileExtension = this.isSafari ? 'mp3' : 'wav';
-      audio.src = `${this.basePath}${soundName}.${fileExtension}`;
+      const audioUrl = `${this.basePath}${soundName}.${fileExtension}`;
+      console.log('🎵 Loading audio from:', audioUrl, { soundName, fileExtension, isSafari: this.isSafari, basePath: this.basePath });
+      audio.src = audioUrl;
       audio.volume = this.volume;
       audio.currentTime = 0;
       audio.muted = false;

@@ -9,4 +9,8 @@ export default defineConfig({
     },
     verbose: true,
     strict: true,
+    migrations: {
+        prefix: 'timestamp',
+        table: '__drizzle_migrations__',
+    },
 });
