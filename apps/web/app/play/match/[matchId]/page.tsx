@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { GameBoard } from '@/components/game/GameBoard';
 import { useGameStore, MatchState, Player, Trial } from '@/lib/store/gameStore';
-import { gameWebSocket } from '@/lib/websocket/GameWebSocket';
+
 
 // Mock initial match state for demo
 const createMockMatch = (matchId: string): MatchState => {
@@ -184,13 +184,7 @@ export default function MatchPage() {
       setCurrentMatch(mockMatch);
     }
 
-    // Connect to WebSocket
-    if (!gameWebSocket.isConnected()) {
-      gameWebSocket.connect();
-    }
-
-    // Join the match
-    gameWebSocket.joinMatch(matchId, 'player1');
+    // WebSocket functionality removed for Vercel deployment
 
     return () => {
       // Cleanup on unmount

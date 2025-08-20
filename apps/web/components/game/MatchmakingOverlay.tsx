@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Loader2, X, Users, Sparkles } from 'lucide-react';
 import { useGameStore } from '@/lib/store/gameStore';
-import { gameWebSocket } from '@/lib/websocket/GameWebSocket';
+
 
 interface MatchmakingOverlayProps {
   isOpen: boolean;
@@ -43,10 +43,7 @@ export function MatchmakingOverlay({ isOpen, onCancel, deckId }: MatchmakingOver
     setSearchingMatch(true);
     setSearchTime(0);
 
-    // Connect to WebSocket if not connected
-    if (!gameWebSocket.isConnected()) {
-      gameWebSocket.connect();
-    }
+    // WebSocket disabled for Vercel deployment
 
     // Start matchmaking via API
     try {
@@ -74,7 +71,7 @@ export function MatchmakingOverlay({ isOpen, onCancel, deckId }: MatchmakingOver
 
   const cancelMatchmaking = () => {
     setSearchingMatch(false);
-    gameWebSocket.disconnect();
+    // WebSocket disconnect removed for Vercel deployment
     onCancel();
   };
 

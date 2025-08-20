@@ -220,15 +220,7 @@ export const useGameStore = create<GameStore>()(
           phase: state.currentMatch.phase
         });
 
-        // For WebSocket-based games, send the play_card message to server
-        if (state.isConnected) {
-          gameLogger.logAction('play_card_websocket', { cardId: card.id, cardName: card.name, targetSlot }, true, 'Sent to server');
-          // Import and use WebSocket playCard if connected
-          import('../websocket/GameWebSocket').then(({ gameWebSocket }) => {
-            gameWebSocket.playCard(card.id, targetSlot);
-          });
-          return;
-        }
+        // WebSocket functionality removed for Vercel deployment - using local/demo mode
 
         // Fallback for local games (demo mode)
         const player = state.currentMatch.players[playerId];
@@ -559,14 +551,7 @@ export const useGameStore = create<GameStore>()(
           phase: state.currentMatch.phase
         });
 
-        // For WebSocket-based games
-        if (state.isConnected) {
-          gameLogger.logAction('end_turn_websocket', { playerId: state.currentMatch.activePlayer }, true, 'Sent to server');
-          import('../websocket/GameWebSocket').then(({ gameWebSocket }) => {
-            gameWebSocket.endTurn();
-          });
-          return;
-        }
+        // WebSocket functionality removed for Vercel deployment - using local/demo mode
 
         const match = state.currentMatch;
         const playerIds = Object.keys(match.players);
@@ -870,7 +855,7 @@ export const useGameStore = create<GameStore>()(
       },
 
       // Connection
-      connect: () => set({ isConnected: true }),
+      connect: () => set({ isConnected: false }), // WebSocket disabled for Vercel
       disconnect: () => set({ isConnected: false }),
       setSearchingMatch: (searching) => set({ isSearchingMatch: searching }),
     }))
