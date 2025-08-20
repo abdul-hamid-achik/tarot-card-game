@@ -122,7 +122,7 @@ export function GameBoard() {
                 current={opponentPlayer?.fate || 0}
                 max={opponentPlayer?.maxFate || 3}
                 position="top"
-                label="Mana"
+                label="Fate"
               />
             </div>
           </div>
@@ -146,9 +146,6 @@ export function GameBoard() {
                 )}>
                   {currentMatch.phase}
                 </div>
-                {currentMatch.phase === 'main' && isMyTurn && (
-                  <div className="text-xs text-green-300 mt-1">You can play cards!</div>
-                )}
               </div>
             </div>
 
@@ -188,7 +185,7 @@ export function GameBoard() {
                 current={currentPlayer?.fate || 0}
                 max={currentPlayer?.maxFate || 3}
                 position="bottom"
-                label="Mana"
+                label="Fate"
               />
             </div>
 

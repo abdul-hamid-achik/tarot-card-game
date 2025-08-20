@@ -125,25 +125,28 @@ export function TarotCard({
         setIsFlipped(!isFlipped);
       }}
     >
-      {/* Always-on top badges (outside flip/rotation) */}
+      {/* Always-on overlays (outside flip/rotation) */}
+      {/* Attack (top-left) and Health (top-right), fixed regardless of card orientation */}
       {card.type === 'unit' && (
-        <div className="absolute -top-5 left-0 right-0 z-40 pointer-events-none select-none">
-          {/* Optional decorative top border */}
-          <img
-            src="/api/ui/themes/pixel-pack/others/card_ui_top_borders.png"
-            alt=""
-            className="absolute -top-3 left-1/2 -translate-x-1/2 w-[110%] opacity-90"
-          />
-          <div className="relative flex justify-between px-1">
+        <>
+          <div className="absolute top-1 left-1 z-40 pointer-events-none select-none">
             <div className="bg-red-900/95 px-2 py-0.5 rounded border border-red-700 text-white text-xs font-bold shadow-md">
               ⚔ {card.attack || 0}
             </div>
+          </div>
+          <div className="absolute top-1 right-1 z-40 pointer-events-none select-none">
             <div className="bg-blue-900/95 px-2 py-0.5 rounded border border-blue-700 text-white text-xs font-bold shadow-md">
               ❤ {card.health || 0}
             </div>
           </div>
-        </div>
+        </>
       )}
+      {/* Mana/Cost bottom-left, fixed regardless of card orientation */}
+      <div className="absolute bottom-1 left-1 z-40 pointer-events-none select-none">
+        <div className="bg-black/70 rounded-full w-7 h-7 flex items-center justify-center border border-white/20">
+          <span className="text-[13px] font-bold text-yellow-300">{card.cost}</span>
+        </div>
+      </div>
 
       <AnimatePresence mode="wait">
         <motion.div
@@ -169,7 +172,7 @@ export function TarotCard({
           {/* Card Front */}
           <motion.div
             className={cn(
-              "absolute inset-0 rounded-lg shadow-xl backface-hidden overflow-hidden",
+              "absolute inset-0 rounded-md shadow-xl backface-hidden overflow-hidden",
               isHovered && "shadow-2xl ring-2 ring-yellow-400",
               actuallyDragging && "opacity-90"
             )}
@@ -184,40 +187,17 @@ export function TarotCard({
                 <img
                   src={card.imageUrl}
                   alt={card.name}
-                  className="absolute inset-0 w-full h-full rounded-lg"
+                  className="absolute inset-0 w-full h-full rounded-md"
                   style={{ imageRendering: 'auto' }}
                 />
                 {/* Overlay for stats */}
-                <div className="absolute inset-0 flex flex-col justify-between p-2">
-                  {/* Cost at top left */}
-                  <div className="flex justify-between">
-                    <div className="bg-black/70 rounded-full w-8 h-8 flex items-center justify-center">
-                      <span className="text-lg font-bold text-yellow-300">{card.cost}</span>
-                    </div>
-                    {card.orientation === 'reversed' && (
-                      <div className="bg-black/70 rounded-full w-6 h-6 flex items-center justify-center">
-                        <Moon className="w-4 h-4 text-white" />
-                      </div>
-                    )}
-                  </div>
-                  {/* Stats at bottom */}
-                  {card.type === 'unit' && (
-                    <div className="flex justify-between">
-                      <div className="bg-red-900/90 px-2 py-1 rounded text-white font-bold">
-                        ⚔ {card.attack || 0}
-                      </div>
-                      <div className="bg-blue-900/90 px-2 py-1 rounded text-white font-bold">
-                        ❤ {card.health || 0}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <div className="absolute inset-0 p-2" />
               </>
             ) : (
               /* Fallback to stylized frame */
               <>
                 <div
-                  className="absolute inset-0 rounded-lg"
+                  className="absolute inset-0 rounded-md"
                   style={{
                     backgroundImage: `url(${getCardFrame()})`,
                     backgroundSize: 'cover',
@@ -228,12 +208,7 @@ export function TarotCard({
                 <div className="relative h-full p-3 flex flex-col">
                   {/* Card Header */}
                   <div className="flex justify-between items-start mb-1">
-                    <div className="flex items-center gap-1">
-                      <span className="text-lg font-bold text-yellow-300 drop-shadow-[1px_1px_0px_rgba(0,0,0,0.8)]">{card.cost}</span>
-                      {card.orientation === 'reversed' && (
-                        <Moon className="w-3 h-3" />
-                      )}
-                    </div>
+                    <div className="flex items-center gap-1" />
                     <div className="text-2xl">{getSuitIcon(card.suit)}</div>
                   </div>
 
@@ -260,17 +235,7 @@ export function TarotCard({
                     </p>
                   </div>
 
-                  {/* Card Stats */}
-                  {card.type === 'unit' && (
-                    <div className="flex justify-between text-sm font-bold">
-                      <span className="bg-red-800 px-2 py-1 rounded border border-red-600 text-white drop-shadow-[1px_1px_0px_rgba(0,0,0,0.8)]">
-                        ⚔ {card.attack || 0}
-                      </span>
-                      <span className="bg-blue-800 px-2 py-1 rounded border border-blue-600 text-white drop-shadow-[1px_1px_0px_rgba(0,0,0,0.8)]">
-                        ❤ {card.health || 0}
-                      </span>
-                    </div>
-                  )}
+                  {/* Card Stats moved to top overlay */}
                 </div>
               </>
             )}
@@ -291,7 +256,7 @@ export function TarotCard({
 
           {/* Card Back */}
           <motion.div
-            className="absolute inset-0 rounded-lg shadow-xl backface-hidden overflow-hidden"
+            className="absolute inset-0 rounded-md shadow-xl backface-hidden overflow-hidden"
             style={{
               backfaceVisibility: 'hidden',
               transform: 'rotateY(180deg)'
@@ -319,7 +284,7 @@ export function TarotCard({
       {/* Hover Effect Glow */}
       {isHovered && !actuallyDragging && (
         <motion.div
-          className="absolute inset-0 rounded-lg pointer-events-none"
+          className="absolute inset-0 rounded-md pointer-events-none"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

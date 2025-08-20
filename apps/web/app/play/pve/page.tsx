@@ -81,6 +81,25 @@ export default function PvEPage() {
           }
         }
         break;
+      case 'mystery': {
+        // Mystery can be a surprise fight, an event, or treasure
+        if (enemyGenerator) {
+          const enemy = enemyGenerator.generateEnemy('mystery', parseInt(node.id.split('-')[2] || '0'));
+          if (enemy) {
+            setCurrentEnemy(enemy);
+            setShowEnemyDialog(true);
+            audioManager.playRandom('cardReveal');
+            break;
+          }
+        }
+        // 50/50 event or treasure if no guardian
+        if (Math.random() < 0.5) {
+          setShowEventDialog(true);
+        } else {
+          handleTreasure(node);
+        }
+        break;
+      }
       case 'event':
         setShowEventDialog(true);
         break;

@@ -84,83 +84,149 @@ const getNodeColor = (type: NodeType) => {
 function generateMapNodes(region: number, seed: string): MapNode[] {
   const nodes: MapNode[] = [];
   const columns = 5;
-  const nodesPerColumn = [1, 2, 3, 2, 1]; // Diamond shape
-  
+
   // Deterministic pseudo-random based on seed
   let seedValue = 0;
   for (let i = 0; i < seed.length; i++) {
     seedValue += seed.charCodeAt(i) * (i + 1);
   }
   seedValue = (seedValue + region * 1000) % 10000;
-  
-  const random = (min: number, max: number) => {
+
+  const nextRand = () => {
     seedValue = (seedValue * 9301 + 49297) % 233280;
-    const rnd = seedValue / 233280;
-    return Math.floor(rnd * (max - min + 1)) + min;
+    return seedValue / 233280; // 0..1
+  };
+  const randomInt = (min: number, max: number) => Math.floor(nextRand() * (max - min + 1)) + min;
+
+  // Curated layout patterns, Runeterra-like. Slight variety, not a sea of choices.
+  const patterns: number[][] = [
+    [1, 2, 3, 2, 1], // diamond
+    [1, 2, 2, 2, 1], // narrow middle
+    [1, 3, 2, 3, 1], // a bit wider in mid columns
+    [1, 2, 3, 3, 1], // extra branch near end
+  ];
+  const nodesPerColumn = patterns[randomInt(0, patterns.length - 1)];
+
+  // Helper to roll weighted node types for middle columns
+  const rollMiddleType = (): NodeType => {
+    const roll = randomInt(0, 100);
+    if (roll < 42) return 'battle';
+    if (roll < 60) return 'elite';
+    if (roll < 70) return 'shop';
+    if (roll < 80) return 'rest';
+    if (roll < 90) return 'event';
+    if (roll < 96) return 'treasure';
+    return 'mystery'; // rare
   };
 
+  // Build nodes column by column
   for (let col = 0; col < columns; col++) {
     const nodeCount = nodesPerColumn[col];
-    
+
     for (let row = 0; row < nodeCount; row++) {
+      // Decide type
       let type: NodeType;
-      
-      // Column 1 is always battles
-      if (col === 0) {
-        type = 'battle';
-      } 
-      // Column 5 is always boss
-      else if (col === columns - 1) {
-        type = 'boss';
-      }
-      // Mixed types for middle columns
-      else {
-        const roll = random(0, 100);
-        if (roll < 40) type = 'battle';
-        else if (roll < 60) type = 'elite';
-        else if (roll < 70) type = 'shop';
-        else if (roll < 80) type = 'rest';
-        else if (roll < 90) type = 'event';
-        else type = 'treasure';
-      }
+      if (col === 0) type = 'battle';
+      else if (col === columns - 1) type = 'boss';
+      else type = rollMiddleType();
+
+      // Base grid position centered vertically per column
+      const baseX = 150 + col * 200;
+      const baseY = 100 + row * 150 + (3 - nodeCount) * 75;
+      // Add slight jitter so runs don't look identical
+      const jitterX = randomInt(-20, 20);
+      const jitterY = randomInt(-30, 30);
 
       const node: MapNode = {
         id: `node-${col}-${row}`,
         type,
-        position: {
-          x: 150 + col * 200,
-          y: 100 + row * 150 + (3 - nodeCount) * 75
-        },
+        position: { x: baseX + jitterX, y: baseY + jitterY },
         column: col,
         row,
         connections: [],
         completed: false,
         available: col === 0,
         rewards: {
-          gold: type === 'battle' ? random(20, 40) : 
-                type === 'elite' ? random(50, 80) :
-                type === 'boss' ? random(100, 150) :
-                type === 'treasure' ? random(30, 60) : undefined,
-          cards: type === 'battle' ? 1 :
-                 type === 'elite' ? 2 :
-                 type === 'boss' ? 3 : undefined,
-          relic: type === 'elite' ? random(0, 100) < 30 :
-                 type === 'boss' ? true : false
-        }
+          gold:
+            type === 'battle'
+              ? randomInt(20, 40)
+              : type === 'elite'
+              ? randomInt(50, 80)
+              : type === 'boss'
+              ? randomInt(100, 150)
+              : type === 'treasure'
+              ? randomInt(30, 60)
+              : undefined,
+          cards: type === 'battle' ? 1 : type === 'elite' ? 2 : type === 'boss' ? 3 : undefined,
+          relic: type === 'elite' ? randomInt(0, 100) < 30 : type === 'boss' ? true : false,
+        },
       };
 
-      // Create connections to next column
-      if (col < columns - 1) {
-        const nextColNodes = nodesPerColumn[col + 1];
-        for (let nextRow = 0; nextRow < nextColNodes; nextRow++) {
-          // Connect to adjacent and nearby nodes
-          if (Math.abs(nextRow - row) <= 1 || nodeCount === 1 || nextColNodes === 1) {
-            node.connections.push(`node-${col + 1}-${nextRow}`);
-          }
+      nodes.push(node);
+    }
+  }
+
+  // Create connections with limited branching (1-2 choices), ensure connectivity
+  for (let col = 0; col < columns - 1; col++) {
+    const currentColNodes = nodes.filter((n) => n.column === col);
+    const nextColNodes = nodes.filter((n) => n.column === col + 1);
+
+    for (const node of currentColNodes) {
+      const candidateRows: number[] = [];
+      const nextCount = nodesPerColumn[col + 1];
+      for (let nextRow = 0; nextRow < nextCount; nextRow++) {
+        if (Math.abs(nextRow - node.row) <= 1 || nextCount === 1 || currentColNodes.length === 1) {
+          candidateRows.push(nextRow);
         }
       }
 
-      nodes.push(node);
+      // Always at least one connection
+      const chosen: Set<number> = new Set();
+      if (candidateRows.length > 0) {
+        chosen.add(candidateRows[randomInt(0, candidateRows.length - 1)]);
+      } else {
+        // Fallback: connect to nearest row
+        chosen.add(Math.max(0, Math.min(nextCount - 1, node.row)));
+      }
+
+      // 50% chance to add a second branch if available
+      if (candidateRows.length > 1 && nextRand() < 0.5) {
+        let second = candidateRows[randomInt(0, candidateRows.length - 1)];
+        if (chosen.has(second) && candidateRows.length > 1) {
+          // try a different one
+          const others = candidateRows.filter((r) => !chosen.has(r));
+          if (others.length > 0) second = others[randomInt(0, others.length - 1)];
+        }
+        chosen.add(second);
+      }
+
+      // Small chance for a cross-link to add spice
+      if (nextRand() < 0.15 && nodesPerColumn[col + 1] >= 3) {
+        const farRow = Math.max(0, Math.min(nodesPerColumn[col + 1] - 1, node.row + (nextRand() < 0.5 ? -2 : 2)));
+        chosen.add(farRow);
+      }
+
+      for (const r of chosen) {
+        node.connections.push(`node-${col + 1}-${r}`);
+      }
+    }
+
+    // Ensure every next-column node has at least one incoming connection
+    for (const target of nextColNodes) {
+      const hasIncoming = currentColNodes.some((n) => n.connections.includes(target.id));
+      if (!hasIncoming) {
+        // Connect from the nearest row in the previous column
+        let nearest = currentColNodes[0];
+        let bestDist = Math.abs(nearest.row - target.row);
+        for (const n of currentColNodes) {
+          const d = Math.abs(n.row - target.row);
+          if (d < bestDist) {
+            bestDist = d;
+            nearest = n;
+          }
+        }
+        nearest.connections.push(target.id);
+      }
     }
   }
 
@@ -323,7 +389,7 @@ export function PvEMap({ runState, onNodeClick }: PvEMapProps) {
           <div className="absolute bottom-4 right-4 bg-black/60 backdrop-blur-sm rounded-lg p-4 border border-white/10">
             <h3 className="text-white font-bold mb-2 text-sm">Legend</h3>
             <div className="space-y-2">
-              {['battle', 'elite', 'boss', 'shop', 'rest', 'event', 'treasure'].map((type) => (
+              {['battle', 'elite', 'boss', 'shop', 'rest', 'event', 'treasure', 'mystery'].map((type) => (
                 <div key={type} className="flex items-center gap-2">
                   <div className={`w-6 h-6 rounded-full bg-gradient-to-br ${getNodeColor(type as NodeType)} flex items-center justify-center`}>
                     <div className="text-white scale-50">
