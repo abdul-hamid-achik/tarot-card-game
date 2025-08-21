@@ -8,9 +8,10 @@ import { PixelButton } from '@/components/ui/pixel-button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { audioManager } from '@/lib/audio/AudioManager';
-import { 
-  Sparkles, 
-  Check, 
+import { gameLogger } from '@tarot/game-logger';
+import {
+  Sparkles,
+  Check,
   Lock,
   Eye,
   ChevronLeft,
@@ -105,7 +106,7 @@ export function DeckSelector({ onSelectDeck, onBack, showBackButton = true }: De
   const handleSelectDeck = (deckId: string) => {
     const deck = availableDecks.find(d => d.id === deckId);
     if (!deck?.isUnlocked) return;
-    
+
     setSelectedDeck(deckId);
     audioManager.playRandom('cardFlip');
   };
@@ -146,7 +147,7 @@ export function DeckSelector({ onSelectDeck, onBack, showBackButton = true }: De
       <div className="fixed inset-0">
         <div className="absolute inset-0 bg-mystic-gradient opacity-30" />
         {/* UI Background Texture */}
-        <div 
+        <div
           className="absolute inset-0 opacity-10"
           style={{
             backgroundImage: 'url(/api/ui/themes/pixel-pack/others/card_ui_gold_tiles.png)',
@@ -201,17 +202,16 @@ export function DeckSelector({ onSelectDeck, onBack, showBackButton = true }: De
             >
               <Card className={cn(
                 "relative overflow-hidden border-2 transition-all duration-300",
-                currentDeck.isUnlocked 
-                  ? "bg-black/60 border-tarot-gold/50 hover:border-tarot-gold cursor-pointer" 
+                currentDeck.isUnlocked
+                  ? "bg-black/60 border-tarot-gold/50 hover:border-tarot-gold cursor-pointer"
                   : "bg-black/40 border-gray-700 cursor-not-allowed"
               )}>
                 {/* Card Frame Background */}
-                <div 
+                <div
                   className="absolute inset-0 opacity-20"
                   style={{
-                    backgroundImage: `url(/api/ui/themes/pixel-pack/others/card_ui_${
-                      currentDeck.isUnlocked ? 'gold' : 'silver'
-                    }_front.png)`,
+                    backgroundImage: `url(/api/ui/themes/pixel-pack/others/card_ui_${currentDeck.isUnlocked ? 'gold' : 'silver'
+                      }_front.png)`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center'
                   }}
@@ -229,11 +229,11 @@ export function DeckSelector({ onSelectDeck, onBack, showBackButton = true }: De
                         </p>
                       )}
                     </div>
-                    <Badge 
+                    <Badge
                       variant={currentDeck.isUnlocked ? "default" : "secondary"}
                       className={cn(
-                        currentDeck.isUnlocked 
-                          ? "bg-tarot-gold text-black" 
+                        currentDeck.isUnlocked
+                          ? "bg-tarot-gold text-black"
                           : "bg-gray-700"
                       )}
                     >
@@ -265,7 +265,7 @@ export function DeckSelector({ onSelectDeck, onBack, showBackButton = true }: De
                         }}
                       />
                     )}
-                    
+
                     {/* Lock Overlay */}
                     {!currentDeck.isUnlocked && (
                       <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
@@ -275,7 +275,7 @@ export function DeckSelector({ onSelectDeck, onBack, showBackButton = true }: De
                   </div>
 
                   <p className="text-gray-300 mb-4">{currentDeck.description}</p>
-                  
+
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-400">
                       {currentDeck.cardCount} cards
@@ -310,7 +310,7 @@ export function DeckSelector({ onSelectDeck, onBack, showBackButton = true }: De
               <Eye className="w-4 h-4 mr-2" />
               Preview Cards
             </Button>
-            
+
             <Button
               onClick={() => setShowCardBackSelector(true)}
               variant="outline"
@@ -319,7 +319,7 @@ export function DeckSelector({ onSelectDeck, onBack, showBackButton = true }: De
               <Palette className="w-4 h-4 mr-2" />
               Card Back
             </Button>
-            
+
             <PixelButton
               onClick={handleConfirmDeck}
               disabled={!currentDeck.isUnlocked || selectedDeck !== currentDeck.id}
@@ -342,8 +342,8 @@ export function DeckSelector({ onSelectDeck, onBack, showBackButton = true }: De
                 }}
                 className={cn(
                   "w-2 h-2 rounded-full transition-all",
-                  index === currentIndex 
-                    ? "w-8 bg-tarot-gold" 
+                  index === currentIndex
+                    ? "w-8 bg-tarot-gold"
                     : "bg-gray-600 hover:bg-gray-500"
                 )}
               />
@@ -395,7 +395,10 @@ export function DeckSelector({ onSelectDeck, onBack, showBackButton = true }: De
           onClose={() => setShowCardBackSelector(false)}
           onSelect={(cardBackId) => {
             audioManager.playRandom('cardFlip');
-            console.log('Selected card back:', cardBackId);
+            gameLogger.logAction('card_back_selected', {
+              cardBackId,
+              playerId: 'player1'
+            }, true, 'Player selected card back');
           }}
         />
       </div>

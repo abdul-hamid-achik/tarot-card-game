@@ -10,6 +10,7 @@ import { Eye, EyeOff, Package, Trash2 } from 'lucide-react';
 import { Player, Card } from '@/lib/store/gameStore';
 import { cn } from '@/lib/utils';
 import { audioManager } from '@/lib/audio/AudioManager';
+import { FateCounter } from './FateCounter';
 
 interface PlayerAreaProps {
   player: Player | undefined;
@@ -61,6 +62,14 @@ export function PlayerArea({ player, isActive, onCardClick }: PlayerAreaProps) {
             value={(player.health / player.maxHealth) * 100}
             className="w-32 h-2 mt-1"
           />
+          <div className="mt-2">
+            <FateCounter
+              current={player.fate || 0}
+              max={player.maxFate || 1}
+              position="bottom"
+              label="Fate"
+            />
+          </div>
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { gameLogger } from '@tarot/game-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +13,10 @@ export async function POST() {
     });
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error('Failed to seed deck:', error);
+    gameLogger.logAction('api_admin_seed_deck_error', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    }, false, 'Failed to seed deck');
     return NextResponse.json({ error: 'Failed to seed deck' }, { status: 500 });
   }
 }

@@ -8,6 +8,7 @@ import { GameBoard } from '@/components/game/GameBoard';
 import { useGameStore } from '@/lib/store/gameStore';
 import { EnemyAI } from '@/lib/ai/EnemyAI';
 import { enemyTemplates } from '@/lib/ai/EnemyAI';
+import { gameLogger } from '@tarot/game-logger';
 import { EnemyGenerator } from '@/lib/ai/EnemyGenerator';
 import { audioManager } from '@/lib/audio/AudioManager';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -161,7 +162,8 @@ function PvEInner() {
             hand: playerHand,
             deck: playerRemainingDeck,
             discard: [],
-            board: Array(6).fill(null).map((_, i) => ({ id: `p1-slot-${i}`, card: null })),
+            bench: Array(6).fill(null),
+            battlefield: Array(6).fill(null),
             trials: []
           },
           ai: {
@@ -176,7 +178,8 @@ function PvEInner() {
             hand: aiHand,
             deck: aiRemainingDeck,
             discard: [],
-            board: Array(6).fill(null).map((_, i) => ({ id: `ai-slot-${i}`, card: null })),
+            bench: Array(6).fill(null),
+            battlefield: Array(6).fill(null),
             trials: [],
             avatar: enemy.portrait,
             isAI: true
@@ -223,7 +226,7 @@ function PvEInner() {
     setIsAIThinking(true);
 
     const aiPlayer = currentMatch.players['ai'];
-    const playerBoard = currentMatch.players['player1'].board;
+    const playerBoard = currentMatch.players['player1'].bench || currentMatch.players['player1'].board;
 
     // Simulate AI thinking
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -235,7 +238,7 @@ function PvEInner() {
       const decision = await enemyAI.decideCardToPlay(
         aiPlayer.hand,
         remainingFate,
-        aiPlayer.board,
+        aiPlayer.bench || aiPlayer.board,
         playerBoard,
         currentMatch.phase
       );
@@ -257,9 +260,10 @@ function PvEInner() {
 
     // End AI turn
     await new Promise(resolve => setTimeout(resolve, 400));
-    // Initiate combat for AI only if it has attackers on board
+    // Initiate combat for AI only if it has attackers on bench
     const latest = useGameStore.getState().currentMatch;
-    const aiHasUnits = latest?.players['ai'].board.some((s: any) => s.card);
+    const aiHasUnits = latest?.players['ai'].bench?.some((unit: any) => unit !== null) || 
+                      latest?.players['ai'].board?.some((s: any) => s?.card);
     if (latest?.attackTokenOwner === 'ai' && aiHasUnits) {
       startCombat();
       await new Promise(resolve => setTimeout(resolve, 600));
@@ -272,7 +276,10 @@ function PvEInner() {
     // Award rewards
     if (victoryRewards) {
       // In a real implementation, this would update the player's collection
-      console.log('Awarding rewards:', victoryRewards);
+      gameLogger.logAction('victory_rewards_awarded', {
+        rewards: victoryRewards,
+        playerId: 'player1'
+      }, true, 'Awarding victory rewards to player');
     }
 
     setShowVictoryDialog(false);

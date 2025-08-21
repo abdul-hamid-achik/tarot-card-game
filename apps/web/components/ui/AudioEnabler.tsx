@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Volume2, VolumeX } from 'lucide-react';
 import { Button } from './button';
 import { audioManager } from '@/lib/audio/AudioManager';
+import { gameLogger } from '@tarot/game-logger';
 
 export function AudioEnabler() {
   const [audioEnabled, setAudioEnabled] = useState(false);
@@ -22,23 +23,25 @@ export function AudioEnabler() {
     // Create a user gesture context for audio
     const testAudio = new Audio();
     testAudio.volume = 0.1;
-    
+
     try {
       await testAudio.play();
       testAudio.pause();
-      
+
       // Audio is now enabled
       setAudioEnabled(true);
       localStorage.setItem('audioEnabled', 'true');
       audioManager.setMuted(false);
-      
+
       // Play a sound to confirm
       await audioManager.playRandom('coinFlip');
-      
+
       // Hide the button after a moment
       setTimeout(() => setIsVisible(false), 500);
     } catch (error) {
-      console.warn('Could not enable audio:', error);
+      gameLogger.logAction('audio_enabler_failed', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, false, 'Could not enable audio');
     }
   };
 

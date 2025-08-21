@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Package, Trash2 } from 'lucide-react';
 import { Player } from '@/lib/store/gameStore';
 import { getRandomCardBack } from '@/lib/cardBacks';
+import { FateCounter } from './FateCounter';
 
 interface OpponentAreaProps {
   player: Player | undefined;
@@ -44,6 +45,14 @@ export function OpponentArea({ player, isActive }: OpponentAreaProps) {
             value={(player.health / player.maxHealth) * 100}
             className="w-32 h-2 mt-1"
           />
+          <div className="mt-2">
+            <FateCounter
+              current={player.fate || 0}
+              max={player.maxFate || 1}
+              position="top"
+              label="Fate"
+            />
+          </div>
         </div>
 
         <Avatar className="w-16 h-16 border-2 border-white/20">

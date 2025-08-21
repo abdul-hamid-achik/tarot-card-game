@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 // import { createTarotAI } from '@tarot/game-sim/src/tarot-ai';
+import { gameLogger } from '@tarot/game-logger';
 
 // Queue management
 interface QueueEntry {
@@ -78,7 +79,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error) {
-    console.error('Queue error:', error);
+    gameLogger.logAction('api_match_queue_error', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    }, false, 'Queue error');
     return NextResponse.json(
       { error: 'Failed to process queue request' },
       { status: 500 }

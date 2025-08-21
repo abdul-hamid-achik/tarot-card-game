@@ -62,7 +62,7 @@ export function CardOverlay({ card, isOpen, onClose }: CardOverlayProps) {
           
           {/* Overlay Content */}
           <motion.div
-            className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-yellow-500/30 rounded-lg shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+            className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-yellow-500/30 rounded-lg shadow-2xl max-w-lg w-full mx-4 max-h-[80vh] overflow-y-auto"
             initial={{ scale: 0.8, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.8, opacity: 0, y: 20 }}
@@ -110,10 +110,10 @@ export function CardOverlay({ card, isOpen, onClose }: CardOverlayProps) {
             </div>
 
             {/* Card Image */}
-            <div className="p-6 flex justify-center">
+            <div className="p-4 flex justify-center">
               <div className="relative">
                 <motion.div
-                  className="w-64 h-96 rounded-lg overflow-hidden shadow-xl"
+                  className="w-48 h-72 rounded-lg overflow-hidden shadow-xl"
                   animate={{
                     rotateZ: isReversed ? 180 : 0
                   }}
@@ -151,29 +151,29 @@ export function CardOverlay({ card, isOpen, onClose }: CardOverlayProps) {
             </div>
 
             {/* Content */}
-            <div className="p-6 space-y-6">
+            <div className="p-4 space-y-4">
               {/* Tarot Meaning */}
               <div>
-                <h3 className="text-lg font-semibold text-yellow-400 mb-2 flex items-center gap-2">
+                <h3 className="text-base font-semibold text-yellow-400 mb-1 flex items-center gap-2">
                   <Sparkles className="w-5 h-5" />
                   Tarot Meaning
                 </h3>
-                <p className="text-white/90 italic text-lg">{meaning}</p>
+                <p className="text-white/90 italic text-sm">{meaning}</p>
               </div>
 
               {/* Description */}
               <div>
-                <h3 className="text-lg font-semibold text-yellow-400 mb-2 flex items-center gap-2">
+                <h3 className="text-base font-semibold text-yellow-400 mb-1 flex items-center gap-2">
                   {isReversed ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
                   {isReversed ? 'Reversed' : 'Upright'} Interpretation
                 </h3>
-                <p className="text-white/80 leading-relaxed">{description}</p>
+                <p className="text-white/80 text-sm leading-relaxed">{description}</p>
               </div>
 
               {/* Game Effect (if it has custom description) */}
               {card.description && (
                 <div>
-                  <h3 className="text-lg font-semibold text-yellow-400 mb-2 flex items-center gap-2">
+                  <h3 className="text-base font-semibold text-yellow-400 mb-1 flex items-center gap-2">
                     <Swords className="w-5 h-5" />
                     Game Effect
                   </h3>

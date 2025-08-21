@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { motion, AnimatePresence } from 'framer-motion';
+import { gameLogger } from '@tarot/game-logger';
 import { EnemyGenerator, GeneratedEnemy } from '@/lib/ai/EnemyGenerator';
 import { EnemyAI } from '@/lib/ai/EnemyAI';
 import { audioManager } from '@/lib/audio/AudioManager';
@@ -128,7 +129,11 @@ export default function PvEPage() {
 
   const completeNode = (node: MapNode) => {
     // In a real app, this would update the map state
-    console.log('Completing node:', node.id);
+    gameLogger.logAction('pve_node_completed', {
+      nodeId: node.id,
+      nodeType: node.type,
+      runState: runState
+    }, true, 'PVE node completed');
   };
 
   const handleEventChoice = (choice: 'accept' | 'decline') => {

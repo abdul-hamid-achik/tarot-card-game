@@ -8,6 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Loader2, X, Users, Sparkles } from 'lucide-react';
 import { useGameStore } from '@/lib/store/gameStore';
 import { useSmoothTimer } from '@/components/ui/smooth-timer';
+import { gameLogger } from '@tarot/game-logger';
 
 
 interface MatchmakingOverlayProps {
@@ -23,13 +24,13 @@ export function MatchmakingOverlay({ isOpen, onCancel, deckId }: MatchmakingOver
   const animationFrameRef = useRef<number>();
   const startTimeRef = useRef<number>(0);
   const lastUpdateRef = useRef<number>(0);
-  
+
   // Use the smooth timer hook for elapsed time
   const { timeRemaining: elapsedSeconds } = useSmoothTimer(
     999999, // Large number since we're counting up
     isSearchingMatch
   );
-  
+
   const searchTime = Math.floor(999999 - elapsedSeconds);
 
   useEffect(() => {
@@ -44,23 +45,23 @@ export function MatchmakingOverlay({ isOpen, onCancel, deckId }: MatchmakingOver
         if (!startTimeRef.current) {
           startTimeRef.current = timestamp;
         }
-        
+
         const elapsed = timestamp - startTimeRef.current;
         const currentSecond = Math.floor(elapsed / 1000);
-        
+
         // Update players in queue once per second
         if (currentSecond > lastUpdateRef.current) {
           lastUpdateRef.current = currentSecond;
           setPlayersInQueue(Math.floor(Math.random() * 20) + 5);
         }
-        
+
         if (isSearchingMatch) {
           animationFrameRef.current = requestAnimationFrame(updateQueueInfo);
         }
       };
-      
+
       animationFrameRef.current = requestAnimationFrame(updateQueueInfo);
-      
+
       return () => {
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current);
@@ -92,9 +93,11 @@ export function MatchmakingOverlay({ isOpen, onCancel, deckId }: MatchmakingOver
       }
 
       const data = await response.json();
-      console.log('Queued for match:', data);
+      gameLogger.logAction('matchmaking_queued', { data }, true, 'Successfully queued for match');
     } catch (error) {
-      console.error('Matchmaking error:', error);
+      gameLogger.logAction('matchmaking_error', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, false, 'Matchmaking error occurred');
       setSearchingMatch(false);
       onCancel();
     }

@@ -24,28 +24,48 @@ export interface Card {
   rarity: 'common' | 'uncommon' | 'rare' | 'mythic';
 }
 
-export interface BoardSlot {
-  id?: string;
-  card: Card | null;
-  position?: number;
-  isBlocked?: boolean;
+// Unit on the battlefield (lane-based)
+export interface Unit {
+  id: string;
+  cardId: string;
+  card: Card;
+  owner: string;
+  currentAttack: number;
+  currentHealth: number;
+  maxHealth: number;
+  lane: number; // 0, 1, or 2
+  canAttack: boolean;
+  hasAttacked: boolean;
+  keywords: string[];
+  buffs: Array<{ type: string; value: number; duration?: number }>;
+  damage: number;
+  isAttacking?: boolean;
+  isBlocking?: boolean;
+  blockedUnitId?: string;
 }
 
 export interface Player {
   id: string;
   name: string;
-  health: number;
-  maxHealth: number;
-  fate: number; // Acts as Mana (LoR) for now
-  maxFate: number; // Acts as Max Mana (cap 10)
-  spellMana?: number; // Carryover mana usable for spells only (cap 3)
+  nexusHealth?: number; // LoR-style health
+  health?: number; // Legacy support
+  maxHealth?: number; // Legacy support
+  fate?: number; // Legacy mana name
+  maxFate?: number; // Legacy max mana
+  mana?: number; // Current mana (LoR style)
+  maxMana?: number; // Max mana (cap 10)
+  spellMana?: number; // Banked spell mana (cap 3)
   deck: Card[];
   hand: Card[];
   discard: Card[];
-  board: BoardSlot[];
-  trials: Trial[];
+  bench?: Array<Unit | null>; // Back row - units placed but not in combat (6 slots)
+  battlefield?: Array<Unit | null>; // Combat row - attacking/blocking units (6 slots)
+  board?: Array<any>; // Legacy support - will be removed
+  hasAttackToken?: boolean;
+  passed?: boolean;
   avatar?: string;
   isAI?: boolean;
+  trials?: Trial[]; // Legacy support
 }
 
 export interface Trial {
@@ -59,24 +79,36 @@ export interface Trial {
   reward?: string;
 }
 
+// Combat pairing for attack/block
+export interface CombatPair {
+  attackerId: string;
+  blockerId?: string; // Optional, can attack nexus directly
+}
+
 export interface MatchState {
   matchId: string;
   type?: 'pvp' | 'pve' | 'tutorial';
   turn: number;
   phase: GamePhase;
-  activePlayer: string;
-  attackTokenOwner?: string; // LoR-style attack token
-  lastPassBy?: string | null; // Track consecutive passes
+  activePlayer?: string; // Legacy support
+  currentPlayer?: string; // LoR style
+  attackTokenOwner?: string; // Legacy support
+  attackToken?: string; // Who has attack token this round
   players: Record<string, Player>;
-  turnTimer?: number;
-  // Optional attack/block orders for LoR-style pairing
-  pendingAttackOrder?: string[]; // array of attacker card IDs in desired order
-  pendingBlockOrder?: string[];  // array of blocker card IDs in desired order
+  combatPairs?: CombatPair[]; // Active combat pairings
+  spellStack?: Array<{
+    id: string;
+    cardId: string;
+    owner: string;
+    targets?: string[];
+  }>;
+  priority?: string; // Who has priority to act
   reactionWindow?: {
-    active: boolean;
-    respondingPlayer?: string;
-    timeRemaining?: number;
+    open: boolean;
+    respondingPlayer: string;
+    source: string; // What triggered the reaction window
   };
+  turnTimer?: number;
   spreadCards?: {
     past?: Card;
     present?: Card;
@@ -87,40 +119,38 @@ export interface MatchState {
     playerId: string;
     data: any;
   };
+  pendingAttackOrder?: string[]; // Legacy support
 }
 
-// Debug helpers for tracking board removals
-function logBoardRemoval(playerId: string, slotIndex: number, card: Card, reason: string): void {
+// Debug helpers for tracking board changes
+function logUnitRemoval(playerId: string, lane: number, unit: Unit, reason: string): void {
   try {
-    console.log('[Board Removal]', {
+    gameLogger.logAction('unit_removal', {
       playerId,
-      slotIndex,
-      cardId: card.id,
-      cardName: card.name,
-      suit: card.suit,
-      type: card.type,
+      lane,
+      unitId: unit.id,
+      cardId: unit.cardId,
       reason,
-    });
+    }, true);
   } catch (_) {
     // no-op
   }
 }
 
-function logBoardDiff(prevBoard: BoardSlot[], nextBoard: BoardSlot[], playerId: string, context: string): void {
-  const len = Math.max(prevBoard.length, nextBoard.length, 6);
-  for (let i = 0; i < len; i++) {
-    const prevCard = prevBoard[i]?.card || null;
-    const nextCard = nextBoard[i]?.card || null;
-    if (prevCard && !nextCard) {
-      logBoardRemoval(playerId, i, prevCard, `diff:${context}`);
-    } else if (prevCard && nextCard && prevCard.id !== nextCard.id) {
-      console.log('[Board Replace]', {
+function logBoardDiff(prevBoard: Array<Unit | null>, nextBoard: Array<Unit | null>, playerId: string, context: string): void {
+  for (let lane = 0; lane < 3; lane++) {
+    const prevUnit = prevBoard[lane];
+    const nextUnit = nextBoard[lane];
+    if (prevUnit && !nextUnit) {
+      logUnitRemoval(playerId, lane, prevUnit, `diff:${context}`);
+    } else if (prevUnit && nextUnit && prevUnit.id !== nextUnit.id) {
+      gameLogger.logAction('unit_replace', {
         playerId,
-        slotIndex: i,
-        from: { id: prevCard.id, name: prevCard.name },
-        to: { id: nextCard.id, name: nextCard.name },
+        lane,
+        from: { id: prevUnit.id, cardId: prevUnit.cardId },
+        to: { id: nextUnit.id, cardId: nextUnit.cardId },
         context,
-      });
+      }, true);
     }
   }
 }
@@ -148,18 +178,15 @@ interface GameStore {
   toggleHand: () => void;
 
   // Game Actions
-  playCard: (card: Card, targetSlot?: number, playerId?: string) => void;
-  startCombat: () => void;
+  playCard: (card: Card, lane?: number, playerId?: string) => void;
   declareAttackers: (attackerIds: string[], playerId?: string) => void;
-  setBlockOrder: (blockerIds: string[]) => void;
-  resolveDeclaredCombat: () => void;
-  endTurn: () => void; // Acts as Pass priority
-  flipCard: (cardId: string, playerId?: string) => void;
-  peekDestiny: () => void;
-  forceDraw: () => void;
+  declareBlockers: (blockAssignments: Array<{ blockerId: string; attackerId: string }>, playerId?: string) => void;
+  resolveCombat: () => void;
+  pass: (playerId?: string) => void; // Pass priority
+  endTurn: () => void;
+  endMatch: (result: 'victory' | 'defeat' | 'abandon') => void;
   initializeMatch: (matchData: Partial<MatchState>) => void;
   updateMatch: (updates: Partial<MatchState>) => void;
-  useFateToFlip: (cardId: string, playerId?: string) => void;
 
   // Connection
 
@@ -211,10 +238,10 @@ export const useGameStore = create<GameStore>()(
       toggleHand: () => set((state) => ({ showHandToggle: !state.showHandToggle })),
 
       // Game Actions
-      playCard: (card, targetSlot, playerId = 'player1') => {
+      playCard: (card, lane, playerId = 'player1') => {
         const state = get();
         if (!state.currentMatch) {
-          gameLogger.logAction('play_card', { cardName: card.name, targetSlot, playerId }, false, 'No current match');
+          gameLogger.logAction('play_card', { cardName: card.name, lane, playerId }, false, 'No current match');
           return;
         }
 
@@ -234,47 +261,86 @@ export const useGameStore = create<GameStore>()(
 
         // Turn guard: only active player can initiate actions locally
         if (state.currentMatch.activePlayer !== playerId) {
-          gameLogger.logAction('play_card', { cardName: card.name, playerId, activePlayer: state.currentMatch.activePlayer }, false, 'Not your turn');
+          gameLogger.logAction('play_card_denied', {
+            cardName: card.name,
+            reason: 'not_your_turn',
+            activePlayer: state.currentMatch.activePlayer
+          }, false, 'Play card denied - not your turn');
           return;
         }
 
-        console.log('Current board:', player.board);
-        console.log('Current hand:', player.hand.map(c => c.name));
+        // Only log board state on failed attempts or first few turns for debugging
+        if (!state.currentMatch || state.currentMatch.turn <= 3) {
+          gameLogger.logAction('debug_board_state', {
+            benchCount: player.bench?.filter(u => u !== null).length || 0,
+            boardCount: player.board?.filter(u => u !== null).length || 0,
+            handCount: player.hand.length,
+            handNames: player.hand.slice(0, 3).map(c => c.name), // Limit to first 3 cards
+            playerId
+          }, true);
+        }
 
         // LoR-style resource check: pay from fate (mana), and for spells, from spellMana if needed
         const isSpell = card.type === 'spell';
         const availableMana = player.fate + (isSpell ? (player.spellMana || 0) : 0);
         if (card.cost > availableMana) {
-          gameLogger.logAction('play_card', {
+          gameLogger.logAction('play_card_denied', {
             cardName: card.name,
+            reason: 'insufficient_mana',
             cost: card.cost,
-            availableMana,
-            fate: player.fate,
-            spellMana: player.spellMana || 0
-          }, false, 'Insufficient mana');
+            availableMana
+          }, false, 'Play card denied - insufficient mana');
           return;
         }
 
         // Remove card from hand
         const updatedHand = player.hand.filter(c => c.id !== card.id);
 
-        // Board update path only for units; spells resolve instantly and go to discard
-        const updatedBoard = [...player.board];
+        // Units go to bench, spells resolve instantly
+        const updatedBench = [...(player.bench || Array(6).fill(null))];
         const updatedDiscard = [...player.discard];
-        if (card.type === 'unit' || card.type === 'major' || (card.type === 'spell' && card.suit === 'major')) {
-          if (targetSlot === undefined || targetSlot >= updatedBoard.length) {
-            gameLogger.logAction('play_card', { cardName: card.name, targetSlot, boardLength: updatedBoard.length }, false, 'Invalid slot');
+
+        if (card.type === 'unit') {
+          // Find first empty slot on bench
+          const emptySlot = lane !== undefined ? lane : updatedBench.findIndex(slot => !slot);
+          if (emptySlot === -1 || emptySlot >= 6) {
+            gameLogger.logAction('play_card_denied', {
+              cardName: card.name,
+              reason: 'bench_full'
+            }, false, 'Play card denied - bench is full');
             return;
           }
-          if (updatedBoard[targetSlot].card) {
-            gameLogger.logAction('play_card', { cardName: card.name, targetSlot, occupiedBy: updatedBoard[targetSlot].card?.name }, false, 'Slot occupied');
+          if (updatedBench[emptySlot]) {
+            gameLogger.logAction('play_card_denied', {
+              cardName: card.name,
+              reason: 'slot_occupied',
+              slot: emptySlot
+            }, false, 'Play card denied - slot occupied');
             return;
           }
-          updatedBoard[targetSlot] = { ...updatedBoard[targetSlot], card };
-          gameLogger.logAction('place_unit', { cardName: card.name, targetSlot, cardType: card.type }, true);
+
+          // Create unit and place on bench
+          const unit: Unit = {
+            id: `unit_${Date.now()}_${card.id}`,
+            cardId: card.id,
+            card: card,
+            owner: playerId,
+            currentAttack: card.attack || 0,
+            currentHealth: card.health || 1,
+            maxHealth: card.health || 1,
+            lane: emptySlot,
+            canAttack: false, // Summoning sickness
+            hasAttacked: false,
+            keywords: [],
+            buffs: [],
+            damage: 0
+          };
+
+          updatedBench[emptySlot] = unit;
+          gameLogger.logAction('place_unit', { cardName: card.name, slot: emptySlot }, true);
         } else {
           // Spell: resolve immediately (placeholder), then discard
-          gameLogger.logAction('cast_spell', { cardName: card.name, suit: card.suit }, true);
+          gameLogger.logAction('cast_spell', { cardName: card.name, type: card.type }, true);
           updatedDiscard.push(card);
         }
 
@@ -334,6 +400,7 @@ export const useGameStore = create<GameStore>()(
               [playerId]: {
                 ...player,
                 hand: updatedHand,
+                bench: updatedBench,
                 board: updatedBoard,
                 fate: updatedFate,
                 spellMana,
@@ -345,7 +412,8 @@ export const useGameStore = create<GameStore>()(
 
         // Log diff for immediate local play
         try {
-          const prevBoard = player.board;
+          const prevBoard = player.board || [];
+          const updatedBoard = player.board || [];
           logBoardDiff(prevBoard, updatedBoard, playerId, 'playCard');
         } catch (_) { }
       },
@@ -946,6 +1014,21 @@ export const useGameStore = create<GameStore>()(
         });
       },
 
+      endMatch: (result) => {
+        const state = get();
+        if (!state.currentMatch) return;
+
+        gameLogger.logAction('match_end', {
+          matchId: state.currentMatch.matchId,
+          result,
+          turn: state.currentMatch.turn,
+          phase: state.currentMatch.phase
+        }, true, `Match ended: ${result}`);
+
+        // Clear match state
+        set({ currentMatch: null });
+      },
+
       flipCard: (cardId, playerId = 'player1') => {
         const state = get();
         if (!state.currentMatch) return;
@@ -1035,7 +1118,12 @@ export const useGameStore = create<GameStore>()(
 
         const player = state.currentMatch.players[playerId];
         if (!player || player.fate < 1) {
-          console.log('Not enough fate to flip card');
+          gameLogger.logAction('flip_card_failed', {
+            cardId,
+            playerId,
+            currentFate: player?.fate || 0,
+            requiredFate: 1
+          }, false, 'Not enough fate to flip card');
           return;
         }
 
@@ -1058,13 +1146,11 @@ export const useGameStore = create<GameStore>()(
       },
 
       peekDestiny: () => {
-        console.log('Peeking at destiny');
-
+        gameLogger.logAction('peek_destiny', {}, true);
       },
 
       forceDraw: () => {
-        console.log('Forcing draw');
-
+        gameLogger.logAction('force_draw', {}, true);
       },
 
       initializeMatch: (matchData) => {

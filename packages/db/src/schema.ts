@@ -7,9 +7,13 @@ export const CardSchema = z.object({
   name: z.string(),
   suit: z.string(),
   cost: z.number(),
-  type: z.string(),
-  rarity: z.string(),
+  attack: z.number().optional(),
+  health: z.number().optional(),
+  type: z.enum(['unit', 'spell', 'burst', 'fast', 'slow']),
+  keywords: z.array(z.string()).optional(),
+  rarity: z.enum(['common', 'uncommon', 'rare', 'epic', 'legendary', 'champion']),
   cardSet: z.string(),
+  championLevelUp: z.string().optional(),
 });
 
 export const DeckSchema = z.object({
@@ -65,13 +69,33 @@ export const cards = pgTable('cards', {
   name: text('name').notNull(),
   suit: text('suit').notNull(),
   cost: integer('cost').notNull(),
-  type: text('type').notNull(),
+  attack: integer('attack'),
+  health: integer('health'),
+  type: text('type').notNull(), // 'unit' | 'spell' | 'burst' | 'fast' | 'slow'
+  keywords: text('keywords'), // JSON array of keywords
   rarity: text('rarity').notNull(),
   cardSet: text('card_set').notNull(),
+  championLevelUp: text('champion_level_up'), // Level up condition for champions
 });
 
 export const decks = pgTable('decks', {
   id: text('id').primaryKey(),
   ownerId: text('owner_id').notNull(),
   format: text('format').notNull(),
+  cards: text('cards').notNull(), // JSON array of card IDs
+  championCount: integer('champion_count').default(0),
+});
+
+// Match state for lane-based games
+export const matches = pgTable('matches', {
+  id: text('id').primaryKey(),
+  seed: text('seed').notNull(),
+  players: text('players').notNull(), // JSON array of player IDs
+  turn: integer('turn').notNull().default(0),
+  currentPlayer: text('current_player').notNull(),
+  phase: text('phase').notNull(), // 'draw' | 'main' | 'combat' | 'end'
+  state: text('state').notNull(), // Full JSON match state
+  winner: text('winner'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

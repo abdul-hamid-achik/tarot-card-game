@@ -46,12 +46,6 @@ class AudioManager {
     // Only access localStorage on client side
     if (typeof window !== 'undefined') {
       this.isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-      console.log('🎵 AudioManager initialized:', {
-        isSafari: this.isSafari,
-        basePath: this.basePath,
-        userAgent: navigator.userAgent
-      });
-
       gameLogger.logAction('audio_manager_init', {
         isSafari: this.isSafari,
         basePath: this.basePath,
@@ -102,8 +96,6 @@ class AudioManager {
     }
 
     try {
-      console.log('🎵 Enabling audio system...');
-
       gameLogger.logAction('audio_enable_start', {
         isSafari: this.isSafari,
         currentAudioEnabled: this.audioEnabled
@@ -115,11 +107,11 @@ class AudioManager {
           const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
           if (audioContext.state === 'suspended') {
             await audioContext.resume();
-            console.log('🎵 Audio context resumed');
+            gameLogger.logAction('audio_context_resumed', {}, true);
           }
           audioContext.close(); // Clean up
         } catch (contextError) {
-          console.warn('Audio context resume failed:', contextError);
+          gameLogger.logAction('audio_context_resume_failed', { error: contextError.message }, false, 'Audio context resume failed');
         }
       }
 
@@ -158,18 +150,20 @@ class AudioManager {
             testAudio.pause();
             testAudio.remove();
             unlockSuccessful = true;
-            console.log('🎵 Autoplay unlocked successfully');
+            gameLogger.logAction('audio_autoplay_unlocked', {}, true, 'Autoplay unlocked successfully');
             break;
           }
         } catch (playError) {
-          console.warn('🎵 Test audio play failed:', playError);
+          gameLogger.logAction('audio_test_play_failed', {
+            error: playError instanceof Error ? playError.message : 'Unknown error'
+          }, false, 'Test audio play failed');
           testAudio.remove();
         }
       }
 
       if (!unlockSuccessful) {
         // Last resort: create a user interaction dependent unlock
-        console.warn('🎵 Standard autoplay unlock failed, will unlock on user interaction');
+        gameLogger.logAction('audio_autoplay_unlock_failed', { isSafari: this.isSafari }, false, 'Standard autoplay unlock failed, will unlock on user interaction');
         gameLogger.logAction('audio_enable_failed', {
           reason: 'autoplay_unlock_failed',
           isSafari: this.isSafari
@@ -181,15 +175,12 @@ class AudioManager {
 
       this.audioEnabled = true;
       localStorage.setItem('audioEnabled', 'true');
-      console.log('🎵 Audio system enabled successfully');
-
-      gameLogger.logAction('audio_enable_success', {
+      gameLogger.logAction('audio_system_enabled', {
         isSafari: this.isSafari,
         audioEnabled: this.audioEnabled
       }, true, 'Audio system enabled successfully');
       return true;
     } catch (error) {
-      console.error('🎵 Failed to enable audio:', error);
       gameLogger.logAction('audio_enable_error', {
         error: error instanceof Error ? error.message : 'Unknown error',
         isSafari: this.isSafari
@@ -233,7 +224,10 @@ class AudioManager {
     const timeSinceInteraction = now - lastInteraction;
 
     if (timeSinceInteraction > 5000) { // 5 seconds
-      console.warn('🎵 No recent user interaction for Safari audio');
+      gameLogger.logAction('audio_no_recent_interaction', {
+        isSafari: this.isSafari,
+        lastInteraction: lastInteraction
+      }, false, 'No recent user interaction for Safari audio');
       return;
     }
 
@@ -259,9 +253,12 @@ class AudioManager {
       source.connect(audioContext.destination);
       source.start(0);
 
-      console.log('🎵 Safari fallback successful for:', soundName);
+      gameLogger.logAction('audio_safari_fallback_success', { soundName }, true, 'Safari fallback successful');
     } catch (fallbackError) {
-      console.error('🎵 Safari Web Audio fallback failed:', fallbackError);
+      gameLogger.logAction('audio_web_audio_fallback_failed', {
+        soundName,
+        error: fallbackError instanceof Error ? fallbackError.message : 'Unknown error'
+      }, false, 'Safari Web Audio fallback failed');
     }
   }
 
@@ -288,7 +285,7 @@ class AudioManager {
     const lastInteraction = parseInt(localStorage.getItem('lastUserInteraction') || '0');
     const timeSinceInteraction = Date.now() - lastInteraction;
 
-    console.log('🎵 Audio Debug Info:', {
+    gameLogger.logAction('audio_debug_status', {
       isSafari,
       audioEnabled: this.audioEnabled,
       audioEnabledInStorage: localStorage.getItem('audioEnabled'),
@@ -373,14 +370,14 @@ class AudioManager {
         return;
       }
 
-      console.log('🎵 Playing sound:', soundName);
-
-      gameLogger.logAction('audio_play_start', {
-        soundName,
-        isSafari: this.isSafari,
-        volume: this.volume,
-        fileExtension: this.isSafari ? 'mp3' : 'wav'
-      }, true, 'Starting audio play');
+      // Only log audio play for non-frequent sounds to reduce verbosity
+      if (!soundName.includes('hover') && !soundName.includes('tick')) {
+        gameLogger.logAction('audio_play_start', {
+          soundName,
+          isSafari: this.isSafari,
+          volume: this.volume
+        }, true, 'Starting audio play');
+      }
 
       // Get an available audio element from the pool
       const audio = this.getAvailableAudioElement();
@@ -396,7 +393,7 @@ class AudioManager {
       // Set the source and volume - prefer MP3 for Safari, WAV for others
       const fileExtension = this.isSafari ? 'mp3' : 'wav';
       const audioUrl = `${this.basePath}${soundName}.${fileExtension}`;
-      console.log('🎵 Loading audio from:', audioUrl, { soundName, fileExtension, isSafari: this.isSafari, basePath: this.basePath });
+      gameLogger.logAction('audio_loading', { audioUrl, soundName, fileExtension, isSafari: this.isSafari, basePath: this.basePath }, true);
       audio.src = audioUrl;
       audio.volume = this.volume;
       audio.currentTime = 0;
@@ -405,7 +402,7 @@ class AudioManager {
       // Wait for the audio to be loadable with Safari-specific timeout
       const canPlay = await new Promise<boolean>((resolve) => {
         const timeout = setTimeout(() => {
-          console.warn('🎵 Audio load timeout for:', soundName);
+          gameLogger.logAction('audio_load_timeout', { soundName, isSafari: this.isSafari }, false, 'Audio load timeout');
           resolve(false);
         }, this.isSafari ? 2000 : 1000); // Longer timeout for Safari
 
@@ -419,7 +416,11 @@ class AudioManager {
           clearTimeout(timeout);
           audio.removeEventListener('canplay', onCanPlay);
           audio.removeEventListener('error', onError);
-          console.warn('🎵 Audio load error:', soundName, event);
+          gameLogger.logAction('audio_load_error', {
+            soundName,
+            error: event instanceof Error ? event.message : 'Load error',
+            isSafari: this.isSafari
+          }, false, 'Audio load error');
           resolve(false);
         };
 
@@ -431,7 +432,7 @@ class AudioManager {
       });
 
       if (!canPlay) {
-        console.warn('Failed to load audio:', soundName);
+        gameLogger.logAction('audio_load_failed', { soundName, isSafari: this.isSafari }, false, 'Failed to load audio');
         return;
       }
 
@@ -442,30 +443,41 @@ class AudioManager {
           await playPromise.catch(error => {
             // Handle autoplay policy issues
             if (error.name === 'NotAllowedError' || error.name === 'NotSupportedError') {
-              console.warn('🎵 Audio play blocked by browser. User interaction required.');
-              console.warn('🎵 Error details:', {
+              gameLogger.logAction('audio_play_blocked', {
                 name: error.name,
                 message: error.message,
                 browser: navigator.userAgent,
                 audioEnabled: this.audioEnabled,
                 isSafari: this.isSafari
-              });
+              }, false, 'Audio play blocked by browser. User interaction required.');
               this.audioEnabled = false;
               return;
             }
-            console.warn('🎵 Failed to play sound:', soundName, error);
+            gameLogger.logAction('audio_play_failed', {
+              soundName,
+              error: error.name,
+              message: error.message,
+              isSafari: this.isSafari
+            }, false, 'Failed to play sound');
           });
         }
       } catch (playError) {
-        console.error('🎵 Play method threw error:', soundName, playError);
+        gameLogger.logAction('audio_play_method_error', {
+          soundName,
+          error: playError instanceof Error ? playError.message : 'Unknown error',
+          isSafari: this.isSafari
+        }, false, 'Play method threw error');
         // For Safari, try a different approach
         if (this.isSafari) {
-          console.log('🎵 Attempting Safari fallback for:', soundName);
+          gameLogger.logAction('audio_safari_fallback_attempt', { soundName }, true, 'Attempting Safari fallback');
           try {
             // Force a user interaction check
             await this.handleSafariFallback(audio, soundName);
           } catch (fallbackError) {
-            console.error('🎵 Safari fallback failed:', fallbackError);
+            gameLogger.logAction('audio_safari_fallback_failed', {
+              soundName,
+              error: fallbackError instanceof Error ? fallbackError.message : 'Unknown error'
+            }, false, 'Safari fallback failed');
           }
         }
       }
@@ -476,16 +488,14 @@ class AudioManager {
       if (categoryOfSound) this.lastCategoryPlayAt.set(categoryOfSound, now);
       this.playTimestamps.push(now);
 
-      console.log('🎵 Successfully played:', soundName);
-
-      gameLogger.logAction('audio_play_success', {
-        soundName,
-        isSafari: this.isSafari,
-        volume: this.volume
-      }, true, 'Audio played successfully');
+      // Only log successful audio plays for important sounds
+      if (!soundName.includes('hover') && !soundName.includes('tick') && !soundName.includes('cardFlip')) {
+        gameLogger.logAction('audio_play_success', {
+          soundName,
+          isSafari: this.isSafari
+        }, true, 'Audio played successfully');
+      }
     } catch (error) {
-      console.error('🎵 Error playing sound:', soundName, error);
-
       gameLogger.logAction('audio_play_error', {
         soundName,
         error: error instanceof Error ? error.message : 'Unknown error',

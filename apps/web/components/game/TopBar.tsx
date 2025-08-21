@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dialog';
 import { GamePhase } from '@/lib/store/gameStore';
 import { useGameStore } from '@/lib/store/gameStore';
+// Removed TrialsDisplay from TopBar; it will be shown in GameBoard top-left
 
 interface TopBarProps {
   matchId: string;

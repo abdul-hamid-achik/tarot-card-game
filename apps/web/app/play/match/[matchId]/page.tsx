@@ -131,7 +131,8 @@ const createMockMatch = (matchId: string): MatchState => {
       }
     ],
     discard: [],
-    board: Array(6).fill(null).map((_, i) => ({ card: null, position: i })),
+    bench: Array(6).fill(null),
+    battlefield: Array(6).fill(null),
     trials: mockTrials
   };
 
@@ -154,7 +155,8 @@ const createMockMatch = (matchId: string): MatchState => {
       rarity: 'common'
     })),
     discard: [],
-    board: Array(6).fill(null).map((_, i) => ({ card: null, position: i })),
+    bench: Array(6).fill(null),
+    battlefield: Array(6).fill(null),
     trials: mockTrials
   };
 

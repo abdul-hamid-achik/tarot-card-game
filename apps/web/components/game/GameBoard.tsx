@@ -2,21 +2,202 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DndContext, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
+import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, DragOverEvent } from '@dnd-kit/core';
+import { useDroppable } from '@dnd-kit/core';
 import { Card, useGameStore } from '@/lib/store/gameStore';
 import { TarotCard } from './TarotCard';
-import { PlayerArea } from './PlayerArea';
-import { OpponentArea } from './OpponentArea';
-import { CenterBoard } from './CenterBoard';
-import { TopBar } from './TopBar';
-import { FateCounter } from './FateCounter';
-import { TrialsDisplay } from './TrialsDisplay';
 import { CardOverlay } from './CardOverlay';
-import { PixelButton } from '@/components/ui/pixel-button';
+import { GameMenu } from './GameMenu';
+import { CardActionMenu } from './CardActionMenu';
 import { cn } from '@/lib/utils';
 import { audioManager } from '@/lib/audio/AudioManager';
 import { gameLogger } from '@tarot/game-logger';
-import { GameLogViewer, DebugToggle } from '@/components/debug/GameLogViewer';
+
+interface ZoneProps {
+  id: string;
+  cards: (Card | null)[];
+  type: 'hand' | 'bench' | 'battlefield';
+  isPlayer: boolean;
+  maxCards: number;
+  onCardClick?: (card: Card, event?: React.MouseEvent) => void;
+  isValidDropZone?: boolean;
+  className?: string;
+}
+
+function DropZone({ id, cards, type, isPlayer, maxCards, onCardClick, isValidDropZone, className }: ZoneProps) {
+  const { setNodeRef, isOver } = useDroppable({
+    id,
+    data: { type, isPlayer }
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "relative transition-all duration-200",
+        type === 'hand' && "flex gap-2 justify-center p-4",
+        type === 'bench' && "grid grid-cols-6 gap-2 p-3",
+        type === 'battlefield' && "grid grid-cols-6 gap-2 p-3",
+        isValidDropZone && "ring-2 ring-tarot-gold/50",
+        isOver && "bg-tarot-gold/10 scale-[1.02]",
+        className
+      )}
+    >
+      {/* Background pattern for zones */}
+      <div className="absolute inset-0 opacity-5">
+        <div className="w-full h-full"
+          style={{
+            backgroundImage: type === 'battlefield'
+              ? 'radial-gradient(circle at center, var(--tarot-gold) 1px, transparent 1px)'
+              : 'linear-gradient(45deg, var(--tarot-mystic-purple) 25%, transparent 25%)',
+            backgroundSize: type === 'battlefield' ? '20px 20px' : '10px 10px'
+          }}
+        />
+      </div>
+
+      {/* Zone Label */}
+      <div className={cn(
+        "absolute text-xs font-bold uppercase tracking-wider opacity-30",
+        isPlayer ? "bottom-1 right-2" : "top-1 left-2"
+      )}>
+        {type === 'hand' ? 'The Spread' :
+          type === 'bench' ? 'Reading Table' :
+            'Manifestation'}
+      </div>
+
+      {/* Card Slots */}
+      {type === 'hand' ? (
+        cards.filter(Boolean).map((card, idx) => (
+          <motion.div
+            key={card?.id || idx}
+            initial={{ opacity: 0, y: isPlayer ? 20 : -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ delay: idx * 0.05 }}
+            whileHover={isPlayer ? { y: -20, scale: 1.05 } : undefined}
+            onClick={(e) => card && onCardClick?.(card, e)}
+            className="cursor-pointer relative"
+          >
+            {card && (
+              <TarotCard card={card} scale={0.8} isDraggable={false} />
+            )}
+          </motion.div>
+        ))
+      ) : (
+        Array.from({ length: maxCards }).map((_, idx) => {
+          const card = cards[idx];
+          return (
+            <div
+              key={idx}
+              className={cn(
+                "relative aspect-[2/3] rounded-lg border-2 transition-all",
+                card ? "border-tarot-gold/30 bg-black/20" : "border-white/10 bg-black/10",
+                type === 'battlefield' && "shadow-lg"
+              )}
+            >
+              {card && (
+                <motion.div
+                  layoutId={card.id}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  onClick={() => {
+                    // Only log significant card interactions, not every click
+                    if (type === 'hand' || type === 'battlefield') {
+                      gameLogger.logAction('card_interaction', {
+                        cardId: card.id,
+                        cardName: card.name,
+                        zoneType: type,
+                        slot: idx,
+                        isPlayer: isPlayer
+                      }, true, 'Card interaction in game board');
+                    }
+                    onCardClick?.(card);
+                  }}
+                  className="absolute inset-0 cursor-pointer"
+                >
+                  <TarotCard card={card} scale={1} />
+                </motion.div>
+              )}
+
+              {/* Slot number indicator */}
+              <div className="absolute bottom-1 right-1 text-xs opacity-20">
+                {idx + 1}
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+interface ArcanumProps {
+  health: number;
+  maxHealth: number;
+  isPlayer: boolean;
+  playerName: string;
+}
+
+function Arcanum({ health, maxHealth, isPlayer, playerName }: ArcanumProps) {
+  const healthPercentage = (health / maxHealth) * 100;
+
+  return (
+    <div className={cn(
+      "relative w-24 h-32 rounded-xl overflow-hidden",
+      "bg-gradient-to-br from-tarot-mystic-purple to-tarot-mystic-violet",
+      "border-2 border-tarot-gold/50 shadow-2xl",
+      health <= 5 && "animate-pulse border-red-500"
+    )}>
+      {/* Arcanum Crystal Effect */}
+      <div className="absolute inset-0">
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+        <motion.div
+          className="absolute inset-0 opacity-30"
+          animate={{
+            backgroundPosition: ['0% 0%', '100% 100%'],
+          }}
+          transition={{
+            duration: 10,
+            repeat: Infinity,
+            repeatType: 'reverse'
+          }}
+          style={{
+            backgroundImage: 'radial-gradient(circle at center, var(--tarot-gold) 1px, transparent 50%)',
+            backgroundSize: '10px 10px'
+          }}
+        />
+      </div>
+
+      {/* Health Display */}
+      <div className="relative z-10 h-full flex flex-col items-center justify-center">
+        <div className="text-3xl font-bold text-white drop-shadow-lg">
+          {health}
+        </div>
+        <div className="text-xs text-white/70">
+          ARCANUM
+        </div>
+      </div>
+
+      {/* Health Bar */}
+      <div className="absolute bottom-0 left-0 right-0 h-2 bg-black/50">
+        <motion.div
+          className="h-full bg-gradient-to-r from-tarot-gold to-yellow-400"
+          initial={{ width: '100%' }}
+          animate={{ width: `${healthPercentage}%` }}
+          transition={{ duration: 0.5 }}
+        />
+      </div>
+
+      {/* Player Name */}
+      <div className={cn(
+        "absolute text-xs font-bold text-white/70",
+        isPlayer ? "-bottom-5 left-1/2 -translate-x-1/2" : "-top-5 left-1/2 -translate-x-1/2"
+      )}>
+        {playerName}
+      </div>
+    </div>
+  );
+}
 
 export function GameBoard() {
   const {
@@ -24,456 +205,318 @@ export function GameBoard() {
     draggedCard,
     setDraggedCard,
     playCard,
-    declareAttackers,
-    setBlockOrder,
-    resolveDeclaredCombat,
-    startCombat,
     endTurn,
-    validDropZones,
-    updateMatchState
+    validDropZones
   } = useGameStore();
 
-  // Helper function to check if player can take actions
-  const canPlayerTakeActions = (player: any) => {
-    if (!player) return false;
-
-    // Check if player has fate (mana) remaining
-    const hasMana = player.fate > 0;
-
-    // Check if player has spell mana remaining
-    const hasSpellMana = (player.spellMana || 0) > 0;
-
-    // Check if player has any playable cards in hand
-    const hasPlayableCards = player.hand?.some((card: any) =>
-      card.cost <= (player.fate + (player.spellMana || 0))
-    ) || false;
-
-    // Check if player has any units on board that could perform actions
-    const hasActiveUnits = player.board?.some((slot: any) =>
-      slot.card && slot.card.type === 'unit'
-    ) || false;
-
-    return hasMana || hasSpellMana || hasPlayableCards || hasActiveUnits;
-  };
-
-  const [activePlayer, setActivePlayer] = useState<string | null>(null);
-  const [showSpellStack, setShowSpellStack] = useState(false);
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [showCardOverlay, setShowCardOverlay] = useState(false);
-  const [showDebugLog, setShowDebugLog] = useState(false);
-
-  useEffect(() => {
-    // Preload common game sounds
-    audioManager.preloadGameSounds();
-
-    // Set up game logging context when match changes
-    if (currentMatch) {
-      gameLogger.setContext({
-        matchId: currentMatch.matchId,
-        turn: currentMatch.turn,
-        phase: currentMatch.phase
-      });
-    }
-  }, [currentMatch]);
-
-  const handleCardClick = (card: Card) => {
-    requestAnimationFrame(() => {
-      setSelectedCard(card);
-      setShowCardOverlay(true);
-    });
-  };
-
-  const handleCloseOverlay = () => {
-    requestAnimationFrame(() => {
-      setShowCardOverlay(false);
-      setSelectedCard(null);
-    });
-  };
-
-  const handleDragStart = (event: DragStartEvent) => {
-    const card = event.active.data.current as Card;
-    requestAnimationFrame(() => {
-      if (card) {
-        gameLogger.logAction('drag_start', {
-          cardId: card.id,
-          cardName: card.name,
-          cardType: card.type
-        }, true);
-        setDraggedCard(card);
-      }
-    });
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    requestAnimationFrame(() => {
-      if (over && draggedCard) {
-        // Check if this is a player slot (not opponent slot)
-        const isPlayerSlot = over.data.current?.isPlayerSlot;
-        const targetSlot = over.data.current?.slot;
-
-        gameLogger.logAction('drag_end', {
-          cardId: draggedCard.id,
-          cardName: draggedCard.name,
-          overId: over.id,
-          isPlayerSlot,
-          targetSlot
-        }, true);
-
-        if (isPlayerSlot && targetSlot !== undefined) {
-          gameLogger.logAction('card_drop_success', {
-            cardName: draggedCard.name,
-            targetSlot
-          }, true);
-          playCard(draggedCard, targetSlot);
-          audioManager.playRandom('cardPlace');
-        } else {
-          gameLogger.logAction('card_drop_invalid', {
-            cardName: draggedCard.name,
-            reason: !isPlayerSlot ? 'Not player slot' : 'Invalid slot'
-          }, false);
-        }
-      } else {
-        gameLogger.logAction('drag_end_no_target', {
-          cardName: draggedCard?.name || 'unknown'
-        });
-      }
-
-      setDraggedCard(null);
-    });
-  };
+  const [dragOverZone, setDragOverZone] = useState<string | null>(null);
+  const [actionMenuCard, setActionMenuCard] = useState<Card | null>(null);
+  const [actionMenuPosition, setActionMenuPosition] = useState({ x: 0, y: 0 });
+  const [showActionMenu, setShowActionMenu] = useState(false);
 
   if (!currentMatch) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-tarot-board-dark to-tarot-mystic-purple flex items-center justify-center">
-        <div className="text-tarot-gold text-2xl animate-pulse">Preparing the Arcanum...</div>
+        <div className="text-tarot-gold text-2xl animate-pulse">Consulting the Fates...</div>
       </div>
     );
   }
 
-  const currentPlayerId = 'player1'; // This will come from auth/session
+  const currentPlayerId = 'player1';
   const playerIds = Object.keys(currentMatch.players);
-  const opponentId = playerIds.find(id => id !== currentPlayerId) || playerIds[1] || 'player2';
+  const opponentId = playerIds.find(id => id !== currentPlayerId) || 'player2';
   const currentPlayer = currentMatch.players[currentPlayerId];
   const opponentPlayer = currentMatch.players[opponentId];
   const isMyTurn = currentMatch.activePlayer === currentPlayerId;
-  const hasAttackToken = currentMatch.attackTokenOwner === currentPlayerId;
-  const isDefender = currentMatch.attackTokenOwner !== currentPlayerId;
+
+  const handleCardClick = (card: Card, event?: React.MouseEvent) => {
+    // Only show action menu for cards in hand
+    if (event && currentPlayer?.hand?.some(c => c.id === card.id)) {
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      setActionMenuCard(card);
+      setActionMenuPosition({
+        x: rect.left + rect.width / 2,
+        y: rect.top - 10
+      });
+      setShowActionMenu(true);
+    } else {
+      // For cards not in hand, just show the overlay
+      setSelectedCard(card);
+      setShowCardOverlay(true);
+    }
+  };
+
+  const handlePlayCard = () => {
+    if (actionMenuCard) {
+      // Find first empty slot on bench
+      const emptySlot = currentPlayer?.bench?.findIndex(slot => !slot);
+      if (emptySlot !== undefined && emptySlot >= 0) {
+        playCard(actionMenuCard, emptySlot);
+        audioManager.playRandom('cardPlace');
+      }
+      setShowActionMenu(false);
+      setActionMenuCard(null);
+    }
+  };
+
+  const handleViewCard = () => {
+    if (actionMenuCard) {
+      setSelectedCard(actionMenuCard);
+      setShowCardOverlay(true);
+      setShowActionMenu(false);
+    }
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const card = event.active.data.current as Card;
+    if (card) {
+      setDraggedCard(card);
+      audioManager.playRandom('cardPickup');
+      // Only log drag start for meaningful interactions
+      if (card.type !== 'unit') {
+        gameLogger.logAction('card_drag_start', {
+          cardId: card.id,
+          cardName: card.name,
+          cardType: card.type,
+          playerId: 'player1'
+        }, true, 'Player started dragging card');
+      }
+    }
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    setDragOverZone(event.over?.id as string || null);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && draggedCard) {
+      const dropData = over.data.current;
+
+      if (dropData?.type === 'bench' && dropData?.isPlayer) {
+        // Find first empty slot on bench
+        const emptySlot = currentPlayer.bench?.findIndex(slot => !slot);
+        if (emptySlot !== undefined && emptySlot >= 0) {
+          playCard(draggedCard, emptySlot);
+          audioManager.playRandom('cardPlace');
+          // Only log successful plays for non-unit cards to reduce verbosity
+          if (draggedCard.type !== 'unit') {
+            gameLogger.logAction('card_play_success', {
+              cardId: draggedCard.id,
+              cardName: draggedCard.name,
+              cardType: draggedCard.type,
+              slot: emptySlot,
+              playerId: 'player1'
+            }, true, 'Card successfully played');
+          }
+        } else {
+          gameLogger.logAction('card_play_failed', {
+            cardId: draggedCard.id,
+            cardName: draggedCard.name,
+            reason: 'bench_full'
+          }, false, 'Failed to play card - bench is full');
+        }
+      } else {
+        gameLogger.logAction('card_play_failed', {
+          cardId: draggedCard.id,
+          cardName: draggedCard.name,
+          reason: 'invalid_drop_zone',
+          dropZone: dropData?.type
+        }, false, 'Failed to play card - invalid drop zone');
+      }
+    } else {
+      // Don't log cancelled drags to reduce noise - only log meaningful interactions
+    }
+
+    setDraggedCard(null);
+    setDragOverZone(null);
+  };
 
   return (
-    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div
-        className="min-h-screen bg-gradient-to-b from-tarot-board-dark via-tarot-board-medium to-tarot-board-light overflow-hidden"
-        data-testid="game-board"
-      >
-        {/* Background Effects - Mystical atmosphere */}
+    <DndContext
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="min-h-screen bg-gradient-to-b from-tarot-board-dark via-tarot-mystic-purple/20 to-tarot-board-dark overflow-hidden">
+        {/* Game Menu */}
+        <GameMenu />
+
+        {/* Mystical Background Effects */}
         <div className="fixed inset-0">
-          {/* Table Background Texture */}
-          <div
-            className="absolute inset-0 opacity-30"
-            style={{
-              backgroundImage: 'url(/api/ui/themes/pixel-pack/backgrounds/table_bg_03.png)',
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              imageRendering: 'auto'
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/50" />
-          <div className="absolute inset-0 bg-mystic-gradient opacity-30" />
-          <div className="absolute top-0 left-1/4 w-96 h-96 bg-tarot-mystic-purple rounded-full blur-3xl opacity-20 animate-glow-pulse" />
-          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-tarot-mystic-violet rounded-full blur-3xl opacity-20 animate-glow-pulse delay-1000" />
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-tarot-gold/5 rounded-full blur-3xl" />
+          <div className="absolute inset-0 opacity-20">
+            <div className="absolute top-20 left-1/4 w-96 h-96 bg-tarot-mystic-purple rounded-full blur-3xl animate-pulse" />
+            <div className="absolute bottom-20 right-1/4 w-96 h-96 bg-tarot-mystic-violet rounded-full blur-3xl animate-pulse delay-1000" />
+          </div>
         </div>
 
-        <div className="relative z-10 h-screen flex flex-col">
-          {/* Top Bar - 6% Height */}
-          <div className="h-[6%] bg-black/30 backdrop-blur-sm border-b border-white/10">
-            <TopBar
-              matchId={currentMatch.matchId}
-              turn={currentMatch.turn}
-              phase={currentMatch.phase}
-              turnTimer={currentMatch.turnTimer}
-            />
-          </div>
+        <div className="relative z-10 h-screen flex flex-col p-4">
+          {/* Opponent Side */}
+          <div className="flex-1 flex flex-col gap-2">
+            {/* Opponent Hand (hidden cards) */}
+            <div className="h-20 bg-black/30 backdrop-blur-sm rounded-lg border border-white/10">
+              <div className="flex justify-center items-center h-full gap-1">
+                {opponentPlayer?.hand?.map((_, idx) => (
+                  <div
+                    key={idx}
+                    className="w-12 h-16 bg-gradient-to-br from-tarot-mystic-purple to-tarot-mystic-violet rounded border border-tarot-gold/30"
+                  >
+                    <div className="w-full h-full flex items-center justify-center text-tarot-gold/50">
+                      ✦
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-          {/* Opponent Area - 30% Height */}
-          <div className="h-[30%] relative" data-testid="opponent-area-container">
-            <OpponentArea
-              player={opponentPlayer}
-              isActive={currentMatch.activePlayer === opponentId}
-            />
+            {/* Opponent Bench */}
+            <div className="h-32 bg-black/20 backdrop-blur-sm rounded-lg border border-white/10">
+              <DropZone
+                id="opponent-bench"
+                cards={opponentPlayer?.bench || Array(6).fill(null)}
+                type="bench"
+                isPlayer={false}
+                maxCards={6}
+                onCardClick={handleCardClick}
+              />
+            </div>
 
-            {/* Opponent Fate Counter */}
-            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-40 pointer-events-none">
-              <FateCounter
-                current={opponentPlayer?.fate || 0}
-                max={opponentPlayer?.maxFate || 1}
-                position="top"
-                label="Fate"
+            {/* Opponent Battlefield */}
+            <div className="h-32 bg-gradient-to-b from-red-900/20 to-transparent rounded-lg border border-red-500/30">
+              <DropZone
+                id="opponent-battlefield"
+                cards={opponentPlayer?.battlefield || Array(6).fill(null)}
+                type="battlefield"
+                isPlayer={false}
+                maxCards={6}
+                onCardClick={handleCardClick}
               />
             </div>
           </div>
 
-          {/* Center Board Area - 34% Height */}
-          <div className="h-[34%] relative px-8" data-testid="center-board-container">
-            <CenterBoard
-              playerBoard={currentPlayer?.board || []}
-              opponentBoard={opponentPlayer?.board || []}
-              phase={currentMatch.phase}
-              isMyTurn={isMyTurn}
-              onCardClick={handleCardClick}
+          {/* Center Area - Combat Zone & Arcanums */}
+          <div className="h-24 relative flex items-center justify-between px-8">
+            {/* Combat Line */}
+            <div className="absolute inset-x-0 top-1/2 h-[2px] bg-gradient-to-r from-transparent via-tarot-gold/50 to-transparent" />
+
+            {/* Player Arcanum (Nexus) */}
+            <Arcanum
+              health={currentPlayer?.nexusHealth || 20}
+              maxHealth={20}
+              isPlayer={true}
+              playerName="You"
             />
 
-            {/* Phase Indicator - Made more prominent */}
-            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 z-50" data-testid="phase-indicator">
-              <div className="bg-black/80 backdrop-blur-md rounded-xl p-4 border-2 border-white/30 shadow-2xl">
-                <div className="text-white text-sm font-bold mb-2 text-center">CURRENT PHASE</div>
+            {/* Turn Indicator */}
+            <div className="px-6 py-3 bg-black/50 backdrop-blur-sm rounded-xl border border-tarot-gold/30">
+              <div className="text-center">
+                <div className="text-xs text-white/50 mb-1">TURN {currentMatch.turn}</div>
                 <div className={cn(
-                  "text-2xl capitalize font-bold text-center tracking-wide",
-                  currentMatch.phase === 'main' ? "text-green-400 drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" :
-                    currentMatch.phase === 'combat' ? "text-red-400 drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]" :
-                      currentMatch.phase === 'draw' ? "text-blue-400 drop-shadow-[0_0_10px_rgba(59,130,246,0.8)]" :
-                        "text-yellow-400 drop-shadow-[0_0_10px_rgba(234,179,8,0.8)]"
+                  "text-lg font-bold",
+                  isMyTurn ? "text-tarot-gold animate-pulse" : "text-white/30"
                 )}>
-                  {currentMatch.phase}
-                </div>
-                <div className="text-white/70 text-xs mt-1 text-center">
-                  {currentMatch.phase === 'main' ? 'Play cards & take actions' :
-                    currentMatch.phase === 'combat' ? 'Units attack each other' :
-                      currentMatch.phase === 'draw' ? 'Draw cards & prepare' :
-                        'End phase & cleanup'}
+                  {isMyTurn ? "YOUR FATE" : "OPPONENT'S FATE"}
                 </div>
               </div>
             </div>
 
-            {/* Turn Counter */}
-            <div className="absolute right-4 top-1/2 transform -translate-y-1/2" data-testid="turn-counter">
-              <div className="bg-black/50 backdrop-blur-sm rounded-lg p-3 border border-white/20">
-                <div className="text-white text-sm font-bold mb-1">Turn</div>
-                <div className="text-cyan-400 text-2xl">{currentMatch.turn}</div>
-              </div>
-            </div>
-
-            {/* Spell Stack */}
-            <AnimatePresence>
-              {showSpellStack && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  className="absolute bottom-0 left-1/2 transform -translate-x-1/2 flex gap-2"
-                >
-                  {/* Spell stack cards would go here */}
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {/* Opponent Arcanum */}
+            <Arcanum
+              health={opponentPlayer?.nexusHealth || 20}
+              maxHealth={20}
+              isPlayer={false}
+              playerName="Opponent"
+            />
           </div>
 
-          {/* Player Area - 30% Height */}
-          <div className="h-[30%] relative" data-testid="player-area-container">
-            <PlayerArea
-              player={currentPlayer}
-              isActive={isMyTurn}
-              onCardClick={handleCardClick}
-            />
-
-            {/* Player Fate Counter */}
-            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-40 pointer-events-none">
-              <FateCounter
-                current={currentPlayer?.fate || 0}
-                max={currentPlayer?.maxFate || 1}
-                position="bottom"
-                label="Fate"
+          {/* Player Side */}
+          <div className="flex-1 flex flex-col gap-2">
+            {/* Player Battlefield */}
+            <div className="h-32 bg-gradient-to-t from-blue-900/20 to-transparent rounded-lg border border-blue-500/30">
+              <DropZone
+                id="player-battlefield"
+                cards={currentPlayer?.battlefield || Array(6).fill(null)}
+                type="battlefield"
+                isPlayer={true}
+                maxCards={6}
+                onCardClick={handleCardClick}
+                isValidDropZone={validDropZones?.includes('battlefield')}
               />
             </div>
 
-            {/* Action Buttons - Proper phase-based logic */}
-            <div className="absolute bottom-8 right-8 flex gap-3">
-              {isMyTurn ? (
-                <>
-                  {currentMatch.phase === 'draw' && (
-                    <PixelButton
-                      size="lg"
-                      variant="blue"
-                      data-testid="btn-continue-to-main"
-                      onClick={() => {
-                        gameLogger.logAction('continue_to_main', {
-                          playerId: currentPlayerId,
-                          phase: currentMatch.phase
-                        }, true);
-                        endTurn(); // This will transition from draw to main
-                        audioManager.playRandom('turnChange');
-                      }}
-                      className="animate-pulse"
-                    >
-                      CONTINUE
-                    </PixelButton>
-                  )}
-
-                  {currentMatch.phase === 'main' && (
-                    <PixelButton
-                      size="lg"
-                      variant="gold"
-                      data-testid="btn-end-turn"
-                      onClick={() => {
-                        gameLogger.logAction('end_turn_button', {
-                          playerId: currentPlayerId,
-                          phase: currentMatch.phase,
-                          canTakeActions: canPlayerTakeActions(currentPlayer)
-                        }, true);
-                        endTurn();
-                        audioManager.playRandom('turnChange');
-                      }}
-                      className="animate-pulse"
-                    >
-                      {canPlayerTakeActions(currentPlayer) ? "PASS TURN" : "END TURN"}
-                    </PixelButton>
-                  )}
-
-                  {currentMatch.phase === 'combat' && hasAttackToken && (
-                    <>
-                      <PixelButton
-                        size="lg"
-                        variant="red"
-                        data-testid="btn-resolve-combat"
-                        onClick={() => {
-                          gameLogger.logAction('commit_attack', { playerId: currentPlayerId }, true);
-                          // Use pending orders if set, otherwise fall back to immediate lane combat
-                          if (currentMatch.pendingAttackOrder && currentMatch.pendingAttackOrder.length > 0) {
-                            resolveDeclaredCombat();
-                          } else {
-                            startCombat();
-                          }
-                          audioManager.playRandom('turnChange');
-                        }}
-                        className="animate-pulse"
-                      >
-                        RESOLVE COMBAT
-                      </PixelButton>
-                      <PixelButton
-                        size="md"
-                        variant="default"
-                        data-testid="btn-skip-combat"
-                        onClick={() => {
-                          gameLogger.logAction('skip_combat', {
-                            playerId: currentPlayerId
-                          }, true);
-                          // Skip to end phase without combat
-                          updateMatchState({
-                            phase: 'end'
-                          });
-                        }}
-                      >
-                        SKIP COMBAT
-                      </PixelButton>
-                    </>
-                  )}
-
-                  {currentMatch.phase === 'combat' && !hasAttackToken && (
-                    <PixelButton
-                      size="lg"
-                      variant="gold"
-                      data-testid="btn-end-turn"
-                      onClick={() => {
-                        gameLogger.logAction('end_turn_no_attack_token', {
-                          playerId: currentPlayerId
-                        }, true);
-                        endTurn();
-                        audioManager.playRandom('turnChange');
-                      }}
-                    >
-                      END TURN
-                    </PixelButton>
-                  )}
-
-                  {currentMatch.phase === 'end' && (
-                    <PixelButton
-                      size="lg"
-                      variant="green"
-                      data-testid="btn-start-new-turn"
-                      onClick={() => {
-                        gameLogger.logAction('start_new_turn', {
-                          playerId: currentPlayerId,
-                          phase: currentMatch.phase
-                        }, true);
-                        endTurn(); // This will transition from end to draw (new turn)
-                        audioManager.playRandom('turnChange');
-                      }}
-                      className="animate-pulse"
-                    >
-                      START NEW TURN
-                    </PixelButton>
-                  )}
-                </>
-              ) : (
-                <PixelButton
-                  size="lg"
-                  variant="default"
-                  disabled={true}
-                  data-testid="badge-opponent-turn"
-                >
-                  OPPONENT'S TURN
-                </PixelButton>
-              )}
-            </div>
-
-            {/* Trials Display - Positioned higher to not overlap with cards */}
-            <div className="absolute top-1/2 left-8 transform -translate-y-1/2">
-              <TrialsDisplay
-                trials={currentPlayer?.trials || []}
-                playerName="You"
+            {/* Player Bench */}
+            <div className="h-32 bg-black/20 backdrop-blur-sm rounded-lg border border-white/10">
+              <DropZone
+                id="player-bench"
+                cards={currentPlayer?.bench || Array(6).fill(null)}
+                type="bench"
+                isPlayer={true}
+                maxCards={6}
+                onCardClick={handleCardClick}
+                isValidDropZone={validDropZones?.includes('bench')}
               />
             </div>
+
+            {/* Player Hand */}
+            <div className="h-28 bg-black/30 backdrop-blur-sm rounded-lg border border-white/10">
+              <DropZone
+                id="player-hand"
+                cards={currentPlayer?.hand || []}
+                type="hand"
+                isPlayer={true}
+                maxCards={10}
+                onCardClick={handleCardClick}
+              />
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="absolute bottom-8 right-8">
+            {isMyTurn && (
+              <button
+                onClick={endTurn}
+                className="px-6 py-3 bg-tarot-gold text-black font-bold rounded-lg hover:bg-yellow-400 transition-all"
+              >
+                END TURN
+              </button>
+            )}
           </div>
         </div>
 
         {/* Drag Overlay */}
         <DragOverlay dropAnimation={null}>
           {draggedCard && (
-            <div style={{ pointerEvents: 'none' }} data-testid="drag-overlay-card">
-              <TarotCard
-                card={draggedCard}
-                isDragging={true}
-                scale={1}
-              />
+            <div className="pointer-events-none opacity-80">
+              <TarotCard card={draggedCard} isDragging={true} scale={1} />
             </div>
           )}
         </DragOverlay>
-
-        {/* Oracle Eye (Blue Orb) */}
-        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-          <motion.div
-            animate={{
-              scale: [1, 1.2, 1],
-              opacity: [0.3, 0.5, 0.3],
-            }}
-            transition={{
-              duration: 3,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-            className="w-32 h-32 bg-blue-500 rounded-full blur-xl"
-          />
-        </div>
       </div>
 
       {/* Card Overlay */}
       <CardOverlay
         card={selectedCard}
         isOpen={showCardOverlay}
-        onClose={handleCloseOverlay}
+        onClose={() => setShowCardOverlay(false)}
       />
 
-      {/* Debug Components */}
-      <GameLogViewer
-        isVisible={showDebugLog}
-        onToggle={() => setShowDebugLog(false)}
-        maxEvents={100}
-      />
-
-      <DebugToggle
-        isVisible={showDebugLog}
-        onToggle={() => setShowDebugLog(!showDebugLog)}
+      {/* Card Action Menu */}
+      <CardActionMenu
+        card={actionMenuCard}
+        isOpen={showActionMenu}
+        position={actionMenuPosition}
+        onPlay={handlePlayCard}
+        onView={handleViewCard}
+        onClose={() => {
+          setShowActionMenu(false);
+          setActionMenuCard(null);
+        }}
+        canPlay={isMyTurn && ((currentPlayer?.fate || 0) + ((actionMenuCard?.type === 'spell' ? currentPlayer?.spellMana : 0) || 0)) >= (actionMenuCard?.cost || 0)}
+        playerMana={currentPlayer?.fate || 0}
+        playerSpellMana={currentPlayer?.spellMana || 0}
       />
     </DndContext>
   );

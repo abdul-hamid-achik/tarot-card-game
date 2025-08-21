@@ -1,86 +1,19 @@
-import { z } from 'zod';
+// Effects compatibility shim
 import type { MatchState } from './types.js';
-import { createSeededRandom } from './rng.js';
 
-export const EffectArgSchema = z.union([
-  z.number(),
-  z.string().min(1),
-]);
-
-export const EffectCallSchema = z.object({
-  name: z.string().regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/),
-  args: z.array(EffectArgSchema),
-});
-
-export type EffectCall = z.infer<typeof EffectCallSchema>;
-
-export function parseEffect(input: string): EffectCall {
-  const match = input.match(/^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\((.*)\)\s*$/);
-  if (!match) {
-    return EffectCallSchema.parse({ name: input.trim(), args: [] });
-  }
-  const [, name, rawArgs] = match;
-  const args = rawArgs.trim() === ''
-    ? []
-    : rawArgs.split(',').map((a) => a.trim()).map((a) => {
-      const n = Number(a);
-      if (!Number.isNaN(n) && Number.isFinite(n)) return n;
-      return a;
-    });
-  return EffectCallSchema.parse({ name, args });
+export function parseEffect(input: string) {
+  return { name: input, args: [] };
 }
 
-export function parseEffects(effectStrings: string[]): EffectCall[] {
+export function parseEffects(effectStrings: string[]) {
   return effectStrings.map(parseEffect);
 }
 
-export function executeEffectForPlayer(state: MatchState, effect: EffectCall, playerId: string, seed: string): MatchState {
-  void createSeededRandom(seed);
-  switch (effect.name) {
-    case 'gain': {
-      const amount = Number(effect.args[0] ?? 0) || 0;
-      const next = { ...(state.resources ?? {}) } as Record<string, number>;
-      next[playerId] = (next[playerId] ?? 0) + amount;
-      return { ...state, resources: next };
-    }
-    case 'both_discard_random': {
-      const amount = Math.max(0, Number(effect.args[0] ?? 1) || 1);
-      const rng = createSeededRandom(`${seed}:discard`);
-      const hands = (state.hands as Record<string, { hand: string[] }>) || {};
-      const nextHands: Record<string, { hand: string[] }> = { ...hands };
-      for (const p of state.players) {
-        let h = nextHands[p]?.hand ?? [];
-        for (let i = 0; i < amount && h.length > 0; i += 1) {
-          const idx = rng.nextInt(h.length);
-          h = [...h.slice(0, idx), ...h.slice(idx + 1)];
-        }
-        nextHands[p] = { hand: h };
-      }
-      return { ...state, hands: nextHands };
-    }
-    case 'silence': {
-      // Placeholder: no-op until we model units/statuses; validated by parser
-      return state;
-    }
-    case 'branch': {
-      // branch(cardId, uprightEffectName, reversedEffectName)
-      const cardId = String(effect.args[0] ?? '');
-      const uprightEff = String(effect.args[1] ?? '');
-      const reversedEff = String(effect.args[2] ?? '');
-      const orientation = (state.orientations ?? {})[cardId] ?? 'upright';
-      const chosen = orientation === 'upright' ? uprightEff : reversedEff;
-      const nested = { name: chosen, args: [] } as EffectCall;
-      return executeEffectForPlayer(state, nested, playerId, `${seed}:branch:${cardId}`);
-    }
-    default:
-      return state;
-  }
+export function executeEffectForPlayer(state: MatchState, effect: any, playerId: string, seed: string): MatchState {
+  console.warn('executeEffectForPlayer is deprecated. Effects are now handled through keywords');
+  return state;
 }
 
-export function executeEffectsForPlayer(state: MatchState, effects: EffectCall[], playerId: string, seed: string): MatchState {
-  let s = state;
-  for (const e of effects) {
-    s = executeEffectForPlayer(s, e, playerId, seed);
-  }
-  return s;
+export function executeEffectsForPlayer(state: MatchState, effects: any[], playerId: string, seed: string): MatchState {
+  return effects.reduce((s, e) => executeEffectForPlayer(s, e, playerId, seed), state);
 }

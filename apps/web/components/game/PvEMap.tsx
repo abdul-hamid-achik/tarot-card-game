@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { gameLogger } from '@tarot/game-logger';
 import {
   Swords,
   Shield,
@@ -248,12 +249,31 @@ export function PvEMap({ runState, onNodeClick, onAbandonRun }: PvEMapProps) {
 
   const handleNodeClick = (node: MapNode) => {
     if (node.available && !node.completed) {
+      gameLogger.logAction('pve_node_clicked', {
+        nodeId: node.id,
+        nodeType: node.type,
+        nodeAvailable: node.available,
+        nodeCompleted: node.completed,
+        runState: runState
+      }, true, 'Player clicked on PVE map node');
       setSelectedNode(node);
       onNodeClick(node);
+    } else {
+      gameLogger.logAction('pve_node_click_ignored', {
+        nodeId: node.id,
+        nodeType: node.type,
+        nodeAvailable: node.available,
+        nodeCompleted: node.completed,
+        reason: !node.available ? 'node_not_available' : 'node_already_completed'
+      }, true, 'PVE node click ignored - node not available or completed');
     }
   };
 
   const handleAbandonRun = () => {
+    gameLogger.logAction('pve_run_abandoned', {
+      runState: runState,
+      reason: 'player_choice'
+    }, true, 'Player abandoned PVE run');
     setShowAbandonDialog(false);
     if (onAbandonRun) {
       onAbandonRun();
