@@ -2,247 +2,215 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, DragOverEvent } from '@dnd-kit/core';
-import { useDroppable } from '@dnd-kit/core';
+import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, useDraggable, useDroppable } from '@dnd-kit/core';
 import { Card, useGameStore } from '@/lib/store/gameStore';
 import { TarotCard } from './TarotCard';
 import { CardOverlay } from './CardOverlay';
-import { GameMenu } from './GameMenu';
 import { CardActionMenu } from './CardActionMenu';
+import { GameMenu } from './GameMenu';
 import { cn } from '@/lib/utils';
 import { audioManager } from '@/lib/audio/AudioManager';
 import { gameLogger } from '@tarot/game-logger';
+import { Sword, Shield, Heart, Sparkles, ChevronRight } from 'lucide-react';
 
-interface ZoneProps {
-  id: string;
-  cards: (Card | null)[];
-  type: 'hand' | 'bench' | 'battlefield';
-  isPlayer: boolean;
-  maxCards: number;
-  onCardClick?: (card: Card, event?: React.MouseEvent) => void;
-  isValidDropZone?: boolean;
-  className?: string;
+// Separate component for draggable hand cards to avoid hooks in loops
+function DraggableHandCard({ card, idx, playerId, onCardClick }: { 
+  card: Card; 
+  idx: number; 
+  playerId: string;
+  onCardClick: (card: Card, event?: React.MouseEvent) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `hand-${card.id}`,
+    data: { card, isFromHand: true, playerId }
+  });
+  
+  const handleClick = (e: React.MouseEvent) => {
+    // Only process click if not dragging
+    if (!isDragging) {
+      onCardClick(card, e);
+    }
+  };
+  
+  return (
+    <motion.div
+      key={card.id}
+      ref={setNodeRef}
+      initial={{ y: 20, opacity: 0 }}
+      animate={{ 
+        y: isDragging ? -20 : 0, 
+        opacity: isDragging ? 0.5 : 1,
+        x: transform?.x ?? 0,
+        scale: isDragging ? 1.1 : 1
+      }}
+      transition={{ delay: idx * 0.05 }}
+      whileHover={{ y: -10, scale: 1.05 }}
+      className="cursor-grab active:cursor-grabbing"
+      onClick={handleClick}
+      {...attributes}
+      {...listeners}
+    >
+      <TarotCard card={card} scale={0.8} isDraggable={false} />
+    </motion.div>
+  );
 }
 
-function DropZone({ id, cards, type, isPlayer, maxCards, onCardClick, isValidDropZone, className }: ZoneProps) {
+interface BoardSlotProps {
+  card: Card | null;
+  unit: any;
+  index: number;
+  isPlayer: boolean;
+  zone: 'bench' | 'battlefield';
+  onCardClick?: (card: Card, event?: React.MouseEvent) => void;
+  playerId: string;
+}
+
+function BoardSlot({ card, unit, index, isPlayer, zone, onCardClick, playerId }: BoardSlotProps) {
+  const actualCard = unit?.card || card;
+  const slotId = `${playerId}-${zone}-${index}`;
+
+  // Make slots droppable
   const { setNodeRef, isOver } = useDroppable({
-    id,
-    data: { type, isPlayer }
+    id: slotId,
+    data: { zone, index, playerId }
+  });
+
+  // Make cards draggable (only player's own cards)
+  const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
+    id: actualCard?.id || slotId,
+    data: { card: actualCard, fromZone: zone, fromIndex: index, playerId },
+    disabled: !isPlayer || !actualCard
   });
 
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "relative transition-all duration-200",
-        type === 'hand' && "flex gap-2 justify-center p-4",
-        type === 'bench' && "grid grid-cols-6 gap-2 p-3",
-        type === 'battlefield' && "grid grid-cols-6 gap-2 p-3",
-        isValidDropZone && "ring-2 ring-tarot-gold/50",
-        isOver && "bg-tarot-gold/10 scale-[1.02]",
-        className
+        "relative w-[100px] h-[140px] rounded-lg transition-all",
+        "border-2",
+        actualCard ? "border-tarot-gold/30" : "border-white/10",
+        zone === 'battlefield' && "shadow-lg",
+        isOver && "border-tarot-gold bg-tarot-gold/10 scale-105",
+        isDragging && "opacity-50"
       )}
     >
-      {/* Background pattern for zones */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="w-full h-full"
-          style={{
-            backgroundImage: type === 'battlefield'
-              ? 'radial-gradient(circle at center, var(--tarot-gold) 1px, transparent 1px)'
-              : 'linear-gradient(45deg, var(--tarot-mystic-purple) 25%, transparent 25%)',
-            backgroundSize: type === 'battlefield' ? '20px 20px' : '10px 10px'
+      {actualCard && (
+        <motion.div
+          ref={isPlayer ? setDragRef : undefined}
+          layoutId={actualCard.id}
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{
+            opacity: isDragging ? 0.5 : 1,
+            scale: 1,
+            x: transform?.x ?? 0,
+            y: transform?.y ?? 0
           }}
-        />
-      </div>
-
-      {/* Zone Label */}
-      <div className={cn(
-        "absolute text-xs font-bold uppercase tracking-wider opacity-30",
-        isPlayer ? "bottom-1 right-2" : "top-1 left-2"
-      )}>
-        {type === 'hand' ? 'The Spread' :
-          type === 'bench' ? 'Reading Table' :
-            'Manifestation'}
-      </div>
-
-      {/* Card Slots */}
-      {type === 'hand' ? (
-        cards.filter(Boolean).map((card, idx) => (
-          <motion.div
-            key={card?.id || idx}
-            initial={{ opacity: 0, y: isPlayer ? 20 : -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ delay: idx * 0.05 }}
-            whileHover={isPlayer ? { y: -20, scale: 1.05 } : undefined}
-            onClick={(e) => card && onCardClick?.(card, e)}
-            className="cursor-pointer relative"
-          >
-            {card && (
-              <TarotCard card={card} scale={0.8} isDraggable={false} />
-            )}
-          </motion.div>
-        ))
-      ) : (
-        Array.from({ length: maxCards }).map((_, idx) => {
-          const card = cards[idx];
-          return (
-            <div
-              key={idx}
-              className={cn(
-                "relative aspect-[2/3] rounded-lg border-2 transition-all",
-                card ? "border-tarot-gold/30 bg-black/20" : "border-white/10 bg-black/10",
-                type === 'battlefield' && "shadow-lg"
-              )}
-            >
-              {card && (
-                <motion.div
-                  layoutId={card.id}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  onClick={() => {
-                    // Only log significant card interactions, not every click
-                    if (type === 'hand' || type === 'battlefield') {
-                      gameLogger.logAction('card_interaction', {
-                        cardId: card.id,
-                        cardName: card.name,
-                        zoneType: type,
-                        slot: idx,
-                        isPlayer: isPlayer
-                      }, true, 'Card interaction in game board');
-                    }
-                    onCardClick?.(card);
-                  }}
-                  className="absolute inset-0 cursor-pointer"
-                >
-                  <TarotCard card={card} scale={1} />
-                </motion.div>
-              )}
-
-              {/* Slot number indicator */}
-              <div className="absolute bottom-1 right-1 text-xs opacity-20">
-                {idx + 1}
-              </div>
-            </div>
-          );
-        })
+          className={cn(
+            "absolute inset-0",
+            isPlayer ? "cursor-move" : "cursor-pointer"
+          )}
+          onClick={(e) => {
+            // Click will only fire if drag hasn't started due to delay
+            onCardClick?.(actualCard, e);
+          }}
+          {...(isPlayer ? attributes : {})}
+          {...(isPlayer ? listeners : {})}
+        >
+          <TarotCard card={actualCard} scale={0.95} isDraggable={false} />
+        </motion.div>
+      )}
+      {!actualCard && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <span className="text-white/10 text-4xl">{index + 1}</span>
+        </div>
       )}
     </div>
   );
 }
 
-interface ArcanumProps {
+interface NexusProps {
   health: number;
   maxHealth: number;
   isPlayer: boolean;
-  playerName: string;
+  name: string;
 }
 
-function Arcanum({ health, maxHealth, isPlayer, playerName }: ArcanumProps) {
-  const healthPercentage = (health / maxHealth) * 100;
+function Nexus({ health, maxHealth, isPlayer, name }: NexusProps) {
+  const healthPercent = (health / maxHealth) * 100;
 
   return (
     <div className={cn(
-      "relative w-24 h-32 rounded-xl overflow-hidden",
-      "bg-gradient-to-br from-tarot-mystic-purple to-tarot-mystic-violet",
-      "border-2 border-tarot-gold/50 shadow-2xl",
-      health <= 5 && "animate-pulse border-red-500"
+      "relative w-24 h-32",
+      "bg-gradient-to-br from-purple-900/80 to-black/80",
+      "rounded-xl border-2",
+      health <= 5 ? "border-red-500 animate-pulse" : isPlayer ? "border-tarot-gold" : "border-red-400",
+      "shadow-2xl backdrop-blur-sm"
     )}>
-      {/* Arcanum Crystal Effect */}
-      <div className="absolute inset-0">
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-        <motion.div
-          className="absolute inset-0 opacity-30"
-          animate={{
-            backgroundPosition: ['0% 0%', '100% 100%'],
-          }}
-          transition={{
-            duration: 10,
-            repeat: Infinity,
-            repeatType: 'reverse'
-          }}
-          style={{
-            backgroundImage: 'radial-gradient(circle at center, var(--tarot-gold) 1px, transparent 50%)',
-            backgroundSize: '10px 10px'
-          }}
-        />
+      {/* Health Display */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <Heart className={cn(
+          "w-8 h-8 mb-1",
+          health <= 5 ? "text-red-500" : "text-red-400"
+        )} />
+        <span className={cn(
+          "text-2xl font-bold",
+          health <= 5 ? "text-red-500" : "text-white"
+        )}>
+          {health}
+        </span>
+        <span className="text-xs text-gray-400">/{maxHealth}</span>
       </div>
 
-      {/* Health Display */}
-      <div className="relative z-10 h-full flex flex-col items-center justify-center">
-        <div className="text-3xl font-bold text-white drop-shadow-lg">
-          {health}
-        </div>
-        <div className="text-xs text-white/70">
-          ARCANUM
-        </div>
+      {/* Name */}
+      <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap">
+        <span className="text-xs text-white/60 font-medium">{name}</span>
       </div>
 
       {/* Health Bar */}
-      <div className="absolute bottom-0 left-0 right-0 h-2 bg-black/50">
-        <motion.div
-          className="h-full bg-gradient-to-r from-tarot-gold to-yellow-400"
-          initial={{ width: '100%' }}
-          animate={{ width: `${healthPercentage}%` }}
-          transition={{ duration: 0.5 }}
+      <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50 rounded-b-xl overflow-hidden">
+        <div
+          className={cn(
+            "h-full transition-all",
+            health <= 5 ? "bg-red-500" : "bg-green-500"
+          )}
+          style={{ width: `${healthPercent}%` }}
         />
-      </div>
-
-      {/* Player Name */}
-      <div className={cn(
-        "absolute text-xs font-bold text-white/70",
-        isPlayer ? "-bottom-5 left-1/2 -translate-x-1/2" : "-top-5 left-1/2 -translate-x-1/2"
-      )}>
-        {playerName}
       </div>
     </div>
   );
 }
 
 export function GameBoard() {
-  const {
-    currentMatch,
-    draggedCard,
-    setDraggedCard,
-    playCard,
-    endTurn,
-    validDropZones
-  } = useGameStore();
-
+  const { currentMatch, playCard, endTurn, updateMatch } = useGameStore();
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [showCardOverlay, setShowCardOverlay] = useState(false);
-  const [dragOverZone, setDragOverZone] = useState<string | null>(null);
   const [actionMenuCard, setActionMenuCard] = useState<Card | null>(null);
   const [actionMenuPosition, setActionMenuPosition] = useState({ x: 0, y: 0 });
   const [showActionMenu, setShowActionMenu] = useState(false);
+  const [draggedCard, setDraggedCard] = useState<Card | null>(null);
 
   if (!currentMatch) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-tarot-board-dark to-tarot-mystic-purple flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-b from-purple-900 to-black flex items-center justify-center">
         <div className="text-tarot-gold text-2xl animate-pulse">Consulting the Fates...</div>
       </div>
     );
   }
 
   const currentPlayerId = 'player1';
-  const playerIds = Object.keys(currentMatch.players);
-  const opponentId = playerIds.find(id => id !== currentPlayerId) || 'player2';
+  const opponentId = Object.keys(currentMatch.players).find(id => id !== currentPlayerId) || 'ai';
   const currentPlayer = currentMatch.players[currentPlayerId];
   const opponentPlayer = currentMatch.players[opponentId];
   const isMyTurn = currentMatch.activePlayer === currentPlayerId;
+  const hasAttackToken = currentMatch.attackTokenOwner === currentPlayerId;
 
   const handleCardClick = (card: Card, event?: React.MouseEvent) => {
-    // Only show action menu for cards in hand
     if (event && currentPlayer?.hand?.some(c => c.id === card.id)) {
       const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
       setActionMenuCard(card);
-      setActionMenuPosition({
-        x: rect.left + rect.width / 2,
-        y: rect.top - 10
-      });
+      setActionMenuPosition({ x: rect.left + rect.width / 2, y: rect.top - 10 });
       setShowActionMenu(true);
     } else {
-      // For cards not in hand, just show the overlay
       setSelectedCard(card);
       setShowCardOverlay(true);
     }
@@ -250,7 +218,6 @@ export function GameBoard() {
 
   const handlePlayCard = () => {
     if (actionMenuCard) {
-      // Find first empty slot on bench
       const emptySlot = currentPlayer?.bench?.findIndex(slot => !slot);
       if (emptySlot !== undefined && emptySlot >= 0) {
         playCard(actionMenuCard, emptySlot);
@@ -261,263 +228,373 @@ export function GameBoard() {
     }
   };
 
-  const handleViewCard = () => {
-    if (actionMenuCard) {
-      setSelectedCard(actionMenuCard);
-      setShowCardOverlay(true);
-      setShowActionMenu(false);
-    }
-  };
-
   const handleDragStart = (event: DragStartEvent) => {
-    const card = event.active.data.current as Card;
+    const { card } = event.active.data.current || {};
     if (card) {
       setDraggedCard(card);
       audioManager.playRandom('cardPickup');
-      // Only log drag start for meaningful interactions
-      if (card.type !== 'unit') {
-        gameLogger.logAction('card_drag_start', {
-          cardId: card.id,
-          cardName: card.name,
-          cardType: card.type,
-          playerId: 'player1'
-        }, true, 'Player started dragging card');
-      }
     }
-  };
-
-  const handleDragOver = (event: DragOverEvent) => {
-    setDragOverZone(event.over?.id as string || null);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
-    if (over && draggedCard) {
-      const dropData = over.data.current;
-
-      if (dropData?.type === 'bench' && dropData?.isPlayer) {
-        // Find first empty slot on bench
-        const emptySlot = currentPlayer.bench?.findIndex(slot => !slot);
-        if (emptySlot !== undefined && emptySlot >= 0) {
-          playCard(draggedCard, emptySlot);
-          audioManager.playRandom('cardPlace');
-          // Only log successful plays for non-unit cards to reduce verbosity
-          if (draggedCard.type !== 'unit') {
-            gameLogger.logAction('card_play_success', {
-              cardId: draggedCard.id,
-              cardName: draggedCard.name,
-              cardType: draggedCard.type,
-              slot: emptySlot,
-              playerId: 'player1'
-            }, true, 'Card successfully played');
-          }
-        } else {
-          gameLogger.logAction('card_play_failed', {
-            cardId: draggedCard.id,
-            cardName: draggedCard.name,
-            reason: 'bench_full'
-          }, false, 'Failed to play card - bench is full');
-        }
-      } else {
-        gameLogger.logAction('card_play_failed', {
-          cardId: draggedCard.id,
-          cardName: draggedCard.name,
-          reason: 'invalid_drop_zone',
-          dropZone: dropData?.type
-        }, false, 'Failed to play card - invalid drop zone');
-      }
-    } else {
-      // Don't log cancelled drags to reduce noise - only log meaningful interactions
+    if (!over || !currentMatch) {
+      setDraggedCard(null);
+      return;
     }
 
+    const fromData = active.data.current;
+    const toData = over.data.current;
+
+    // Check if dragging from hand to bench
+    if (fromData?.isFromHand && toData?.zone === 'bench' && toData?.playerId === currentPlayerId) {
+      const card = fromData.card;
+      const toIndex = toData.index;
+
+      // Check if player has enough mana
+      if ((currentPlayer?.fate || 0) < card.cost) {
+        setDraggedCard(null);
+        return;
+      }
+
+      // Play the card to the specific bench slot
+      playCard(card, toIndex);
+      audioManager.playRandom('cardPlace');
+      setDraggedCard(null);
+      return;
+    }
+
+    // Only allow rearranging within the same player's zones
+    if (fromData?.playerId !== toData?.playerId || fromData?.playerId !== currentPlayerId) {
+      setDraggedCard(null);
+      return;
+    }
+
+    const player = currentMatch.players[currentPlayerId];
+    if (!player) {
+      setDraggedCard(null);
+      return;
+    }
+
+    // Get the zones
+    const fromZone = fromData.fromZone;
+    const toZone = toData.zone;
+    const fromIndex = fromData.fromIndex;
+    const toIndex = toData.index;
+
+    // Allow movement between bench and battlefield
+    const validZones = ['bench', 'battlefield'];
+    if (!validZones.includes(fromZone) || !validZones.includes(toZone)) {
+      setDraggedCard(null);
+      return;
+    }
+
+    // Create updated zones
+    const updatedBench = [...(player.bench || Array(6).fill(null))];
+    const updatedBattlefield = [...(player.battlefield || Array(6).fill(null))];
+
+    // Handle the move
+    if (fromZone === toZone) {
+      // Same zone - swap positions for reordering
+      const zone = fromZone === 'bench' ? updatedBench : updatedBattlefield;
+      const temp = zone[fromIndex];
+      zone[fromIndex] = zone[toIndex];
+      zone[toIndex] = temp;
+    } else {
+      // Different zones - move card from bench to battlefield or vice versa
+      const sourceZone = fromZone === 'bench' ? updatedBench : updatedBattlefield;
+      const targetZone = toZone === 'bench' ? updatedBench : updatedBattlefield;
+      
+      // Get the units
+      const movingUnit = sourceZone[fromIndex];
+      const targetUnit = targetZone[toIndex];
+      
+      // If target slot is empty, just move
+      if (!targetUnit) {
+        targetZone[toIndex] = movingUnit;
+        sourceZone[fromIndex] = null;
+      } else {
+        // If target slot is occupied, swap
+        sourceZone[fromIndex] = targetUnit;
+        targetZone[toIndex] = movingUnit;
+      }
+    }
+
+    // Update the match state
+    updateMatch({
+      ...currentMatch,
+      players: {
+        ...currentMatch.players,
+        [currentPlayerId]: {
+          ...player,
+          bench: updatedBench,
+          battlefield: updatedBattlefield
+        }
+      }
+    });
+
+    audioManager.playRandom('cardPlace');
     setDraggedCard(null);
-    setDragOverZone(null);
   };
 
   return (
-    <DndContext
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
+    <DndContext 
+      onDragStart={handleDragStart} 
       onDragEnd={handleDragEnd}
+      activationConstraint={{
+        delay: 200,
+        tolerance: 5
+      }}
     >
-      <div className="min-h-screen bg-gradient-to-b from-tarot-board-dark via-tarot-mystic-purple/20 to-tarot-board-dark overflow-hidden">
-        {/* Game Menu */}
-        <GameMenu />
-
-        {/* Mystical Background Effects */}
-        <div className="fixed inset-0">
-          <div className="absolute inset-0 opacity-20">
-            <div className="absolute top-20 left-1/4 w-96 h-96 bg-tarot-mystic-purple rounded-full blur-3xl animate-pulse" />
-            <div className="absolute bottom-20 right-1/4 w-96 h-96 bg-tarot-mystic-violet rounded-full blur-3xl animate-pulse delay-1000" />
-          </div>
+      <div className="relative min-h-screen bg-gradient-to-b from-indigo-950 via-purple-900 to-black overflow-hidden">
+        {/* Background Effects */}
+        <div className="absolute inset-0 opacity-30">
+          <div className="absolute top-20 left-1/4 w-96 h-96 bg-purple-600 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-20 right-1/4 w-96 h-96 bg-indigo-600 rounded-full blur-3xl animate-pulse delay-1000" />
         </div>
 
-        <div className="relative z-10 h-screen flex flex-col p-4">
-          {/* Opponent Side */}
-          <div className="flex-1 flex flex-col gap-2">
-            {/* Opponent Hand (hidden cards) */}
-            <div className="h-20 bg-black/30 backdrop-blur-sm rounded-lg border border-white/10">
-              <div className="flex justify-center items-center h-full gap-1">
+        {/* Main Board Container */}
+        <div className="relative h-screen flex">
+
+          {/* Left Side - Player Nexus Area */}
+          <div className="w-32 flex flex-col justify-center items-center gap-4 p-4">
+            <Nexus
+              health={currentPlayer?.health || 30}
+              maxHealth={currentPlayer?.maxHealth || 30}
+              isPlayer={true}
+              name="You"
+            />
+
+            {/* Player Mana */}
+            <div className="bg-black/60 rounded-lg p-2 border border-blue-400/50">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-blue-400" />
+                <span className="text-white font-bold">
+                  {currentPlayer?.fate || 0}/{currentPlayer?.maxFate || 0}
+                </span>
+              </div>
+              {currentPlayer?.spellMana > 0 && (
+                <div className="text-xs text-purple-400 mt-1">
+                  +{currentPlayer.spellMana} spell
+                </div>
+              )}
+            </div>
+
+            {/* Attack Token */}
+            {hasAttackToken && (
+              <motion.div
+                animate={{ scale: [1, 1.1, 1] }}
+                transition={{ repeat: Infinity, duration: 2 }}
+                className="bg-orange-500/20 rounded-full p-2 border-2 border-orange-500"
+              >
+                <Sword className="w-6 h-6 text-orange-400" />
+              </motion.div>
+            )}
+          </div>
+
+          {/* Center - Game Board */}
+          <div className="flex-1 flex flex-col justify-center px-8">
+
+            {/* Opponent Side */}
+            <div className="mb-2">
+              {/* Opponent Hand (Hidden) */}
+              <div className="flex justify-center gap-1 mb-2 h-16">
                 {opponentPlayer?.hand?.map((_, idx) => (
-                  <div
+                  <motion.div
                     key={idx}
-                    className="w-12 h-16 bg-gradient-to-br from-tarot-mystic-purple to-tarot-mystic-violet rounded border border-tarot-gold/30"
+                    initial={{ y: -20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: idx * 0.05 }}
+                    className="w-12 h-16 bg-gradient-to-br from-purple-800 to-purple-900 rounded border border-purple-500/50 shadow-lg"
                   >
-                    <div className="w-full h-full flex items-center justify-center text-tarot-gold/50">
+                    <div className="w-full h-full flex items-center justify-center text-purple-300">
                       ✦
                     </div>
-                  </div>
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* Opponent Bench (Back Row) */}
+              <div className="flex justify-center gap-2 mb-1">
+                {Array.from({ length: 6 }).map((_, idx) => (
+                  <BoardSlot
+                    key={`opp-bench-${idx}`}
+                    card={null}
+                    unit={opponentPlayer?.bench?.[idx]}
+                    index={idx}
+                    isPlayer={false}
+                    zone="bench"
+                    onCardClick={handleCardClick}
+                    playerId={opponentId}
+                  />
+                ))}
+              </div>
+
+              {/* Opponent Battlefield (Combat Row) */}
+              <div className="flex justify-center gap-2">
+                {Array.from({ length: 6 }).map((_, idx) => (
+                  <BoardSlot
+                    key={`opp-battle-${idx}`}
+                    card={null}
+                    unit={opponentPlayer?.battlefield?.[idx]}
+                    index={idx}
+                    isPlayer={false}
+                    zone="battlefield"
+                    onCardClick={handleCardClick}
+                    playerId={opponentId}
+                  />
                 ))}
               </div>
             </div>
 
-            {/* Opponent Bench */}
-            <div className="h-32 bg-black/20 backdrop-blur-sm rounded-lg border border-white/10">
-              <DropZone
-                id="opponent-bench"
-                cards={opponentPlayer?.bench || Array(6).fill(null)}
-                type="bench"
-                isPlayer={false}
-                maxCards={6}
-                onCardClick={handleCardClick}
-              />
-            </div>
+            {/* Combat Line / Middle Area */}
+            <div className="h-12 relative flex items-center my-2">
+              <div className="absolute inset-x-0 top-1/2 h-[2px] bg-gradient-to-r from-transparent via-tarot-gold/50 to-transparent" />
 
-            {/* Opponent Battlefield */}
-            <div className="h-32 bg-gradient-to-b from-red-900/20 to-transparent rounded-lg border border-red-500/30">
-              <DropZone
-                id="opponent-battlefield"
-                cards={opponentPlayer?.battlefield || Array(6).fill(null)}
-                type="battlefield"
-                isPlayer={false}
-                maxCards={6}
-                onCardClick={handleCardClick}
-              />
-            </div>
-          </div>
-
-          {/* Center Area - Combat Zone & Arcanums */}
-          <div className="h-24 relative flex items-center justify-between px-8">
-            {/* Combat Line */}
-            <div className="absolute inset-x-0 top-1/2 h-[2px] bg-gradient-to-r from-transparent via-tarot-gold/50 to-transparent" />
-
-            {/* Player Arcanum (Nexus) */}
-            <Arcanum
-              health={currentPlayer?.nexusHealth || 20}
-              maxHealth={20}
-              isPlayer={true}
-              playerName="You"
-            />
-
-            {/* Turn Indicator */}
-            <div className="px-6 py-3 bg-black/50 backdrop-blur-sm rounded-xl border border-tarot-gold/30">
-              <div className="text-center">
-                <div className="text-xs text-white/50 mb-1">TURN {currentMatch.turn}</div>
-                <div className={cn(
-                  "text-lg font-bold",
-                  isMyTurn ? "text-tarot-gold animate-pulse" : "text-white/30"
-                )}>
-                  {isMyTurn ? "YOUR FATE" : "OPPONENT'S FATE"}
+              {/* Phase & Turn Indicator */}
+              <div className="absolute right-0 px-4 py-1 bg-black/60 rounded-lg border border-tarot-gold/30">
+                <div className="text-xs text-white/60">Turn {currentMatch.turn}</div>
+                <div className="text-sm font-bold text-tarot-gold">
+                  {currentMatch.phase.toUpperCase()}
                 </div>
               </div>
             </div>
 
-            {/* Opponent Arcanum */}
-            <Arcanum
-              health={opponentPlayer?.nexusHealth || 20}
-              maxHealth={20}
+            {/* Player Side */}
+            <div className="mt-2">
+              {/* Player Battlefield (Combat Row) */}
+              <div className="flex justify-center gap-2 mb-1">
+                {Array.from({ length: 6 }).map((_, idx) => (
+                  <BoardSlot
+                    key={`player-battle-${idx}`}
+                    card={null}
+                    unit={currentPlayer?.battlefield?.[idx]}
+                    index={idx}
+                    isPlayer={true}
+                    zone="battlefield"
+                    onCardClick={handleCardClick}
+                    playerId={currentPlayerId}
+                  />
+                ))}
+              </div>
+
+              {/* Player Bench (Back Row) */}
+              <div className="flex justify-center gap-2 mb-2">
+                {Array.from({ length: 6 }).map((_, idx) => (
+                  <BoardSlot
+                    key={`player-bench-${idx}`}
+                    card={null}
+                    unit={currentPlayer?.bench?.[idx]}
+                    index={idx}
+                    isPlayer={true}
+                    zone="bench"
+                    onCardClick={handleCardClick}
+                    playerId={currentPlayerId}
+                  />
+                ))}
+              </div>
+
+              {/* Player Hand */}
+              <div className="flex justify-center gap-2 mt-4">
+                {currentPlayer?.hand?.map((card, idx) => (
+                  <DraggableHandCard
+                    key={card.id}
+                    card={card}
+                    idx={idx}
+                    playerId={currentPlayerId}
+                    onCardClick={handleCardClick}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Side - Opponent Nexus Area */}
+          <div className="w-32 flex flex-col justify-center items-center gap-4 p-4">
+            <Nexus
+              health={opponentPlayer?.health || 30}
+              maxHealth={opponentPlayer?.maxHealth || 30}
               isPlayer={false}
-              playerName="Opponent"
+              name={opponentPlayer?.name || "Opponent"}
             />
-          </div>
 
-          {/* Player Side */}
-          <div className="flex-1 flex flex-col gap-2">
-            {/* Player Battlefield */}
-            <div className="h-32 bg-gradient-to-t from-blue-900/20 to-transparent rounded-lg border border-blue-500/30">
-              <DropZone
-                id="player-battlefield"
-                cards={currentPlayer?.battlefield || Array(6).fill(null)}
-                type="battlefield"
-                isPlayer={true}
-                maxCards={6}
-                onCardClick={handleCardClick}
-                isValidDropZone={validDropZones?.includes('battlefield')}
-              />
+            {/* Opponent Mana */}
+            <div className="bg-black/60 rounded-lg p-2 border border-red-400/50">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-red-400" />
+                <span className="text-white font-bold">
+                  {opponentPlayer?.fate || 0}/{opponentPlayer?.maxFate || 0}
+                </span>
+              </div>
             </div>
 
-            {/* Player Bench */}
-            <div className="h-32 bg-black/20 backdrop-blur-sm rounded-lg border border-white/10">
-              <DropZone
-                id="player-bench"
-                cards={currentPlayer?.bench || Array(6).fill(null)}
-                type="bench"
-                isPlayer={true}
-                maxCards={6}
-                onCardClick={handleCardClick}
-                isValidDropZone={validDropZones?.includes('bench')}
-              />
-            </div>
-
-            {/* Player Hand */}
-            <div className="h-28 bg-black/30 backdrop-blur-sm rounded-lg border border-white/10">
-              <DropZone
-                id="player-hand"
-                cards={currentPlayer?.hand || []}
-                type="hand"
-                isPlayer={true}
-                maxCards={10}
-                onCardClick={handleCardClick}
-              />
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="absolute bottom-8 right-8">
-            {isMyTurn && (
-              <button
-                onClick={endTurn}
-                className="px-6 py-3 bg-tarot-gold text-black font-bold rounded-lg hover:bg-yellow-400 transition-all"
+            {/* Opponent Attack Token */}
+            {currentMatch.attackTokenOwner === opponentId && (
+              <motion.div
+                animate={{ scale: [1, 1.1, 1] }}
+                transition={{ repeat: Infinity, duration: 2 }}
+                className="bg-red-500/20 rounded-full p-2 border-2 border-red-500"
               >
-                END TURN
-              </button>
+                <Sword className="w-6 h-6 text-red-400" />
+              </motion.div>
             )}
           </div>
         </div>
 
-        {/* Drag Overlay */}
-        <DragOverlay dropAnimation={null}>
-          {draggedCard && (
-            <div className="pointer-events-none opacity-80">
-              <TarotCard card={draggedCard} isDragging={true} scale={1} />
-            </div>
-          )}
-        </DragOverlay>
+        {/* End Turn Button */}
+        {isMyTurn && (
+          <button
+            onClick={endTurn}
+            className="absolute bottom-8 right-48 px-6 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-lg shadow-lg transition-all"
+          >
+            END TURN
+          </button>
+        )}
+
+        {/* Settings Button */}
+        <div className="absolute top-4 right-4">
+          <GameMenu />
+        </div>
+
+        {/* Card Overlay */}
+        <CardOverlay
+          card={selectedCard}
+          isOpen={showCardOverlay}
+          onClose={() => setShowCardOverlay(false)}
+        />
+
+        {/* Card Action Menu */}
+        <CardActionMenu
+          card={actionMenuCard}
+          isOpen={showActionMenu}
+          position={actionMenuPosition}
+          onPlay={handlePlayCard}
+          onView={() => {
+            if (actionMenuCard) {
+              setSelectedCard(actionMenuCard);
+              setShowCardOverlay(true);
+              setShowActionMenu(false);
+            }
+          }}
+          onClose={() => {
+            setShowActionMenu(false);
+            setActionMenuCard(null);
+          }}
+          canPlay={isMyTurn && ((currentPlayer?.fate || 0) >= (actionMenuCard?.cost || 0))}
+          playerMana={currentPlayer?.fate || 0}
+          playerSpellMana={currentPlayer?.spellMana || 0}
+        />
       </div>
 
-      {/* Card Overlay */}
-      <CardOverlay
-        card={selectedCard}
-        isOpen={showCardOverlay}
-        onClose={() => setShowCardOverlay(false)}
-      />
-
-      {/* Card Action Menu */}
-      <CardActionMenu
-        card={actionMenuCard}
-        isOpen={showActionMenu}
-        position={actionMenuPosition}
-        onPlay={handlePlayCard}
-        onView={handleViewCard}
-        onClose={() => {
-          setShowActionMenu(false);
-          setActionMenuCard(null);
-        }}
-        canPlay={isMyTurn && ((currentPlayer?.fate || 0) + ((actionMenuCard?.type === 'spell' ? currentPlayer?.spellMana : 0) || 0)) >= (actionMenuCard?.cost || 0)}
-        playerMana={currentPlayer?.fate || 0}
-        playerSpellMana={currentPlayer?.spellMana || 0}
-      />
+      {/* Drag Overlay */}
+      <DragOverlay dropAnimation={null}>
+        {draggedCard && (
+          <div className="pointer-events-none opacity-80">
+            <TarotCard card={draggedCard} isDragging={true} scale={1} />
+          </div>
+        )}
+      </DragOverlay>
     </DndContext>
   );
 }

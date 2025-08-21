@@ -53,7 +53,7 @@ function generateDeck(count: number, prefix: string): Card[] {
       health: template.health,
       orientation: Math.random() > 0.8 ? 'reversed' : 'upright',
       description: `${template.name} - A mystical tarot card`,
-      type: template.suit === 'major' ? 'spell' : 'unit',
+      type: 'unit', // All cards with attack/health are units
       rarity: template.suit === 'major' ? 'mythic' : 'common',
       deck: 'classic',
       imageUrl: `/api/card-image?id=${template.id}&deck=classic`,
@@ -155,7 +155,7 @@ function PvEInner() {
             name: 'You',
             health: 30,
             maxHealth: 30,
-            // LoR-style start
+            // Fate system start
             maxFate: playerStarts ? 1 : 0,
             fate: playerStarts ? 1 : 0,
             spellMana: 0,

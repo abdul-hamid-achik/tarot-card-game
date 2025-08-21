@@ -17,6 +17,7 @@ interface TarotCardProps {
   isOnBoard?: boolean;
   isDragging?: boolean;
   isSelectable?: boolean;
+  isDraggable?: boolean;
   scale?: number;
   onClick?: () => void;
   onRightClick?: (e: React.MouseEvent) => void;
@@ -29,6 +30,7 @@ export function TarotCard({
   isOnBoard = false,
   isDragging = false,
   isSelectable = true,
+  isDraggable = true,
   scale = 1,
   onClick,
   onRightClick,
@@ -41,7 +43,6 @@ export function TarotCard({
   const [healthChange, setHealthChange] = useState<number | null>(null);
   const isReversed = card.orientation === 'reversed';
   const { useFateToFlip, playCard } = useGameStore();
-
   // Track health changes for animation
   useEffect(() => {
     const currentHealth = card.health ?? 0;
@@ -51,22 +52,32 @@ export function TarotCard({
       const change = currentHealth - prevHealth;
 
       // Small delay to let combat animation finish
-      const showTimer = setTimeout(() => {
-        setHealthChange(change);
-        setPreviousHealth(currentHealth);
+      const showTimerId = requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            setHealthChange(change);
+            setPreviousHealth(currentHealth);
 
-        // Clear the change indicator after animation
-        const clearTimer = setTimeout(() => {
-          setHealthChange(null);
-        }, 1500);
+            // Clear the change indicator after animation
+            const clearTimerId = requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                setTimeout(() => {
+                  setHealthChange(null);
+                }, 1500);
+              });
+            });
 
-        return () => clearTimeout(clearTimer);
-      }, 500);
+            return () => cancelAnimationFrame(clearTimerId);
+          }, 500);
+        });
+      });
 
-      return () => clearTimeout(showTimer);
+      return () => cancelAnimationFrame(showTimerId);
     } else if (currentHealth !== prevHealth) {
       // Just update the previous health without animation for initial load
-      setPreviousHealth(currentHealth);
+      requestAnimationFrame(() => {
+        setPreviousHealth(currentHealth);
+      });
     }
   }, [card.health, previousHealth]);
 
@@ -258,13 +269,13 @@ export function TarotCard({
       {/* Always-on overlays (outside flip/rotation) */}
       {/* Attack (top-left) and Health (top-right), fixed regardless of card orientation or type */}
       <div className="absolute top-1 left-1 z-40 pointer-events-none select-none">
-        <div className="bg-red-900/95 px-2 py-0.5 rounded border border-red-700 text-white text-xs font-bold shadow-md">
+        <div className="bg-red-900/95 px-1.5 py-0.5 rounded border border-red-700 text-white text-[11px] font-bold shadow-md">
           ⚔ {card.attack ?? 0}
         </div>
       </div>
       <div className="absolute top-1 right-1 z-40 pointer-events-none select-none">
         <div className={cn(
-          "px-2 py-0.5 rounded border text-white text-xs font-bold shadow-md relative",
+          "px-1.5 py-0.5 rounded border text-white text-[11px] font-bold shadow-md relative",
           healthChange && healthChange < 0
             ? "bg-red-600/95 border-red-700 animate-pulse"
             : "bg-blue-900/95 border-blue-700"
@@ -288,8 +299,8 @@ export function TarotCard({
       </div>
       {/* Mana/Cost bottom-left, fixed regardless of card orientation */}
       <div className="absolute bottom-1 left-1 z-40 pointer-events-none select-none">
-        <div className="bg-black/70 rounded-full w-7 h-7 flex items-center justify-center border border-white/20">
-          <span className="text-[13px] font-bold text-yellow-300">{card.cost}</span>
+        <div className="bg-blue-900/90 rounded-full w-7 h-7 flex items-center justify-center border-2 border-blue-400 shadow-lg">
+          <span className="text-[13px] font-bold text-white">{card.cost ?? 0}</span>
         </div>
       </div>
 
@@ -310,8 +321,8 @@ export function TarotCard({
           }}
           style={{
             transformStyle: 'preserve-3d',
-            width: '150px',
-            height: '210px',
+            width: `${120 * cardScale}px`,
+            height: `${168 * cardScale}px`,
           }}
         >
           {/* Card Front */}

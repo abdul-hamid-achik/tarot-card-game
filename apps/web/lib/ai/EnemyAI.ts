@@ -295,20 +295,20 @@ export class EnemyAI {
     score += (myHealth - enemyHealth) * 2;
 
     // Board presence
-    const myUnits = myBoard.filter(slot => slot.card).length;
-    const enemyUnits = enemyBoard.filter(slot => slot.card).length;
+    const myUnits = myBoard.filter(slot => slot && slot.card).length;
+    const enemyUnits = enemyBoard.filter(slot => slot && slot.card).length;
     score += (myUnits - enemyUnits) * 5;
 
     // Total stats on board
     const myStats = myBoard.reduce((sum, slot) => {
-      if (slot.card?.type === 'unit') {
+      if (slot && slot.card?.type === 'unit') {
         return sum + (slot.card.attack || 0) + (slot.card.health || 0);
       }
       return sum;
     }, 0);
 
     const enemyStats = enemyBoard.reduce((sum, slot) => {
-      if (slot.card?.type === 'unit') {
+      if (slot && slot.card?.type === 'unit') {
         return sum + (slot.card.attack || 0) + (slot.card.health || 0);
       }
       return sum;
@@ -357,7 +357,7 @@ export class EnemyAI {
     if (Math.random() < this.config.mistakeChance) {
       // Make a random play
       const randomCard = playableCards[Math.floor(Math.random() * playableCards.length)];
-      const emptySlots = board.map((slot, i) => !slot.card ? i : -1).filter(i => i >= 0);
+      const emptySlots = board.map((slot, i) => !slot || (!slot.card && slot !== null) ? i : -1).filter(i => i >= 0);
       const targetSlot = emptySlots[Math.floor(Math.random() * emptySlots.length)];
 
       gameLogger.logAction('ai_mistake_play', {
@@ -434,7 +434,7 @@ export class EnemyAI {
     }
 
     // Find best slot for placement
-    const emptySlots = board.map((slot, i) => !slot.card ? i : -1).filter(i => i >= 0);
+    const emptySlots = board.map((slot, i) => !slot || slot === null ? i : !slot.card ? i : -1).filter(i => i >= 0);
     if (emptySlots.length === 0) {
       gameLogger.logAction('ai_no_slot_available', {
         enemyId: this.enemy.id,

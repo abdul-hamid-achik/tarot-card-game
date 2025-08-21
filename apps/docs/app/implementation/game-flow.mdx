@@ -6,7 +6,7 @@ title: Game Flow FSM
 
 ## Finite State Machine Overview
 
-The game uses XState to manage the complete game flow with proper state transitions. The FSM lives in the shared engine at `packages/game-sim/src/lor-game-flow.ts` and is imported in the web app from `@tarot/game-sim`.
+The game uses XState to manage the complete game flow with proper state transitions. The FSM lives in the shared engine at `packages/game-sim/src/game-flow.ts` and is imported in the web app from `@tarot/game-sim`.
 
 ### Key Features
 - Attack token system
@@ -52,7 +52,7 @@ type SpellSpeed = 'burst' | 'focus' | 'fast' | 'slow';
 
 ```bash
 # Generate FSM visualization
-npx xstate visualize packages/game-sim/src/lor-game-flow.ts
+npx xstate visualize packages/game-sim/src/game-flow.ts
 ```
 
 ## Common Issues & Solutions

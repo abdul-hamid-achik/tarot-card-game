@@ -1,5 +1,5 @@
 import type { MatchState, Unit, CardDefinition, PlayerState } from './types.js';
-import { TarotLorSimulator } from './tarot-lor-simulator.js';
+import { TarotSimulator } from './tarot-simulator.js';
 import { CombatSystem } from './combat.js';
 import { KeywordProcessor } from './keywords.js';
 
@@ -326,7 +326,7 @@ export class AIController {
 
     switch (move.type) {
       case 'play_card':
-        return TarotLorSimulator.playCard(stateCopy, playerId, move.details.cardId);
+        return TarotSimulator.playCard(stateCopy, playerId, move.details.cardId);
       
       case 'attack':
         return CombatSystem.declareAttackers(stateCopy, playerId, move.details.attackerIds);
@@ -335,10 +335,10 @@ export class AIController {
         return CombatSystem.declareBlockers(stateCopy, playerId, move.details.blockAssignments);
       
       case 'pass':
-        return TarotLorSimulator.processAction(stateCopy, { type: 'pass', playerId });
+        return TarotSimulator.processAction(stateCopy, { type: 'pass', playerId });
       
       case 'end_turn':
-        return TarotLorSimulator.endTurn(stateCopy);
+        return TarotSimulator.endTurn(stateCopy);
       
       default:
         return stateCopy;

@@ -127,7 +127,7 @@ export function CenterBoard({ playerBoard, opponentBoard, phase, isMyTurn, onCar
   // Track destroyed cards for animation
   const [destroyedCards, setDestroyedCards] = useState<Set<string>>(new Set());
 
-  // Calculate which cards will be destroyed based on combat (LoR-style pairing by order)
+  // Calculate which cards will be destroyed based on combat (pairing by order)
   const calculateDestroyedCards = () => {
     if (!showCombatLines) return new Set<string>();
 

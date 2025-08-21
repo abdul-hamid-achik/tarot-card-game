@@ -121,7 +121,7 @@ export function TopBar({ matchId, turn, phase, turnTimer }: TopBarProps) {
                   key={turn}
                   duration={turnTimer}
                   onComplete={() => {
-                    // Auto-pass on timeout like LoR turn rope
+                    // Auto-pass on timeout with turn rope
                     try { endTurn(); } catch (_) { /* no-op */ }
                   }}
                   isActive={!isPaused}

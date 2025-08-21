@@ -1,7 +1,7 @@
 import { stableStringify } from './serialize.js';
 import type { IntentInput } from './schemas.js';
 import type { MatchState } from './types.js';
-import { TarotLorSimulator } from './tarot-lor-simulator.js';
+import { TarotSimulator } from './tarot-simulator.js';
 
 export interface GoldenStepSnapshot {
   idx: number;
@@ -17,7 +17,7 @@ export function createGoldenTimeline(state: MatchState, intents: IntentInput[]):
     const action = {
       ...intent
     };
-    s = TarotLorSimulator.processAction(s, action);
+    s = TarotSimulator.processAction(s, action);
     snapshots.push({ idx, intent, stateJSON: stableStringify(s) });
   });
   return snapshots;

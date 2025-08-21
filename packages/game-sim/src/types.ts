@@ -6,7 +6,7 @@ export type TurnPhase = 'draw' | 'main' | 'combat' | 'end';
 export type CardOrientation = 'upright' | 'reversed';
 export type GameSpeed = 'burst' | 'fast' | 'slow';
 
-// Keywords for LoR-style abilities
+// Keywords for tactical card abilities
 export type Keyword = 
   | 'quick-attack'
   | 'challenger'
@@ -32,7 +32,7 @@ export interface CardDefinition {
   type: CardType;
   attack?: number; // For units
   health?: number; // For units
-  keywords?: Keyword[]; // LoR-style keywords
+  keywords?: Keyword[]; // Card ability keywords
   upright: CardEffect;
   reversed: CardEffect;
   tags: string[];
@@ -69,7 +69,7 @@ export interface Unit {
   zone?: 'bench' | 'battlefield'; // Current zone
 }
 
-// Player state in LoR-style game
+// Player state in tactical card game
 export interface PlayerState {
   id: string;
   nexusHealth: number;

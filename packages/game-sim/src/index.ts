@@ -6,10 +6,10 @@ export * from './serialize.js';
 export * from './effects.js';
 export * from './bot.js';
 export * from './golden.js';
-export { default as lorGameMachine } from './lor-game-flow.js';
+export { default as gameMachine } from './game-flow.js';
 
-// New LoR-style exports
-export * from './tarot-lor-simulator.js';
+// New tarot game exports
+export * from './tarot-simulator.js';
 export * from './combat.js';
 export * from './keywords.js';
 export * from './ai-controller.js';

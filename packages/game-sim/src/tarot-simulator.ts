@@ -2,10 +2,10 @@ import { createSeededRandom } from './rng.js';
 import type { MatchState, PlayerState, Unit, CardDefinition, CombatPair } from './types.js';
 
 /**
- * Tarot LoR-style Game Simulator
- * Implements bench/battlefield mechanics similar to Legends of Runeterra
+ * Tarot Game Simulator
+ * Implements tactical card game mechanics with bench/battlefield zones
  */
-export class TarotLorSimulator {
+export class TarotSimulator {
   /**
    * Create initial game state with bench/battlefield zones
    */

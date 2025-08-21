@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, Play, X } from 'lucide-react';
+import { Eye, Play, X, Sparkles } from 'lucide-react';
 import { Card } from '@/lib/store/gameStore';
 import { cn } from '@/lib/utils';
 
@@ -43,43 +43,31 @@ export function CardActionMenu({
             onClick={onClose}
           />
           
-          {/* Action Menu */}
+          {/* Action Menu - Compact */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.8, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.8, y: 10 }}
-            transition={{ duration: 0.2 }}
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: -5 }}
+            exit={{ opacity: 0, y: 5 }}
+            transition={{ duration: 0.1 }}
             className="fixed z-50"
             style={{
               left: `${position.x}px`,
-              top: `${position.y}px`,
+              top: `${position.y - 10}px`,
               transform: 'translate(-50%, -100%)'
             }}
           >
-            <div className="bg-black/90 backdrop-blur-md rounded-xl border border-tarot-gold/30 p-2 shadow-2xl">
-              {/* Card Name */}
-              <div className="text-white text-sm font-bold px-3 py-1 mb-2 text-center border-b border-tarot-gold/20">
-                {card.name}
-              </div>
-              
-              {/* Action Buttons */}
-              <div className="flex gap-2">
+            <div className="bg-black/95 backdrop-blur-sm rounded-lg border border-tarot-gold/40 shadow-xl">
+              <div className="flex gap-0.5 p-1">
                 {/* View Button */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onView();
                   }}
-                  className={cn(
-                    "flex items-center gap-2 px-4 py-2 rounded-lg",
-                    "bg-blue-600/80 hover:bg-blue-500",
-                    "text-white font-medium",
-                    "transition-all duration-200",
-                    "hover:scale-105"
-                  )}
+                  className="p-2 rounded hover:bg-white/10 text-white transition-colors"
+                  title="View Card"
                 >
                   <Eye className="w-4 h-4" />
-                  <span>View</span>
                 </button>
 
                 {/* Play Button */}
@@ -92,24 +80,18 @@ export function CardActionMenu({
                   }}
                   disabled={!canPlay}
                   className={cn(
-                    "flex items-center gap-2 px-4 py-2 rounded-lg",
-                    "font-medium transition-all duration-200",
+                    "flex items-center gap-1 px-2 py-2 rounded transition-colors",
                     canPlay ? [
-                      "bg-green-600/80 hover:bg-green-500",
-                      "text-white hover:scale-105"
+                      "hover:bg-white/10 text-green-400"
                     ] : [
-                      "bg-gray-700/50 cursor-not-allowed",
-                      "text-gray-400"
+                      "cursor-not-allowed text-gray-500"
                     ]
                   )}
+                  title={canPlay ? `Play for ${card.cost} fate` : `Need ${manaNeeded} more fate`}
                 >
-                  <Play className="w-4 h-4" />
-                  <span>
-                    {canPlay ? (
-                      `Play (${card.cost})`
-                    ) : (
-                      `Need ${manaNeeded} more`
-                    )}
+                  <Sparkles className="w-4 h-4" />
+                  <span className="text-xs font-bold">
+                    {card.cost}
                   </span>
                 </button>
               </div>

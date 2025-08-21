@@ -1,7 +1,7 @@
 // @ts-nocheck
 /**
- * Legends of Runeterra Style Game Flow
- * Implements the complete LoR mechanics including:
+ * Tarot Tactical Card Game Flow
+ * Implements tactical card game mechanics including:
  * - Attack token system
  * - Defender priority
  * - Spell stack with proper speeds
@@ -10,7 +10,7 @@
 
 import { createMachine, assign } from 'xstate';
 
-export interface LoRGameContext {
+export interface GameContext {
   matchId: string;
   players: string[];
   round: number;
@@ -73,7 +73,7 @@ interface UnitCard extends Card {
   hasAttacked: boolean;
 }
 
-export type LoRGameEvent =
+export type GameEvent =
   | { type: 'ROUND_START' }
   | { type: 'PLAY_UNIT'; playerId: string; card: UnitCard }
   | { type: 'PLAY_SPELL'; playerId: string; card: Card; targets?: string[] }
@@ -85,8 +85,8 @@ export type LoRGameEvent =
   | { type: 'END_ROUND' }
   | { type: 'RALLY'; playerId: string };
 
-export const lorGameMachine = createMachine<LoRGameContext, LoRGameEvent>({
-  id: 'lorGame',
+export const gameMachine = createMachine<GameContext, GameEvent>({
+  id: 'tarotGame',
   initial: 'roundStart',
   context: {
     matchId: '',
@@ -149,7 +149,7 @@ export const lorGameMachine = createMachine<LoRGameContext, LoRGameEvent>({
               },
             ],
             DECLARE_ATTACK: {
-              target: '#lorGame.combatPhase',
+              target: '#tarotGame.combatPhase',
               cond: 'canAttack',
               actions: ['consumeAttackToken', 'setAttackers'],
             },
@@ -199,7 +199,7 @@ export const lorGameMachine = createMachine<LoRGameContext, LoRGameEvent>({
         checkRoundEnd: {
           always: [
             {
-              target: '#lorGame.roundEnd',
+              target: '#tarotGame.roundEnd',
               cond: 'bothPlayersPassed',
             },
             {
@@ -531,4 +531,4 @@ export const lorGameMachine = createMachine<LoRGameContext, LoRGameEvent>({
     },
   });
 
-export default lorGameMachine;
+export default gameMachine;

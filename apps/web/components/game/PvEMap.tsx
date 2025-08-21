@@ -105,7 +105,7 @@ function generateMapNodes(region: number, seed: string): MapNode[] {
   };
   const randomInt = (min: number, max: number) => Math.floor(nextRand() * (max - min + 1)) + min;
 
-  // Curated layout patterns, Runeterra-like. Slight variety, not a sea of choices.
+  // Curated layout patterns for tactical variety without overwhelming choices.
   const patterns: number[][] = [
     [1, 2, 3, 2, 1], // diamond
     [1, 2, 2, 2, 1], // narrow middle

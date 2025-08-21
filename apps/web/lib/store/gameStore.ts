@@ -47,12 +47,12 @@ export interface Unit {
 export interface Player {
   id: string;
   name: string;
-  nexusHealth?: number; // LoR-style health
+  nexusHealth?: number; // Arcanum health
   health?: number; // Legacy support
   maxHealth?: number; // Legacy support
   fate?: number; // Legacy mana name
   maxFate?: number; // Legacy max mana
-  mana?: number; // Current mana (LoR style)
+  mana?: number; // Current mana
   maxMana?: number; // Max mana (cap 10)
   spellMana?: number; // Banked spell mana (cap 3)
   deck: Card[];
@@ -91,7 +91,7 @@ export interface MatchState {
   turn: number;
   phase: GamePhase;
   activePlayer?: string; // Legacy support
-  currentPlayer?: string; // LoR style
+  currentPlayer?: string; // Active player
   attackTokenOwner?: string; // Legacy support
   attackToken?: string; // Who has attack token this round
   players: Record<string, Player>;
@@ -280,7 +280,7 @@ export const useGameStore = create<GameStore>()(
           }, true);
         }
 
-        // LoR-style resource check: pay from fate (mana), and for spells, from spellMana if needed
+        // Resource check: pay from fate (mana), and for spells, from spellMana if needed
         const isSpell = card.type === 'spell';
         const availableMana = player.fate + (isSpell ? (player.spellMana || 0) : 0);
         if (card.cost > availableMana) {
@@ -359,9 +359,12 @@ export const useGameStore = create<GameStore>()(
           remainingCost -= spendFromSpell;
         }
         const updatedFate = mana;
+        
+        console.log('Playing card:', card.name, 'Cost:', card.cost, 'Fate before:', player.fate, 'Fate after:', updatedFate);
 
         // Log the card play with resource changes
-        withGameLogging.cardPlay(gameLogger, card, playerId, targetSlot, player.fate, updatedFate);
+        const targetSlot = lane !== undefined ? lane : -1; // -1 for spells or when no specific slot
+        withGameLogging.cardPlay(gameLogger, card, playerId, targetSlot, player.fate || 0, updatedFate);
 
         // Log resource changes
         if (player.fate !== updatedFate) {
@@ -401,7 +404,6 @@ export const useGameStore = create<GameStore>()(
                 ...player,
                 hand: updatedHand,
                 bench: updatedBench,
-                board: updatedBoard,
                 fate: updatedFate,
                 spellMana,
                 discard: updatedDiscard
@@ -410,11 +412,12 @@ export const useGameStore = create<GameStore>()(
           }
         });
 
-        // Log diff for immediate local play
+        // Log diff for immediate local play (bench updates)
         try {
-          const prevBoard = player.board || [];
-          const updatedBoard = player.board || [];
-          logBoardDiff(prevBoard, updatedBoard, playerId, 'playCard');
+          gameLogger.logAction('bench_updated', {
+            playerId,
+            benchCount: updatedBench.filter(u => u !== null).length
+          }, true);
         } catch (_) { }
       },
 
@@ -477,8 +480,8 @@ export const useGameStore = create<GameStore>()(
           const def = latest.players[defenderId];
           if (!atk || !def) return;
 
-          const atkBoard = Array.from({ length: 6 }, (_, i) => atk.board[i] || { card: null, position: i });
-          const defBoard = Array.from({ length: 6 }, (_, i) => def.board[i] || { card: null, position: i });
+          const atkBoard = Array.from({ length: 6 }, (_, i) => atk.battlefield?.[i] || atk.board?.[i] || { card: null, position: i });
+          const defBoard = Array.from({ length: 6 }, (_, i) => def.battlefield?.[i] || def.board?.[i] || { card: null, position: i });
 
           const updatedAtkBoard = [...atkBoard];
           const updatedDefBoard = [...defBoard];
@@ -575,12 +578,14 @@ export const useGameStore = create<GameStore>()(
                 [attackerId]: {
                   ...atk,
                   health: newAttackerHealth,
+                  battlefield: updatedAtkBoard,
                   board: updatedAtkBoard,
                   discard: attackerDiscard,
                 },
                 [defenderId]: {
                   ...def,
                   health: newDefenderHealth,
+                  battlefield: updatedDefBoard,
                   board: updatedDefBoard,
                   discard: defenderDiscard,
                 },
@@ -590,7 +595,7 @@ export const useGameStore = create<GameStore>()(
         }, 2500);
       },
 
-      // Declare attackers (LoR-style). Sets combat phase and waits for blocks.
+      // Declare attackers. Sets combat phase and waits for blocks.
       declareAttackers: (attackerIds, playerId = 'player1') => {
         const state = get();
         if (!state.currentMatch) return;
@@ -656,8 +661,8 @@ export const useGameStore = create<GameStore>()(
         const def = match.players[defenderId];
         if (!atk || !def) return;
 
-        const atkBoard = Array.from({ length: 6 }, (_, i) => atk.board[i] || { card: null, position: i });
-        const defBoard = Array.from({ length: 6 }, (_, i) => def.board[i] || { card: null, position: i });
+        const atkBoard = Array.from({ length: 6 }, (_, i) => atk.battlefield?.[i] || atk.board?.[i] || { card: null, position: i });
+        const defBoard = Array.from({ length: 6 }, (_, i) => def.battlefield?.[i] || def.board?.[i] || { card: null, position: i });
 
         const updatedAtkBoard = [...atkBoard];
         const updatedDefBoard = [...defBoard];
@@ -760,12 +765,14 @@ export const useGameStore = create<GameStore>()(
               [attackerId]: {
                 ...atk,
                 health: newAttackerHealth,
+                battlefield: updatedAtkBoard,
                 board: updatedAtkBoard,
                 discard: attackerDiscard,
               },
               [defenderId]: {
                 ...def,
                 health: newDefenderHealth,
+                battlefield: updatedDefBoard,
                 board: updatedDefBoard,
                 discard: defenderDiscard,
               },
@@ -1066,7 +1073,7 @@ export const useGameStore = create<GameStore>()(
           return card;
         });
 
-        const updatedBoard = player.board.map(slot => {
+        const updatedBoard = (player.board || player.battlefield || []).map(slot => {
           if (slot.card?.id === cardId) {
             if (!cardFound) {
               cardFound = true;
@@ -1105,6 +1112,7 @@ export const useGameStore = create<GameStore>()(
               [playerId]: {
                 ...player,
                 hand: updatedHand,
+                battlefield: updatedBoard,
                 board: updatedBoard
               }
             }
