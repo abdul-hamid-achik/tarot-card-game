@@ -6,3 +6,4 @@ export * from './serialize.js';
 export * from './effects.js';
 export * from './bot.js';
 export * from './golden.js';
+export { default as lorGameMachine } from './lor-game-flow.js';

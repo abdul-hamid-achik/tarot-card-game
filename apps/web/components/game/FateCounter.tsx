@@ -15,7 +15,10 @@ export function FateCounter({ current, max, position = 'bottom', label = 'Fate' 
   const gems = Array.from({ length: max }, (_, i) => i < current);
 
   return (
-    <div className="flex items-center gap-3 bg-black/50 backdrop-blur-sm rounded-full px-4 py-2 border border-white/20">
+    <div
+      className="flex items-center gap-3 bg-black/50 backdrop-blur-sm rounded-full px-4 py-2 border border-white/20"
+      data-testid={`fate-counter-${position}`}
+    >
       <span className="text-xs uppercase tracking-wider text-gray-300 font-semibold">{label}</span>
       <Sparkles className="w-5 h-5 text-purple-400" />
       <div className="flex gap-1">
@@ -51,6 +54,7 @@ export function FateCounter({ current, max, position = 'bottom', label = 'Fate' 
                   ease: "easeInOut"
                 }}
                 className="w-full h-full rounded-full bg-white/20"
+                data-testid={`fate-gem-${index}-${filled ? 'filled' : 'empty'}`}
               />
             )}
           </motion.div>

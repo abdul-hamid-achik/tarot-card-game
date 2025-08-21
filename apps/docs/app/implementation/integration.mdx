@@ -86,7 +86,9 @@ const isValidAction = (state: GameState, action: Action) => {
 
 ### Unit Tests
 ```typescript
-import { createGameMachine } from '@/game-sim/src/lor-game-flow';
+import { lorGameMachine } from '@tarot/game-sim';
+```typescript
+import { lorGameMachine } from '@tarot/game-sim';
 
 describe('Game Flow FSM', () => {
   test('priority passes correctly', () => {
@@ -120,7 +122,7 @@ describe('Full Game Flow', () => {
 npm run test
 
 # Check FSM visualization
-npx xstate visualize packages/game-sim/src/lor-game-flow.ts
+npx xstate visualize apps/web/lib/game/lor-game-flow-v5.ts
 
 # Debug logging
 localStorage.setItem('DEBUG_GAME_FSM', 'true')

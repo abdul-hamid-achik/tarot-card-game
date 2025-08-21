@@ -1,6 +1,6 @@
 "use client";
 
-import MainMenu from '@/components/game/MainMenu';
+import { MainMenu } from '@/components/game/MainMenu';
 
 export default function PlayPage() {
   return (

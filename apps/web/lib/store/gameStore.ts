@@ -69,6 +69,9 @@ export interface MatchState {
   lastPassBy?: string | null; // Track consecutive passes
   players: Record<string, Player>;
   turnTimer?: number;
+  // Optional attack/block orders for LoR-style pairing
+  pendingAttackOrder?: string[]; // array of attacker card IDs in desired order
+  pendingBlockOrder?: string[];  // array of blocker card IDs in desired order
   reactionWindow?: {
     active: boolean;
     respondingPlayer?: string;
@@ -147,6 +150,9 @@ interface GameStore {
   // Game Actions
   playCard: (card: Card, targetSlot?: number, playerId?: string) => void;
   startCombat: () => void;
+  declareAttackers: (attackerIds: string[], playerId?: string) => void;
+  setBlockOrder: (blockerIds: string[]) => void;
+  resolveDeclaredCombat: () => void;
   endTurn: () => void; // Acts as Pass priority
   flipCard: (cardId: string, playerId?: string) => void;
   peekDestiny: () => void;
@@ -349,7 +355,7 @@ export const useGameStore = create<GameStore>()(
         if (!state.currentMatch) return;
 
         const match = state.currentMatch;
-        const attackerId = match.activePlayer;
+        const attackerId = match.attackTokenOwner || match.activePlayer;
         const playerIds = Object.keys(match.players);
         const defenderId = playerIds.find(id => id !== attackerId) || attackerId;
         const attacker = match.players[attackerId];
@@ -419,91 +425,70 @@ export const useGameStore = create<GameStore>()(
             unitsDestroyed: 0
           };
 
-          for (let i = 0; i < 6; i++) {
-            const atkSlot = updatedAtkBoard[i];
-            const defSlot = updatedDefBoard[i];
-            const atkCard = (atkSlot?.card?.type === 'unit' || atkSlot?.card?.type === 'major' || (atkSlot?.card?.type === 'spell' && atkSlot?.card?.suit === 'major')) ? atkSlot.card : null;
-            const defCard = (defSlot?.card?.type === 'unit' || defSlot?.card?.type === 'major' || (defSlot?.card?.type === 'spell' && defSlot?.card?.suit === 'major')) ? defSlot.card : null;
+          // Build ordered lists of units (ignore empty positions for pairing)
+          const atkUnits = updatedAtkBoard
+            .map((slot, i) => ({ i, card: slot.card }))
+            .filter(x => !!x.card) as { i: number; card: Card }[];
+          const defUnits = updatedDefBoard
+            .map((slot, i) => ({ i, card: slot.card }))
+            .filter(x => !!x.card) as { i: number; card: Card }[];
 
-            if (!atkCard && !defCard) continue;
+          const pairs = Math.min(atkUnits.length, defUnits.length);
+          for (let p = 0; p < pairs; p++) {
+            const { i: ai, card: atkCard } = atkUnits[p];
+            const { i: di, card: defCard } = defUnits[p];
 
-            if (atkCard && defCard) {
-              // Both units strike simultaneously (mutual damage like Legends of Runeterra)
-              const atkDmg = effectivePower(atkCard, defCard);
-              const defDmg = effectivePower(defCard, atkCard);
+            const atkDmg = effectivePower(atkCard as any, defCard as any);
+            const defDmg = effectivePower(defCard as any, atkCard as any);
 
-              // Calculate new health after damage (no orientation bonus for health)
-              const defNewHealth = Math.max(0, (defCard.health || 0) - atkDmg);
-              const atkNewHealth = Math.max(0, (atkCard.health || 0) - defDmg);
+            const defNewHealth = Math.max(0, (defCard.health || 0) - atkDmg);
+            const atkNewHealth = Math.max(0, (atkCard.health || 0) - defDmg);
 
-              // Log the unit clash
-              gameLogger.logCombat({
-                subType: 'UNIT_CLASH',
-                attacker: {
-                  id: atkCard.id,
-                  name: atkCard.name,
-                  attack: atkDmg,
-                  health: atkCard.health || 0,
-                  position: i
-                },
-                defender: {
-                  id: defCard.id,
-                  name: defCard.name,
-                  attack: defDmg,
-                  health: defCard.health || 0,
-                  position: i
-                },
-                damage: atkDmg
-              });
+            gameLogger.logCombat({
+              subType: 'UNIT_CLASH',
+              attacker: { id: atkCard.id, name: atkCard.name, attack: atkDmg, health: atkCard.health || 0, position: ai },
+              defender: { id: defCard.id, name: defCard.name, attack: defDmg, health: defCard.health || 0, position: di },
+              damage: atkDmg
+            });
 
-              // Handle defender card - destroy if health <= 0
-              if (defSlot.card) {
-                if (defNewHealth <= 0) {
-                  logBoardRemoval(defenderId, i, defSlot.card, `destroyed by lane ${i} attacker dealing ${atkDmg} damage`);
-                  gameLogger.logUnitDeath(defSlot.card, i, `Destroyed by ${atkCard.name} dealing ${atkDmg} damage`);
-                  withGameLogging.healthChange(gameLogger, 'unit', defSlot.card.id, defSlot.card.name, defSlot.card.health || 0, 0, atkCard.name, 'Combat damage');
-                  defenderDiscard.push(defSlot.card);
-                  updatedDefBoard[i] = { ...defSlot, card: null };
-                  combatSummary.unitsDestroyed++;
-                } else {
-                  withGameLogging.healthChange(gameLogger, 'unit', defSlot.card.id, defSlot.card.name, defSlot.card.health || 0, defNewHealth, atkCard.name, 'Combat damage');
-                  updatedDefBoard[i] = { ...defSlot, card: { ...defSlot.card, health: defNewHealth } };
-                }
-              }
+            // Defender resolution
+            const defSlot = updatedDefBoard[di];
+            if (defNewHealth <= 0) {
+              logBoardRemoval(defenderId, di, defCard as any, `destroyed by attacker dealing ${atkDmg} damage`);
+              gameLogger.logUnitDeath(defCard as any, di, `Destroyed by ${atkCard.name} dealing ${atkDmg} damage`);
+              withGameLogging.healthChange(gameLogger, 'unit', defCard.id, defCard.name, defCard.health || 0, 0, atkCard.name, 'Combat damage');
+              defenderDiscard.push(defCard as any);
+              updatedDefBoard[di] = { ...defSlot, card: null };
+              combatSummary.unitsDestroyed++;
+            } else {
+              withGameLogging.healthChange(gameLogger, 'unit', defCard.id, defCard.name, defCard.health || 0, defNewHealth, atkCard.name, 'Combat damage');
+              updatedDefBoard[di] = { ...defSlot, card: { ...(defSlot.card as any), health: defNewHealth } };
+            }
 
-              // Handle attacker card - destroy if health <= 0
-              if (atkSlot.card) {
-                if (atkNewHealth <= 0) {
-                  logBoardRemoval(attackerId, i, atkSlot.card, `destroyed by lane ${i} blocker dealing ${defDmg} damage`);
-                  gameLogger.logUnitDeath(atkSlot.card, i, `Destroyed by ${defCard.name} dealing ${defDmg} damage`);
-                  withGameLogging.healthChange(gameLogger, 'unit', atkSlot.card.id, atkSlot.card.name, atkSlot.card.health || 0, 0, defCard.name, 'Combat damage');
-                  attackerDiscard.push(atkSlot.card);
-                  updatedAtkBoard[i] = { ...atkSlot, card: null };
-                  combatSummary.unitsDestroyed++;
-                } else {
-                  withGameLogging.healthChange(gameLogger, 'unit', atkSlot.card.id, atkSlot.card.name, atkSlot.card.health || 0, atkNewHealth, defCard.name, 'Combat damage');
-                  updatedAtkBoard[i] = { ...atkSlot, card: { ...atkSlot.card, health: atkNewHealth } };
-                }
-              }
-            } else if (atkCard && !defCard) {
-              // Direct damage to defender nexus
-              const dmg = effectivePower(atkCard, null);
-              const oldDefenderHealth = newDefenderHealth;
+            // Attacker resolution
+            const atkSlot = updatedAtkBoard[ai];
+            if (atkNewHealth <= 0) {
+              logBoardRemoval(attackerId, ai, atkCard as any, `destroyed by blocker dealing ${defDmg} damage`);
+              gameLogger.logUnitDeath(atkCard as any, ai, `Destroyed by ${defCard.name} dealing ${defDmg} damage`);
+              withGameLogging.healthChange(gameLogger, 'unit', atkCard.id, atkCard.name, atkCard.health || 0, 0, defCard.name, 'Combat damage');
+              attackerDiscard.push(atkCard as any);
+              updatedAtkBoard[ai] = { ...atkSlot, card: null };
+              combatSummary.unitsDestroyed++;
+            } else {
+              withGameLogging.healthChange(gameLogger, 'unit', atkCard.id, atkCard.name, atkCard.health || 0, atkNewHealth, defCard.name, 'Combat damage');
+              updatedAtkBoard[ai] = { ...atkSlot, card: { ...(atkSlot.card as any), health: atkNewHealth } };
+            }
+          }
+
+          // Remaining attackers deal direct damage
+          if (atkUnits.length > defUnits.length) {
+            for (let r = pairs; r < atkUnits.length; r++) {
+              const { i: ai, card: atkCard } = atkUnits[r];
+              const dmg = effectivePower(atkCard as any, null);
+              const old = newDefenderHealth;
               newDefenderHealth = Math.max(0, newDefenderHealth - dmg);
-
-              gameLogger.logCombat({
-                subType: 'DIRECT_DAMAGE',
-                attacker: {
-                  id: atkCard.id,
-                  name: atkCard.name,
-                  attack: dmg,
-                  health: atkCard.health || 0,
-                  position: i
-                },
-                damage: dmg
-              });
-
-              withGameLogging.healthChange(gameLogger, 'player', defenderId, 'Player', oldDefenderHealth, newDefenderHealth, atkCard.name, 'Direct combat damage');
+              gameLogger.logCombat({ subType: 'DIRECT_DAMAGE', attacker: { id: atkCard.id, name: atkCard.name, attack: dmg, health: atkCard.health || 0, position: ai }, damage: dmg });
+              withGameLogging.healthChange(gameLogger, 'player', defenderId, 'Player', old, newDefenderHealth, atkCard.name, 'Direct combat damage');
               combatSummary.opponentDamage += dmg;
             }
           }
@@ -535,6 +520,197 @@ export const useGameStore = create<GameStore>()(
             }
           });
         }, 2500);
+      },
+
+      // Declare attackers (LoR-style). Sets combat phase and waits for blocks.
+      declareAttackers: (attackerIds, playerId = 'player1') => {
+        const state = get();
+        if (!state.currentMatch) return;
+
+        const match = state.currentMatch;
+        const attackerId = match.attackTokenOwner || playerId;
+        const playerIds = Object.keys(match.players);
+        const defenderId = playerIds.find(id => id !== attackerId) || attackerId;
+
+        // Enter combat phase and store attack order
+        set({
+          currentMatch: {
+            ...match,
+            phase: 'combat',
+            activePlayer: defenderId, // Defender chooses blocks now
+            pendingAttackOrder: attackerIds,
+            pendingBlockOrder: [],
+          }
+        });
+
+        gameLogger.logAction('declare_attackers', {
+          playerId: attackerId,
+          attackers: attackerIds
+        }, true);
+
+        // If defender is AI, auto-assign simple blocks and resolve after brief delay
+        const defender = match.players[defenderId];
+        if (defender?.isAI) {
+          const defUnits = defender.board.map((s) => s.card).filter(Boolean) as Card[];
+          const autoBlocks = defUnits.slice(0, attackerIds.length).map(c => c.id);
+          set({
+            currentMatch: {
+              ...get().currentMatch!,
+              pendingBlockOrder: autoBlocks,
+            }
+          });
+          setTimeout(() => {
+            get().resolveDeclaredCombat();
+          }, 900);
+        }
+      },
+
+      setBlockOrder: (blockerIds: string[]) => {
+        const state = get();
+        if (!state.currentMatch) return;
+        set({
+          currentMatch: {
+            ...state.currentMatch,
+            pendingBlockOrder: blockerIds,
+          }
+        });
+      },
+
+      resolveDeclaredCombat: () => {
+        const state = get();
+        if (!state.currentMatch) return;
+
+        const match = state.currentMatch;
+        const attackerId = match.attackTokenOwner || match.activePlayer;
+        const playerIds = Object.keys(match.players);
+        const defenderId = playerIds.find(id => id !== attackerId) || attackerId;
+        const atk = match.players[attackerId];
+        const def = match.players[defenderId];
+        if (!atk || !def) return;
+
+        const atkBoard = Array.from({ length: 6 }, (_, i) => atk.board[i] || { card: null, position: i });
+        const defBoard = Array.from({ length: 6 }, (_, i) => def.board[i] || { card: null, position: i });
+
+        const updatedAtkBoard = [...atkBoard];
+        const updatedDefBoard = [...defBoard];
+        let newAttackerHealth = atk.health;
+        let newDefenderHealth = def.health;
+        const attackerDiscard = [...(atk.discard || [])];
+        const defenderDiscard = [...(def.discard || [])];
+
+        const suitBonus = (atkSuit: CardSuit, defSuit: CardSuit): number => {
+          if (atkSuit === 'major' || defSuit === 'major') return 0;
+          if (atkSuit === defSuit) return -1;
+          if (atkSuit === 'wands' && defSuit === 'cups') return 1;
+          if (atkSuit === 'swords' && defSuit === 'pentacles') return 1;
+          return 0;
+        };
+        const effectivePower = (card: Card | null | undefined, enemy: Card | null | undefined): number => {
+          if (!card) return 0;
+          const base = Math.max(0, card.attack || 0);
+          const orientationBonus = card.orientation === 'upright' ? 1 : 0;
+          const suitMod = enemy ? suitBonus(card.suit, enemy.suit) : 0;
+          return Math.max(0, base + orientationBonus + suitMod);
+        };
+
+        const attackIds = match.pendingAttackOrder || [];
+        const blockIds = match.pendingBlockOrder || [];
+        const pairs = Math.min(attackIds.length, blockIds.length);
+
+        // Utility to find board index by card ID
+        const findIndexById = (board: typeof atkBoard, id: string) => board.findIndex(s => s.card?.id === id);
+
+        for (let p = 0; p < pairs; p++) {
+          const atkId = attackIds[p];
+          const blkId = blockIds[p];
+          const ai = findIndexById(updatedAtkBoard, atkId);
+          const di = findIndexById(updatedDefBoard, blkId);
+          if (ai < 0 || di < 0) continue;
+          const atkCard = updatedAtkBoard[ai].card as Card;
+          const defCard = updatedDefBoard[di].card as Card;
+
+          const atkDmg = effectivePower(atkCard, defCard);
+          const defDmg = effectivePower(defCard, atkCard);
+
+          const defNewHealth = Math.max(0, (defCard.health || 0) - atkDmg);
+          const atkNewHealth = Math.max(0, (atkCard.health || 0) - defDmg);
+
+          gameLogger.logCombat({
+            subType: 'UNIT_CLASH',
+            attacker: { id: atkCard.id, name: atkCard.name, attack: atkDmg, health: atkCard.health || 0, position: ai },
+            defender: { id: defCard.id, name: defCard.name, attack: defDmg, health: defCard.health || 0, position: di },
+            damage: atkDmg
+          });
+
+          // Update defender
+          if (defNewHealth <= 0) {
+            logBoardRemoval(defenderId, di, defCard, `destroyed by attacker dealing ${atkDmg} damage`);
+            gameLogger.logUnitDeath(defCard, di, `Destroyed by ${atkCard.name} dealing ${atkDmg} damage`);
+            withGameLogging.healthChange(gameLogger, 'unit', defCard.id, defCard.name, defCard.health || 0, 0, atkCard.name, 'Combat damage');
+            defenderDiscard.push(defCard);
+            updatedDefBoard[di] = { ...updatedDefBoard[di], card: null };
+          } else {
+            withGameLogging.healthChange(gameLogger, 'unit', defCard.id, defCard.name, defCard.health || 0, defNewHealth, atkCard.name, 'Combat damage');
+            updatedDefBoard[di] = { ...updatedDefBoard[di], card: { ...(updatedDefBoard[di].card as Card), health: defNewHealth } };
+          }
+
+          // Update attacker
+          if (atkNewHealth <= 0) {
+            logBoardRemoval(attackerId, ai, atkCard, `destroyed by blocker dealing ${defDmg} damage`);
+            gameLogger.logUnitDeath(atkCard, ai, `Destroyed by ${defCard.name} dealing ${defDmg} damage`);
+            withGameLogging.healthChange(gameLogger, 'unit', atkCard.id, atkCard.name, atkCard.health || 0, 0, defCard.name, 'Combat damage');
+            attackerDiscard.push(atkCard);
+            updatedAtkBoard[ai] = { ...updatedAtkBoard[ai], card: null };
+          } else {
+            withGameLogging.healthChange(gameLogger, 'unit', atkCard.id, atkCard.name, atkCard.health || 0, atkNewHealth, defCard.name, 'Combat damage');
+            updatedAtkBoard[ai] = { ...updatedAtkBoard[ai], card: { ...(updatedAtkBoard[ai].card as Card), health: atkNewHealth } };
+          }
+        }
+
+        // Remaining attackers (unblocked) deal direct damage
+        for (let r = pairs; r < attackIds.length; r++) {
+          const atkId = attackIds[r];
+          const ai = updatedAtkBoard.findIndex(s => s.card?.id === atkId);
+          if (ai < 0) continue;
+          const atkCard = updatedAtkBoard[ai].card as Card;
+          const dmg = effectivePower(atkCard, null);
+          const old = newDefenderHealth;
+          newDefenderHealth = Math.max(0, newDefenderHealth - dmg);
+          gameLogger.logCombat({ subType: 'DIRECT_DAMAGE', attacker: { id: atkCard.id, name: atkCard.name, attack: dmg, health: atkCard.health || 0, position: ai }, damage: dmg });
+          withGameLogging.healthChange(gameLogger, 'player', defenderId, 'Player', old, newDefenderHealth, atkCard.name, 'Direct combat damage');
+        }
+
+        // Write back state and exit combat phase
+        set({
+          currentMatch: {
+            ...match,
+            phase: 'main',
+            pendingAttackOrder: [],
+            pendingBlockOrder: [],
+            players: {
+              ...match.players,
+              [attackerId]: {
+                ...atk,
+                health: newAttackerHealth,
+                board: updatedAtkBoard,
+                discard: attackerDiscard,
+              },
+              [defenderId]: {
+                ...def,
+                health: newDefenderHealth,
+                board: updatedDefBoard,
+                discard: defenderDiscard,
+              },
+            }
+          }
+        });
+
+        gameLogger.logCombatEnd({
+          playerDamage: 0,
+          opponentDamage: 0,
+          unitsDestroyed: 0
+        });
+        withGameLogging.phaseChange(gameLogger, 'combat', 'main', 'Combat resolved');
       },
 
       endTurn: () => {

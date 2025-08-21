@@ -14,6 +14,10 @@ interface CenterBoardProps {
   phase: GamePhase;
   isMyTurn: boolean;
   onCardClick?: (card: Card) => void;
+  // Attack selection helpers
+  selectingAttackers?: boolean;
+  selectedAttackerIds?: string[];
+  onToggleAttacker?: (cardId: string) => void;
 }
 
 interface BoardSlotComponentProps {
@@ -50,6 +54,7 @@ function BoardSlotComponent({ slot, index, isPlayerSlot, canDrop, onCardClick, d
         isOver && canDrop && "border-yellow-400 bg-yellow-400/20 scale-105 shadow-xl",
         blocked && "opacity-50 cursor-not-allowed"
       )}
+      data-testid={isPlayerSlot ? `player-slot-${index}` : `opponent-slot-${index}`}
     >
       <AnimatePresence mode="wait">
         {slot.card && !isCardDestroyed ? (
@@ -58,6 +63,7 @@ function BoardSlotComponent({ slot, index, isPlayerSlot, canDrop, onCardClick, d
             initial={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8, rotate: 45 }}
             transition={{ duration: 0.8, ease: "easeOut" }}
+            data-testid={`board-card-${slot.card.id}`}
           >
             <TarotCard
               card={slot.card}
@@ -104,7 +110,7 @@ function BoardSlotComponent({ slot, index, isPlayerSlot, canDrop, onCardClick, d
   );
 }
 
-export function CenterBoard({ playerBoard, opponentBoard, phase, isMyTurn, onCardClick }: CenterBoardProps) {
+export function CenterBoard({ playerBoard, opponentBoard, phase, isMyTurn, onCardClick, selectingAttackers = false, selectedAttackerIds = [], onToggleAttacker }: CenterBoardProps) {
   const { currentMatch } = useGameStore();
   // Ensure we always have 6 slots
   const playerSlots: BoardSlot[] = Array.from({ length: 6 }, (_, i) =>
@@ -121,7 +127,7 @@ export function CenterBoard({ playerBoard, opponentBoard, phase, isMyTurn, onCar
   // Track destroyed cards for animation
   const [destroyedCards, setDestroyedCards] = useState<Set<string>>(new Set());
 
-  // Calculate which cards will be destroyed based on combat
+  // Calculate which cards will be destroyed based on combat (LoR-style pairing by order)
   const calculateDestroyedCards = () => {
     if (!showCombatLines) return new Set<string>();
 
@@ -154,34 +160,25 @@ export function CenterBoard({ playerBoard, opponentBoard, phase, isMyTurn, onCar
       return Math.max(0, base + orientationBonus + suitMod);
     };
 
-    const atkBoard = Array.from({ length: 6 }, (_, i) => attacker.board[i] || { card: null, position: i });
-    const defBoard = Array.from({ length: 6 }, (_, i) => defender.board[i] || { card: null, position: i });
+    const atkUnits = Array.from({ length: 6 }, (_, i) => ({ idx: i, slot: attacker.board[i] || { card: null, position: i } }))
+      .filter(({ slot }) => !!(slot?.card))
+      .map(({ idx, slot }) => ({ index: idx, card: slot!.card! }));
+    const defUnits = Array.from({ length: 6 }, (_, i) => ({ idx: i, slot: defender.board[i] || { card: null, position: i } }))
+      .filter(({ slot }) => !!(slot?.card))
+      .map(({ idx, slot }) => ({ index: idx, card: slot!.card! }));
 
-    for (let i = 0; i < 6; i++) {
-      const atkSlot = atkBoard[i];
-      const defSlot = defBoard[i];
-      const atkCard = (atkSlot?.card?.type === 'unit' || atkSlot?.card?.type === 'major' || (atkSlot?.card?.type === 'spell' && atkSlot?.card?.suit === 'major')) ? atkSlot.card : null;
-      const defCard = (defSlot?.card?.type === 'unit' || defSlot?.card?.type === 'major' || (defSlot?.card?.type === 'spell' && defSlot?.card?.suit === 'major')) ? defSlot.card : null;
+    const pairs = Math.min(atkUnits.length, defUnits.length);
+    for (let i = 0; i < pairs; i++) {
+      const atkCard = atkUnits[i].card;
+      const defCard = defUnits[i].card;
+      const atkDmg = effectivePower(atkCard, defCard);
+      const defDmg = effectivePower(defCard, atkCard);
 
-      if (!atkCard && !defCard) continue;
+      const defNewHealth = Math.max(0, (defCard.health || 0) - atkDmg);
+      const atkNewHealth = Math.max(0, (atkCard.health || 0) - defDmg);
 
-      if (atkCard && defCard) {
-        // Both units strike simultaneously
-        const atkDmg = effectivePower(atkCard, defCard);
-        const defDmg = effectivePower(defCard, atkCard);
-
-        // Calculate new health after damage
-        const defNewHealth = Math.max(0, (defCard.health || 0) - atkDmg);
-        const atkNewHealth = Math.max(0, (atkCard.health || 0) - defDmg);
-
-        // Mark cards as destroyed if health <= 0
-        if (defNewHealth <= 0 && defCard) {
-          destroyed.add(defCard.id);
-        }
-        if (atkNewHealth <= 0 && atkCard) {
-          destroyed.add(atkCard.id);
-        }
-      }
+      if (defNewHealth <= 0) destroyed.add(defCard.id);
+      if (atkNewHealth <= 0) destroyed.add(atkCard.id);
     }
 
     return destroyed;
@@ -231,17 +228,34 @@ export function CenterBoard({ playerBoard, opponentBoard, phase, isMyTurn, onCar
 
       {/* Player Board */}
       <div className="flex justify-center gap-2">
-        {playerSlots.map((slot, index) => (
-          <BoardSlotComponent
-            key={`player-${index}`}
-            slot={slot}
-            index={index}
-            isPlayerSlot={true}
-            canDrop={canPlayUnits}
-            onCardClick={onCardClick}
-            destroyedCards={destroyedCards}
-          />
-        ))}
+        {playerSlots.map((slot, index) => {
+          const isSelected = !!slot.card && selectedAttackerIds.includes(slot.card.id);
+          return (
+            <div key={`player-${index}`} className={cn(isSelected && "ring-2 ring-yellow-400 rounded-lg relative")}
+              onClick={() => {
+                if (selectingAttackers && slot.card) {
+                  onToggleAttacker?.(slot.card.id);
+                } else if (slot.card) {
+                  onCardClick?.(slot.card);
+                }
+              }}
+            >
+              <BoardSlotComponent
+                slot={slot}
+                index={index}
+                isPlayerSlot={true}
+                canDrop={canPlayUnits}
+                onCardClick={onCardClick}
+                destroyedCards={destroyedCards}
+              />
+              {isSelected && (
+                <div className="absolute -top-3 -right-3 bg-yellow-500 text-black text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg">
+                  {selectedAttackerIds.indexOf(slot.card!.id) + 1}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Enhanced Combat Animation System */}
@@ -274,10 +288,10 @@ function CombatAnimationSystem({ showCombatLines, playerSlots, opponentSlots }: 
         clashing: 400,
         resolving: 1000
       };
-      
+
       const animate = (currentTime: number) => {
         const elapsed = currentTime - startTime;
-        
+
         if (elapsed < animationDurations.charging) {
           setCombatState('charging');
           requestAnimationFrame(animate);
@@ -291,103 +305,71 @@ function CombatAnimationSystem({ showCombatLines, playerSlots, opponentSlots }: 
           setCombatState('idle');
         }
       };
-      
+
       requestAnimationFrame(animate);
     }
   }, [showCombatLines, combatState]);
 
-  // Calculate combat results for animation
+  // Calculate combat results for animation (order-based pairing)
   const calculateCombatResults = () => {
     if (!showCombatLines) return [];
 
     const results = [];
-    for (let i = 0; i < 6; i++) {
-      const playerSlot = playerSlots[i];
-      const oppSlot = opponentSlots[i];
+    const playerUnits = playerSlots.map((s, i) => ({ index: i, card: s.card })).filter(x => !!x.card) as any[];
+    const oppUnits = opponentSlots.map((s, i) => ({ index: i, card: s.card })).filter(x => !!x.card) as any[];
 
-      if (playerSlot?.card && oppSlot?.card) {
-        // Both cards exist - they fight
-        const playerAtk = playerSlot.card.attack || 0;
-        const oppAtk = oppSlot.card.attack || 0;
-        const playerHealth = playerSlot.card.health || 0;
-        const oppHealth = oppSlot.card.health || 0;
+    const pairs = Math.min(playerUnits.length, oppUnits.length);
+    for (let p = 0; p < pairs; p++) {
+      const a = playerUnits[p];
+      const b = oppUnits[p];
+      const playerAtk = a.card.attack || 0;
+      const oppAtk = b.card.attack || 0;
+      const playerHealth = a.card.health || 0;
+      const oppHealth = b.card.health || 0;
 
-        // Simple combat calculation (can be enhanced with suit bonuses)
-        const playerDestroyed = playerHealth <= oppAtk;
-        const oppDestroyed = oppHealth <= playerAtk;
+      const playerDestroyed = playerHealth <= oppAtk;
+      const oppDestroyed = oppHealth <= playerAtk;
 
-        if (!playerDestroyed) {
-          results.push({
-            index: i,
-            damage: oppAtk,
-            isPlayer: true,
-            destroyed: false
-          });
-        } else {
-          results.push({
-            index: i,
-            damage: playerHealth,
-            isPlayer: true,
-            destroyed: true
-          });
-        }
+      results.push({ index: a.index, damage: oppAtk, isPlayer: true, destroyed: playerDestroyed, });
+      results.push({ index: a.index, damage: playerAtk, isPlayer: false, destroyed: oppDestroyed, });
+    }
 
-        if (!oppDestroyed) {
-          results.push({
-            index: i,
-            damage: playerAtk,
-            isPlayer: false,
-            destroyed: false
-          });
-        } else {
-          results.push({
-            index: i,
-            damage: oppHealth,
-            isPlayer: false,
-            destroyed: true
-          });
-        }
-      } else if (playerSlot?.card && !oppSlot?.card) {
-        // Direct player attack on opponent nexus
-        results.push({
-          index: i,
-          damage: playerSlot.card.attack || 0,
-          isPlayer: false,
-          destroyed: false,
-          isNexus: true
-        });
-      } else if (!playerSlot?.card && oppSlot?.card) {
-        // Direct opponent attack on player nexus
-        results.push({
-          index: i,
-          damage: oppSlot.card.attack || 0,
-          isPlayer: true,
-          destroyed: false,
-          isNexus: true
-        });
+    if (playerUnits.length > oppUnits.length) {
+      for (let k = pairs; k < playerUnits.length; k++) {
+        const a = playerUnits[k];
+        results.push({ index: a.index, damage: a.card.attack || 0, isPlayer: false, destroyed: false, isNexus: true });
+      }
+    } else if (oppUnits.length > playerUnits.length) {
+      for (let k = pairs; k < oppUnits.length; k++) {
+        const b = oppUnits[k];
+        results.push({ index: b.index, damage: b.card.attack || 0, isPlayer: true, destroyed: false, isNexus: true });
       }
     }
     return results;
   };
 
   const combatResults = calculateCombatResults();
+  // Build order-based pairing for visuals
+  const playerUnits = playerSlots.map((s, i) => ({ index: i, card: s.card as Card | null })).filter(x => !!x.card) as { index: number, card: Card }[];
+  const oppUnits = opponentSlots.map((s, i) => ({ index: i, card: s.card as Card | null })).filter(x => !!x.card) as { index: number, card: Card }[];
+  const paired = Array.from({ length: Math.min(playerUnits.length, oppUnits.length) }, (_, p) => ({
+    playerIndex: playerUnits[p].index,
+    oppIndex: oppUnits[p].index,
+  }));
 
   return (
     <>
       {/* Combat Lines */}
       {showCombatLines && (
         <svg className="absolute inset-0 pointer-events-none">
-          {playerSlots.map((playerSlot, index) => {
-            const oppSlot = opponentSlots[index];
-            if (!playerSlot.card || !oppSlot.card) return null;
-
-            const startX = 150 + (index * 158) + 75;
+          {paired.map((pair, idx) => {
+            const startX = 150 + (pair.playerIndex * 158) + 75;
             const startY = 280;
-            const endX = startX;
+            const endX = 150 + (pair.oppIndex * 158) + 75;
             const endY = 140;
 
             return (
-              <g key={`combat-group-${index}`}>
+              <g key={`combat-group-${idx}`}>
                 <motion.line
                   x1={startX}
                   y1={startY}
@@ -398,7 +380,7 @@ function CombatAnimationSystem({ showCombatLines, playerSlots, opponentSlots }: 
                   strokeDasharray="5,5"
                   initial={{ pathLength: 0 }}
                   animate={{ pathLength: 1 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                  transition={{ duration: 0.5, delay: idx * 0.1 }}
                 />
               </g>
             );
@@ -410,23 +392,22 @@ function CombatAnimationSystem({ showCombatLines, playerSlots, opponentSlots }: 
       <AnimatePresence>
         {showCombatLines && (
           <>
-            {playerSlots.map((playerSlot, index) => {
-              const oppSlot = opponentSlots[index];
-              if (!playerSlot.card || !oppSlot.card) return null;
-
-              const centerX = 150 + (index * 158) + 75;
+            {paired.map((pair, idx) => {
+              const playerCardXCenter = 150 + (pair.playerIndex * 158) + 75;
+              const oppCardXCenter = 150 + (pair.oppIndex * 158) + 75;
               const playerCardY = 280;
               const oppCardY = 140;
               const collisionY = 210;
+              const collisionX = (playerCardXCenter + oppCardXCenter) / 2;
 
               return (
-                <motion.g key={`collision-group-${index}`}>
+                <div key={`collision-group-${idx}`}>
                   {/* Player card movement during clashing */}
                   {combatState === 'clashing' && (
                     <motion.div
                       className="absolute pointer-events-none"
                       style={{
-                        left: centerX - 75,
+                        left: playerCardXCenter - 75,
                         top: playerCardY - 105,
                         zIndex: 50
                       }}
@@ -443,7 +424,7 @@ function CombatAnimationSystem({ showCombatLines, playerSlots, opponentSlots }: 
                     <motion.div
                       className="absolute pointer-events-none"
                       style={{
-                        left: centerX - 75,
+                        left: oppCardXCenter - 75,
                         top: oppCardY - 105,
                         zIndex: 50
                       }}
@@ -460,7 +441,7 @@ function CombatAnimationSystem({ showCombatLines, playerSlots, opponentSlots }: 
                     <motion.div
                       className="absolute pointer-events-none"
                       style={{
-                        left: centerX - 40,
+                        left: collisionX - 40,
                         top: collisionY - 40,
                       }}
                       initial={{ scale: 0, opacity: 0 }}
@@ -472,7 +453,7 @@ function CombatAnimationSystem({ showCombatLines, playerSlots, opponentSlots }: 
                       </div>
                     </motion.div>
                   )}
-                </motion.g>
+                </div>
               );
             })}
           </>

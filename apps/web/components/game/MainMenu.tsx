@@ -76,7 +76,7 @@ export function MainMenu() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-900 to-indigo-900 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-900 to-indigo-900 relative overflow-hidden" data-testid="main-menu">
       {/* Background Effects */}
       <div className="absolute inset-0">
         <div className="absolute top-20 left-20 w-96 h-96 bg-purple-500 rounded-full blur-3xl opacity-20 animate-pulse" />
@@ -118,12 +118,12 @@ export function MainMenu() {
 
       <div className="relative z-10 container mx-auto px-4 py-8">
         {/* User Profile */}
-        <div className="absolute top-4 right-4">
+        <div className="absolute top-4 right-4" data-testid="user-profile">
           <UserProfile />
         </div>
 
         {/* User Status */}
-        <div className="absolute top-4 left-4">
+        <div className="absolute top-4 left-4" data-testid="user-status">
           <UserStatus />
         </div>
 
@@ -154,7 +154,7 @@ export function MainMenu() {
           transition={{ delay: 0.2 }}
           className="mb-8"
         >
-          <Card className="bg-gradient-to-r from-purple-900/50 to-blue-900/50 backdrop-blur-sm border-purple-500/30">
+          <Card className="bg-gradient-to-r from-purple-900/50 to-blue-900/50 backdrop-blur-sm border-purple-500/30" data-testid="daily-challenges">
             <div className="p-4 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <Zap className="w-8 h-8 text-yellow-400 animate-pulse" />
@@ -163,7 +163,7 @@ export function MainMenu() {
                   <p className="text-sm text-gray-300">Complete 3 matches to earn bonus fate crystals</p>
                 </div>
               </div>
-              <PixelButton variant="gold" size="md">
+              <PixelButton variant="gold" size="md" data-testid="btn-view-challenges">
                 VIEW CHALLENGES
               </PixelButton>
             </div>
@@ -171,7 +171,7 @@ export function MainMenu() {
         </motion.div>
 
         {/* Main Menu Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="menu-grid">
           {menuItems.map((item, index) => (
             <motion.div
               key={item.id}
@@ -184,6 +184,7 @@ export function MainMenu() {
               <Card
                 className="relative overflow-hidden cursor-pointer bg-black/40 backdrop-blur-sm border-white/10 hover:border-white/30 transition-all duration-300"
                 onClick={item.action}
+                data-testid={`menu-item-${item.id}`}
               >
                 <div className={`absolute inset-0 bg-gradient-to-br ${item.color} opacity-10`} />
                 <div className="relative p-6">

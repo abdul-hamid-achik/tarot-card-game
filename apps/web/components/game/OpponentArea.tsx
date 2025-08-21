@@ -29,7 +29,7 @@ export function OpponentArea({ player, isActive }: OpponentAreaProps) {
   const discardCount = player.discard?.length || 0;
 
   return (
-    <div className="h-full relative px-8 py-4">
+    <div className="h-full relative px-8 py-4" data-testid="opponent-area">
       {/* Opponent Info Panel */}
       <div className="absolute right-8 bottom-4 flex items-center gap-4">
         <div className="text-right">
@@ -55,19 +55,19 @@ export function OpponentArea({ player, isActive }: OpponentAreaProps) {
       </div>
 
       {/* Deck & Discard Zone */}
-      <div className="absolute left-8 bottom-4 flex gap-3">
+      <div className="absolute left-8 bottom-4 flex gap-3" data-testid="opponent-deck-discard">
         <div className="bg-black/40 backdrop-blur-sm rounded-lg p-3 border border-white/10">
           <Package className="w-8 h-8 text-blue-400 mb-1" />
-          <div className="text-white text-sm font-bold text-center">{deckCount}</div>
+          <div className="text-white text-sm font-bold text-center" data-testid="opponent-deck-count">{deckCount}</div>
         </div>
         <div className="bg-black/40 backdrop-blur-sm rounded-lg p-3 border border-white/10">
           <Trash2 className="w-8 h-8 text-red-400 mb-1" />
-          <div className="text-white text-sm font-bold text-center">{discardCount}</div>
+          <div className="text-white text-sm font-bold text-center" data-testid="opponent-discard-count">{discardCount}</div>
         </div>
       </div>
 
       {/* Opponent Hand (Face Down) */}
-      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 flex">
+      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 flex" data-testid="opponent-hand">
         {Array.from({ length: handCount }).map((_, index) => (
           <motion.div
             key={index}

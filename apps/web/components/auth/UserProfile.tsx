@@ -6,7 +6,12 @@ import { Button } from '@/components/ui/button';
 import { User, LogIn } from 'lucide-react';
 
 export function UserProfile() {
-    const user = useUser();
+    let user: any = null;
+    try {
+        user = useUser();
+    } catch {
+        user = null;
+    }
 
     // If user is not signed in, show sign in/up buttons with icons
     if (!user) {
@@ -34,7 +39,12 @@ export function UserProfile() {
 
 // Additional component for displaying user status in game
 export function UserStatus() {
-    const user = useUser();
+    let user: any = null;
+    try {
+        user = useUser();
+    } catch {
+        user = null;
+    }
 
     if (!user) {
         return (

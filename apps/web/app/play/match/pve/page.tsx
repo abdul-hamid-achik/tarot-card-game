@@ -228,31 +228,42 @@ function PvEInner() {
     // Simulate AI thinking
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // AI decision: play cards only when it's AI's turn
-    for (let i = 0; i < 3; i++) { // Try to play up to 3 cards
-      if (useGameStore.getState().currentMatch?.activePlayer !== 'ai') break;
+    // AI decision: play cards while it has fate to cover costs
+    let remainingFate = aiPlayer.fate + (aiPlayer.spellMana || 0);
+    let plays = 0;
+    while (plays < 3 && remainingFate > 0 && useGameStore.getState().currentMatch?.activePlayer === 'ai') {
       const decision = await enemyAI.decideCardToPlay(
         aiPlayer.hand,
-        aiPlayer.fate,
+        remainingFate,
         aiPlayer.board,
         playerBoard,
         currentMatch.phase
       );
 
       if (decision) {
-        // Play the card
-        playCard(decision.card, decision.targetSlot, 'ai');
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Verify affordability just before play
+        if (decision.card.cost <= remainingFate) {
+          playCard(decision.card, decision.targetSlot, 'ai');
+          remainingFate -= decision.card.cost;
+          plays++;
+          await new Promise(resolve => setTimeout(resolve, 400));
+        } else {
+          break;
+        }
+      } else {
+        break;
       }
     }
 
     // End AI turn
-    await new Promise(resolve => setTimeout(resolve, 500));
-    // Initiate combat for AI
-    if (useGameStore.getState().currentMatch?.attackTokenOwner === 'ai') {
+    await new Promise(resolve => setTimeout(resolve, 400));
+    // Initiate combat for AI only if it has attackers on board
+    const latest = useGameStore.getState().currentMatch;
+    const aiHasUnits = latest?.players['ai'].board.some((s: any) => s.card);
+    if (latest?.attackTokenOwner === 'ai' && aiHasUnits) {
       startCombat();
+      await new Promise(resolve => setTimeout(resolve, 600));
     }
-    await new Promise(resolve => setTimeout(resolve, 700));
     endTurn();
     setIsAIThinking(false);
   };

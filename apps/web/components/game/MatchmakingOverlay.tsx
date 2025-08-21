@@ -114,7 +114,7 @@ export function MatchmakingOverlay({ isOpen, onCancel, deckId }: MatchmakingOver
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && cancelMatchmaking()}>
-      <DialogContent className="sm:max-w-md bg-gradient-to-b from-slate-900 to-purple-900 border-purple-500/30">
+      <DialogContent className="sm:max-w-md bg-gradient-to-b from-slate-900 to-purple-900 border-purple-500/30" data-testid="matchmaking-overlay">
         <div className="relative">
           {/* Close Button */}
           <Button
@@ -122,12 +122,13 @@ export function MatchmakingOverlay({ isOpen, onCancel, deckId }: MatchmakingOver
             size="icon"
             onClick={cancelMatchmaking}
             className="absolute -top-2 -right-2 text-white/70 hover:text-white"
+            data-testid="btn-cancel-matchmaking"
           >
             <X className="w-4 h-4" />
           </Button>
 
           {/* Content */}
-          <div className="flex flex-col items-center py-6">
+          <div className="flex flex-col items-center py-6" data-testid="matchmaking-content">
             {/* Animated Icon */}
             <div className="relative mb-6">
               <motion.div
@@ -151,19 +152,19 @@ export function MatchmakingOverlay({ isOpen, onCancel, deckId }: MatchmakingOver
             <h2 className="text-2xl font-bold text-white mb-2">Finding Opponent</h2>
 
             {/* Search Time */}
-            <div className="text-sm text-gray-400 mb-4">
+            <div className="text-sm text-gray-400 mb-4" data-testid="search-time">
               Searching for {formatTime(searchTime)}
             </div>
 
             {/* Progress Bar */}
-            <div className="w-full mb-4">
+            <div className="w-full mb-4" data-testid="search-progress">
               <Progress
                 value={(searchTime / estimatedTime) * 100}
                 className="h-2"
               />
               <div className="flex justify-between text-xs text-gray-400 mt-1">
-                <span>Est. time: ~{estimatedTime}s</span>
-                <span>{playersInQueue} players in queue</span>
+                <span data-testid="estimated-time">Est. time: ~{estimatedTime}s</span>
+                <span data-testid="players-in-queue">{playersInQueue} players in queue</span>
               </div>
             </div>
 
@@ -190,6 +191,7 @@ export function MatchmakingOverlay({ isOpen, onCancel, deckId }: MatchmakingOver
                 variant="outline"
                 onClick={cancelMatchmaking}
                 className="bg-transparent text-white border-white/20 hover:bg-white/10"
+                data-testid="btn-cancel-search"
               >
                 Cancel Search
               </Button>
@@ -201,6 +203,7 @@ export function MatchmakingOverlay({ isOpen, onCancel, deckId }: MatchmakingOver
                     window.location.href = '/play/pve';
                   }}
                   className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+                  data-testid="btn-play-vs-ai"
                 >
                   Play vs AI Instead
                 </Button>

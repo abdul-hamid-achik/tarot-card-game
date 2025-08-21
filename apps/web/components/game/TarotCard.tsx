@@ -216,6 +216,7 @@ export function TarotCard({
         actuallyDragging && "z-50 cursor-grabbing",
         className
       )}
+      data-testid={`tarot-card-${card.id}`}
       onMouseEnter={() => {
         requestAnimationFrame(() => {
           setIsHovered(true);

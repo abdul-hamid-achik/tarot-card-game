@@ -47,6 +47,7 @@ export function CardOverlay({ card, isOpen, onClose }: CardOverlayProps) {
       {isOpen && (
         <motion.div
           className="fixed inset-0 z-50 flex items-center justify-center"
+          data-testid="card-overlay"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -67,6 +68,7 @@ export function CardOverlay({ card, isOpen, onClose }: CardOverlayProps) {
             exit={{ scale: 0.8, opacity: 0, y: 20 }}
             transition={{ duration: 0.3, type: "spring", stiffness: 300, damping: 25 }}
             onClick={(e) => e.stopPropagation()}
+            data-testid="card-overlay-content"
           >
             {/* Close Button */}
             <button
@@ -76,6 +78,7 @@ export function CardOverlay({ card, isOpen, onClose }: CardOverlayProps) {
                 });
               }}
               className="absolute top-4 right-4 p-2 rounded-full bg-black/50 hover:bg-black/70 transition-colors z-10"
+              data-testid="btn-close-card-overlay"
             >
               <X className="w-5 h-5 text-white" />
             </button>

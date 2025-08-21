@@ -24,6 +24,9 @@ export function GameBoard() {
     draggedCard,
     setDraggedCard,
     playCard,
+    declareAttackers,
+    setBlockOrder,
+    resolveDeclaredCombat,
     startCombat,
     endTurn,
     validDropZones,
@@ -62,7 +65,7 @@ export function GameBoard() {
   useEffect(() => {
     // Preload common game sounds
     audioManager.preloadGameSounds();
-    
+
     // Set up game logging context when match changes
     if (currentMatch) {
       gameLogger.setContext({
@@ -155,10 +158,14 @@ export function GameBoard() {
   const opponentPlayer = currentMatch.players[opponentId];
   const isMyTurn = currentMatch.activePlayer === currentPlayerId;
   const hasAttackToken = currentMatch.attackTokenOwner === currentPlayerId;
+  const isDefender = currentMatch.attackTokenOwner !== currentPlayerId;
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="min-h-screen bg-gradient-to-b from-tarot-board-dark via-tarot-board-medium to-tarot-board-light overflow-hidden">
+      <div
+        className="min-h-screen bg-gradient-to-b from-tarot-board-dark via-tarot-board-medium to-tarot-board-light overflow-hidden"
+        data-testid="game-board"
+      >
         {/* Background Effects - Mystical atmosphere */}
         <div className="fixed inset-0">
           {/* Table Background Texture */}
@@ -190,7 +197,7 @@ export function GameBoard() {
           </div>
 
           {/* Opponent Area - 30% Height */}
-          <div className="h-[30%] relative">
+          <div className="h-[30%] relative" data-testid="opponent-area-container">
             <OpponentArea
               player={opponentPlayer}
               isActive={currentMatch.activePlayer === opponentId}
@@ -208,7 +215,7 @@ export function GameBoard() {
           </div>
 
           {/* Center Board Area - 34% Height */}
-          <div className="h-[34%] relative px-8">
+          <div className="h-[34%] relative px-8" data-testid="center-board-container">
             <CenterBoard
               playerBoard={currentPlayer?.board || []}
               opponentBoard={opponentPlayer?.board || []}
@@ -218,7 +225,7 @@ export function GameBoard() {
             />
 
             {/* Phase Indicator - Made more prominent */}
-            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 z-50">
+            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 z-50" data-testid="phase-indicator">
               <div className="bg-black/80 backdrop-blur-md rounded-xl p-4 border-2 border-white/30 shadow-2xl">
                 <div className="text-white text-sm font-bold mb-2 text-center">CURRENT PHASE</div>
                 <div className={cn(
@@ -240,7 +247,7 @@ export function GameBoard() {
             </div>
 
             {/* Turn Counter */}
-            <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+            <div className="absolute right-4 top-1/2 transform -translate-y-1/2" data-testid="turn-counter">
               <div className="bg-black/50 backdrop-blur-sm rounded-lg p-3 border border-white/20">
                 <div className="text-white text-sm font-bold mb-1">Turn</div>
                 <div className="text-cyan-400 text-2xl">{currentMatch.turn}</div>
@@ -263,7 +270,7 @@ export function GameBoard() {
           </div>
 
           {/* Player Area - 30% Height */}
-          <div className="h-[30%] relative">
+          <div className="h-[30%] relative" data-testid="player-area-container">
             <PlayerArea
               player={currentPlayer}
               isActive={isMyTurn}
@@ -288,6 +295,7 @@ export function GameBoard() {
                     <PixelButton
                       size="lg"
                       variant="blue"
+                      data-testid="btn-continue-to-main"
                       onClick={() => {
                         gameLogger.logAction('continue_to_main', {
                           playerId: currentPlayerId,
@@ -306,6 +314,7 @@ export function GameBoard() {
                     <PixelButton
                       size="lg"
                       variant="gold"
+                      data-testid="btn-end-turn"
                       onClick={() => {
                         gameLogger.logAction('end_turn_button', {
                           playerId: currentPlayerId,
@@ -326,12 +335,15 @@ export function GameBoard() {
                       <PixelButton
                         size="lg"
                         variant="red"
+                        data-testid="btn-resolve-combat"
                         onClick={() => {
-                          gameLogger.logAction('combat_button', {
-                            playerId: currentPlayerId,
-                            hasAttackToken
-                          }, true);
-                          startCombat();
+                          gameLogger.logAction('commit_attack', { playerId: currentPlayerId }, true);
+                          // Use pending orders if set, otherwise fall back to immediate lane combat
+                          if (currentMatch.pendingAttackOrder && currentMatch.pendingAttackOrder.length > 0) {
+                            resolveDeclaredCombat();
+                          } else {
+                            startCombat();
+                          }
                           audioManager.playRandom('turnChange');
                         }}
                         className="animate-pulse"
@@ -341,6 +353,7 @@ export function GameBoard() {
                       <PixelButton
                         size="md"
                         variant="default"
+                        data-testid="btn-skip-combat"
                         onClick={() => {
                           gameLogger.logAction('skip_combat', {
                             playerId: currentPlayerId
@@ -360,6 +373,7 @@ export function GameBoard() {
                     <PixelButton
                       size="lg"
                       variant="gold"
+                      data-testid="btn-end-turn"
                       onClick={() => {
                         gameLogger.logAction('end_turn_no_attack_token', {
                           playerId: currentPlayerId
@@ -376,6 +390,7 @@ export function GameBoard() {
                     <PixelButton
                       size="lg"
                       variant="green"
+                      data-testid="btn-start-new-turn"
                       onClick={() => {
                         gameLogger.logAction('start_new_turn', {
                           playerId: currentPlayerId,
@@ -395,6 +410,7 @@ export function GameBoard() {
                   size="lg"
                   variant="default"
                   disabled={true}
+                  data-testid="badge-opponent-turn"
                 >
                   OPPONENT'S TURN
                 </PixelButton>
@@ -414,7 +430,7 @@ export function GameBoard() {
         {/* Drag Overlay */}
         <DragOverlay dropAnimation={null}>
           {draggedCard && (
-            <div style={{ pointerEvents: 'none' }}>
+            <div style={{ pointerEvents: 'none' }} data-testid="drag-overlay-card">
               <TarotCard
                 card={draggedCard}
                 isDragging={true}
@@ -454,7 +470,7 @@ export function GameBoard() {
         onToggle={() => setShowDebugLog(false)}
         maxEvents={100}
       />
-      
+
       <DebugToggle
         isVisible={showDebugLog}
         onToggle={() => setShowDebugLog(!showDebugLog)}

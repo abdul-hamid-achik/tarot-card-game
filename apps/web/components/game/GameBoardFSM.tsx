@@ -64,7 +64,7 @@ export function GameBoardFSM() {
   useEffect(() => {
     // Preload game sounds
     audioManager.preloadGameSounds();
-    
+
     // Set up game logging context
     if (currentMatch) {
       gameLogger.setContext({
@@ -95,7 +95,7 @@ export function GameBoardFSM() {
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { over } = event;
-    
+
     if (over && draggedCard) {
       const isPlayerSlot = over.data.current?.isPlayerSlot;
       const targetSlot = over.data.current?.slot;
@@ -126,7 +126,7 @@ export function GameBoardFSM() {
         }
       }
     }
-    
+
     setDraggedCard(null);
   };
 
@@ -216,21 +216,12 @@ export function GameBoardFSM() {
           size="lg"
           variant="red"
           onClick={() => {
-            // Show attacker selection UI
-            const units = currentPlayer?.board?.filter((slot: any) => 
-              slot.card && !slot.card.hasAttacked
-            ) || [];
-            
-            if (units.length > 0) {
-              // For now, select all available attackers
-              const attackerIds = units.map((slot: any) => slot.card.id);
-              declareAttack(attackerIds);
-              audioManager.play('combat');
-            }
+            if (selectedAttackers.length === 0) return;
+            handleAttackDeclaration();
           }}
           className="animate-bounce shadow-red-glow"
         >
-          ⚔️ ATTACK
+          ⚔️ ATTACK ({selectedAttackers.length})
         </PixelButton>
       )}
 
@@ -269,13 +260,13 @@ export function GameBoardFSM() {
         <div className={cn(
           "text-xl capitalize font-bold text-center",
           String(gameState).includes('action') ? "text-green-400" :
-          String(gameState).includes('combat') ? "text-red-400" :
-          String(gameState).includes('roundStart') ? "text-blue-400" :
-          "text-yellow-400"
+            String(gameState).includes('combat') ? "text-red-400" :
+              String(gameState).includes('roundStart') ? "text-blue-400" :
+                "text-yellow-400"
         )}>
           {String(gameState).split('.').pop()?.replace(/([A-Z])/g, ' $1').trim()}
         </div>
-        
+
         <div className="mt-2 space-y-1">
           <div className={cn(
             "text-xs",
@@ -335,8 +326,13 @@ export function GameBoardFSM() {
               phase={String(gameState)}
               isMyTurn={isMyPriority}
               onCardClick={handleCardClick}
+              selectingAttackers={canAttack && !context.combatDeclared}
+              selectedAttackerIds={selectedAttackers}
+              onToggleAttacker={(id) => {
+                setSelectedAttackers(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+              }}
             />
-            
+
             {renderGameStateIndicator()}
             {renderSpellStack()}
           </div>
@@ -348,7 +344,7 @@ export function GameBoardFSM() {
               isActive={isMyPriority}
               onCardClick={handleCardClick}
             />
-            
+
             {/* Mana Display */}
             <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-40">
               <div className="flex gap-4">
@@ -368,7 +364,7 @@ export function GameBoardFSM() {
                 )}
               </div>
             </div>
-            
+
             {renderActionButtons()}
           </div>
         </div>
@@ -405,10 +401,44 @@ export function GameBoardFSM() {
               >
                 <h2 className="text-2xl font-bold text-white mb-4">Assign Blockers</h2>
                 <div className="text-gray-300 mb-6">
-                  Drag your units to block incoming attackers
+                  Click in order to decide which of your units block each attacker.
                 </div>
-                {/* TODO: Implement blocking assignment UI */}
-                <div className="flex gap-4">
+                {/* Simple order picker: show attackers and selectable blockers */}
+                <div className="grid grid-cols-2 gap-8">
+                  <div>
+                    <div className="text-white font-semibold mb-2">Attackers (order)</div>
+                    <div className="flex flex-wrap gap-2">
+                      {(currentPlayer?.board || []).filter(() => false) /* placeholder for symmetry */}
+                      {context.attackers?.map?.((id: string, idx: number) => (
+                        <div key={id} className="px-3 py-2 rounded bg-red-900/40 border border-red-700 text-white text-sm">
+                          {idx + 1}. {id.slice(0, 8)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-white font-semibold mb-2">Choose blockers in order</div>
+                    <div className="flex flex-wrap gap-2">
+                      {(opponentPlayer?.board || [])
+                        .map((s: any) => s.card)
+                        .filter(Boolean)
+                        .map((card: any) => (
+                          <button
+                            key={card.id}
+                            onClick={() => setBlockerAssignments((prev) => ({ ...prev, [String(Object.keys(prev).length)]: card.id }))}
+                            className="px-3 py-2 rounded bg-blue-900/40 border border-blue-700 text-white text-sm hover:bg-blue-800/60"
+                          >
+                            {card.name}
+                          </button>
+                        ))}
+                    </div>
+                    {Object.keys(blockerAssignments).length > 0 && (
+                      <div className="mt-3 text-xs text-blue-200">Selected order: {Object.values(blockerAssignments).map((id) => String(id).slice(0, 4)).join(' → ')}</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex gap-4 mt-6">
                   <PixelButton onClick={handleBlockerAssignment}>
                     Confirm Blocks
                   </PixelButton>

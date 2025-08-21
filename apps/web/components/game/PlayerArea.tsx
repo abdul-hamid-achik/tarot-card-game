@@ -27,7 +27,7 @@ export function PlayerArea({ player, isActive, onCardClick }: PlayerAreaProps) {
   const discardCount = player.discard?.length || 0;
 
   return (
-    <div className="h-full relative px-8 py-4">
+    <div className="h-full relative px-8 py-4" data-testid="player-area">
       {/* Player Info Panel with UI Asset Frame */}
       <div className="absolute left-8 top-4 flex items-center gap-4">
         <div className="relative">
@@ -65,7 +65,7 @@ export function PlayerArea({ player, isActive, onCardClick }: PlayerAreaProps) {
       </div>
 
       {/* Deck Area - Click to toggle hand */}
-      <div className="absolute right-8 top-4 flex gap-3">
+      <div className="absolute right-8 top-4 flex gap-3" data-testid="player-deck-discard">
         <motion.div
           className="relative cursor-pointer"
           onClick={() => {
@@ -75,7 +75,7 @@ export function PlayerArea({ player, isActive, onCardClick }: PlayerAreaProps) {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
-          <div className="bg-blue-900/80 backdrop-blur-sm rounded-lg p-3 border-2 border-blue-400/50 hover:border-blue-400 transition-colors">
+          <div className="bg-blue-900/80 backdrop-blur-sm rounded-lg p-3 border-2 border-blue-400/50 hover:border-blue-400 transition-colors" data-testid="player-deck-count">
             <Package className="w-8 h-8 text-blue-400 mb-1" />
             <div className="text-white text-sm font-bold text-center">{deckCount}</div>
             {!showHand && (
@@ -85,7 +85,7 @@ export function PlayerArea({ player, isActive, onCardClick }: PlayerAreaProps) {
             )}
           </div>
         </motion.div>
-        <div className="bg-red-900/80 backdrop-blur-sm rounded-lg p-3 border-2 border-red-400/50">
+        <div className="bg-red-900/80 backdrop-blur-sm rounded-lg p-3 border-2 border-red-400/50" data-testid="player-discard-count">
           <Trash2 className="w-8 h-8 text-red-400 mb-1" />
           <div className="text-white text-sm font-bold text-center">{discardCount}</div>
         </div>
@@ -101,6 +101,7 @@ export function PlayerArea({ player, isActive, onCardClick }: PlayerAreaProps) {
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
             className="absolute bottom-4 left-1/4 transform -translate-x-1/2"
             style={{ width: '100%', maxWidth: '1200px' }}
+            data-testid="player-hand"
           >
             <div className="relative flex justify-center items-center gap-2" style={{ minHeight: '250px' }}>
               {handCards.map((card, index) => (
@@ -110,6 +111,7 @@ export function PlayerArea({ player, isActive, onCardClick }: PlayerAreaProps) {
                   isInHand={true}
                   isSelectable={isActive}
                   onClick={() => onCardClick?.(card)}
+                  data-testid={`hand-card-${index}`}
                 />
               ))}
             </div>

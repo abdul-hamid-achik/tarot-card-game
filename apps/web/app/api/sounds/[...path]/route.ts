@@ -4,10 +4,11 @@ import path from 'node:path';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: Request, { params }: { params: { path: string[] } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ path: string[] }> }) {
+    const { path: pathParams } = await params;
     const repoRoot = path.resolve(process.cwd(), '..', '..');
     const soundsRoot = path.join(repoRoot, 'packages', 'assets', 'sounds');
-    const safeRel = params.path.join('/');
+    const safeRel = pathParams.join('/');
 
     // Check if this is a Safari browser (based on user agent)
     const userAgent = req.headers.get('user-agent') || '';

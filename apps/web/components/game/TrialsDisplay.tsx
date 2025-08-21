@@ -23,10 +23,10 @@ export function TrialsDisplay({ trials, playerName }: TrialsDisplayProps) {
   const completedCount = trials.filter(t => t.completed).length;
 
   return (
-    <div className="bg-black/50 backdrop-blur-sm rounded-lg p-4 border border-white/20 min-w-[200px]">
+    <div className="bg-black/50 backdrop-blur-sm rounded-lg p-4 border border-white/20 min-w-[200px]" data-testid="trials-display">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-white font-bold text-sm">Arcana Trials</h3>
-        <Badge variant="outline" className="text-yellow-400 border-yellow-400">
+        <Badge variant="outline" className="text-yellow-400 border-yellow-400" data-testid="trials-completed">
           {completedCount}/3
         </Badge>
       </div>
@@ -44,6 +44,7 @@ export function TrialsDisplay({ trials, playerName }: TrialsDisplayProps) {
                 ? "bg-green-900/30 border-green-500/50" 
                 : "bg-gray-900/30 border-gray-700/50"
             )}
+            data-testid={`trial-${trial.id}-${trial.completed ? 'done' : 'pending'}`}
           >
             <div className="flex items-start gap-2">
               <div className={cn(
@@ -69,6 +70,7 @@ export function TrialsDisplay({ trials, playerName }: TrialsDisplayProps) {
                     <Progress 
                       value={(trial.progress / trial.maxProgress) * 100} 
                       className="h-1"
+                      data-testid={`trial-progress-${trial.id}`}
                     />
                     <div className="text-xs text-gray-500 text-right">
                       {trial.progress}/{trial.maxProgress}

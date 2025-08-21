@@ -33,7 +33,7 @@ interface TopBarProps {
 
 export function TopBar({ matchId, turn, phase, turnTimer }: TopBarProps) {
   const router = useRouter();
-  const { disconnect, updateMatch } = useGameStore();
+  const { disconnect, updateMatch, endTurn } = useGameStore();
   const [showTimer, setShowTimer] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [showConcedeDialog, setShowConcedeDialog] = useState(false);
@@ -47,12 +47,12 @@ export function TopBar({ matchId, turn, phase, turnTimer }: TopBarProps) {
 
   return (
     <>
-      <div className="h-full grid grid-cols-3 items-center px-8">
+      <div className="h-full grid grid-cols-3 items-center px-8" data-testid="top-bar">
         {/* Left Side */}
         <div className="flex items-center gap-4 justify-self-start">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-white/70 hover:text-white">
+              <Button variant="ghost" size="icon" className="text-white/70 hover:text-white" data-testid="btn-menu">
                 <Menu className="w-5 h-5" />
               </Button>
             </DropdownMenuTrigger>
@@ -60,6 +60,7 @@ export function TopBar({ matchId, turn, phase, turnTimer }: TopBarProps) {
               <DropdownMenuItem
                 onClick={() => setShowPauseDialog(true)}
                 className="cursor-pointer hover:bg-white/10"
+                data-testid="menu-pause"
               >
                 <Pause className="w-4 h-4 mr-2" />
                 Pause Game
@@ -67,6 +68,7 @@ export function TopBar({ matchId, turn, phase, turnTimer }: TopBarProps) {
               <DropdownMenuItem
                 onClick={() => setShowConcedeDialog(true)}
                 className="cursor-pointer hover:bg-white/10 text-red-400"
+                data-testid="menu-concede"
               >
                 <Flag className="w-4 h-4 mr-2" />
                 Concede
@@ -75,6 +77,7 @@ export function TopBar({ matchId, turn, phase, turnTimer }: TopBarProps) {
               <DropdownMenuItem
                 onClick={() => window.open('https://github.com/anthropics/claude-code/issues', '_blank')}
                 className="cursor-pointer hover:bg-white/10"
+                data-testid="menu-report-issue"
               >
                 <AlertCircle className="w-4 h-4 mr-2" />
                 Report Issue
@@ -85,6 +88,7 @@ export function TopBar({ matchId, turn, phase, turnTimer }: TopBarProps) {
                   router.push('/play');
                 }}
                 className="cursor-pointer hover:bg-white/10"
+                data-testid="menu-exit"
               >
                 <LogOut className="w-4 h-4 mr-2" />
                 Exit to Menu
@@ -94,7 +98,7 @@ export function TopBar({ matchId, turn, phase, turnTimer }: TopBarProps) {
         </div>
 
         {/* Center */}
-        <div className="flex flex-col items-center px-8 justify-self-center">
+        <div className="flex flex-col items-center px-8 justify-self-center" data-testid="match-info">
           <h1 className="text-xl font-bold bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
             Arcanum Duel
           </h1>
@@ -102,7 +106,7 @@ export function TopBar({ matchId, turn, phase, turnTimer }: TopBarProps) {
         </div>
 
         {/* Right Side - Turn Timer */}
-        <div className="justify-self-end px-8">
+        <div className="justify-self-end px-8" data-testid="turn-timer">
           <AnimatePresence>
             {turnTimer && turnTimer > 0 && (
               <motion.div
@@ -113,7 +117,12 @@ export function TopBar({ matchId, turn, phase, turnTimer }: TopBarProps) {
               >
                 <Clock className="w-5 h-5 text-yellow-400" />
                 <SmoothTimer
+                  key={turn}
                   duration={turnTimer}
+                  onComplete={() => {
+                    // Auto-pass on timeout like LoR turn rope
+                    try { endTurn(); } catch (_) { /* no-op */ }
+                  }}
                   isActive={!isPaused}
                   warningThreshold={10}
                   className="text-lg font-bold text-yellow-400"
@@ -139,6 +148,7 @@ export function TopBar({ matchId, turn, phase, turnTimer }: TopBarProps) {
               variant="outline"
               onClick={() => setShowPauseDialog(false)}
               className="bg-transparent border-white/20 text-white hover:bg-white/10"
+              data-testid="btn-resume-game"
             >
               Resume Game
             </Button>
@@ -160,6 +170,7 @@ export function TopBar({ matchId, turn, phase, turnTimer }: TopBarProps) {
               variant="outline"
               onClick={() => setShowConcedeDialog(false)}
               className="bg-transparent border-white/20 text-white hover:bg-white/10"
+              data-testid="btn-continue-playing"
             >
               Continue Playing
             </Button>
@@ -170,6 +181,7 @@ export function TopBar({ matchId, turn, phase, turnTimer }: TopBarProps) {
                 router.push('/play/pve');
               }}
               className="bg-red-600 hover:bg-red-700 text-white"
+              data-testid="btn-concede-confirm"
             >
               Concede Match
             </Button>

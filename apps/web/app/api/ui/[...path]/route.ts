@@ -4,10 +4,11 @@ import path from 'node:path';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(_req: Request, { params }: { params: { path: string[] } }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ path: string[] }> }) {
+    const { path: pathParams } = await params;
     const repoRoot = path.resolve(process.cwd(), '..', '..');
     const root = path.join(repoRoot, 'packages', 'assets', 'ui');
-    const rel = params.path.join('/');
+    const rel = pathParams.join('/');
     const abs = path.join(root, rel);
     if (!abs.startsWith(root)) return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
     try {

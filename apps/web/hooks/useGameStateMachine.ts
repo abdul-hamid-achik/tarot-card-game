@@ -6,20 +6,21 @@ import { useMachine } from '@xstate/react';
 import { useEffect, useCallback } from 'react';
 // Import the FSM - we'll need to export it properly from game-sim
 // For now, using a local copy
-import { lorGameMachine } from '../lib/game/lor-game-flow-v5';
+import { lorGameMachine } from '@tarot/game-sim';
 import { gameLogger } from '@tarot/game-logger';
 import type { Card } from '../lib/types';
 
 export function useGameStateMachine(matchId: string, players: string[], currentPlayerId: string) {
+  const initialAttackOwner = players[Math.floor(Math.random() * players.length)] || players[0];
   const [state, send, service] = useMachine(lorGameMachine, {
     context: {
       matchId,
       players,
       round: 0,
-      attackTokenOwner: players[0],
+      attackTokenOwner: initialAttackOwner,
       hasAttackToken: true,
       rallyTokens: 0,
-      priorityPlayer: players[1], // Defender gets priority first
+      priorityPlayer: initialAttackOwner, // Attacker acts first per flowchart
       hasInitiative: false,
       consecutivePasses: 0,
       playersPassed: new Set(),
@@ -59,7 +60,7 @@ export function useGameStateMachine(matchId: string, players: string[], currentP
   // Helper functions for game actions
   const playUnit = useCallback((card: Card) => {
     if (state.context.priorityPlayer !== currentPlayerId) {
-      gameLogger.logAction('play_unit_denied', { 
+      gameLogger.logAction('play_unit_denied', {
         reason: 'not_priority',
         currentPriority: state.context.priorityPlayer,
         attempted: currentPlayerId,
@@ -67,8 +68,8 @@ export function useGameStateMachine(matchId: string, players: string[], currentP
       return false;
     }
 
-    send({ 
-      type: 'PLAY_UNIT', 
+    send({
+      type: 'PLAY_UNIT',
       playerId: currentPlayerId,
       card: {
         ...card,
@@ -80,9 +81,9 @@ export function useGameStateMachine(matchId: string, players: string[], currentP
         hasAttacked: false,
       },
     });
-    
-    gameLogger.logAction('play_unit', { 
-      playerId: currentPlayerId, 
+
+    gameLogger.logAction('play_unit', {
+      playerId: currentPlayerId,
       card: card.name,
       cost: card.cost,
     });
@@ -92,11 +93,11 @@ export function useGameStateMachine(matchId: string, players: string[], currentP
   const playSpell = useCallback((card: Card, targets?: string[]) => {
     if (state.context.priorityPlayer !== currentPlayerId) {
       // Check if we can respond to stack with fast/burst
-      const canRespond = state.context.canRespondToStack && 
-                        (card.spellSpeed === 'fast' || card.spellSpeed === 'burst');
-      
+      const canRespond = state.context.canRespondToStack &&
+        (card.spellSpeed === 'fast' || card.spellSpeed === 'burst');
+
       if (!canRespond) {
-        gameLogger.logAction('play_spell_denied', { 
+        gameLogger.logAction('play_spell_denied', {
           reason: 'not_priority',
           spellSpeed: card.spellSpeed,
         }, false);
@@ -104,15 +105,15 @@ export function useGameStateMachine(matchId: string, players: string[], currentP
       }
     }
 
-    send({ 
-      type: 'PLAY_SPELL', 
+    send({
+      type: 'PLAY_SPELL',
       playerId: currentPlayerId,
       card,
       targets,
     });
-    
-    gameLogger.logAction('play_spell', { 
-      playerId: currentPlayerId, 
+
+    gameLogger.logAction('play_spell', {
+      playerId: currentPlayerId,
       spell: card.name,
       speed: card.spellSpeed,
       targets,
@@ -122,22 +123,22 @@ export function useGameStateMachine(matchId: string, players: string[], currentP
 
   const declareAttack = useCallback((attackerIds: string[]) => {
     if (!state.context.hasAttackToken || state.context.attackTokenOwner !== currentPlayerId) {
-      gameLogger.logAction('attack_denied', { 
+      gameLogger.logAction('attack_denied', {
         reason: 'no_attack_token',
         tokenOwner: state.context.attackTokenOwner,
       }, false);
       return false;
     }
 
-    send({ 
-      type: 'DECLARE_ATTACK', 
+    send({
+      type: 'DECLARE_ATTACK',
       playerId: currentPlayerId,
       attackers: attackerIds,
     });
-    
+
     gameLogger.logCombatStart();
-    gameLogger.logAction('declare_attack', { 
-      playerId: currentPlayerId, 
+    gameLogger.logAction('declare_attack', {
+      playerId: currentPlayerId,
       attackers: attackerIds,
     });
     return true;
@@ -145,34 +146,34 @@ export function useGameStateMachine(matchId: string, players: string[], currentP
 
   const declareBlockers = useCallback((blockers: Record<string, string>) => {
     if (state.context.attackTokenOwner === currentPlayerId) {
-      gameLogger.logAction('block_denied', { 
+      gameLogger.logAction('block_denied', {
         reason: 'attacker_cannot_block',
       }, false);
       return false;
     }
 
-    send({ 
-      type: 'DECLARE_BLOCKERS', 
+    send({
+      type: 'DECLARE_BLOCKERS',
       playerId: currentPlayerId,
       blockers,
     });
-    
-    gameLogger.logAction('declare_blockers', { 
-      playerId: currentPlayerId, 
+
+    gameLogger.logAction('declare_blockers', {
+      playerId: currentPlayerId,
       blockers,
     });
     return true;
   }, [state.context.attackTokenOwner, currentPlayerId, send]);
 
   const pass = useCallback(() => {
-    send({ 
-      type: 'PASS', 
+    send({
+      type: 'PASS',
       playerId: currentPlayerId,
     });
-    
+
     const willEndRound = state.context.consecutivePasses >= 1;
     gameLogger.logPlayerPass(currentPlayerId, willEndRound);
-    
+
     return true;
   }, [state.context.consecutivePasses, currentPlayerId, send]);
 
@@ -188,14 +189,14 @@ export function useGameStateMachine(matchId: string, players: string[], currentP
     // State
     gameState: state.value,
     context: state.context,
-    
+
     // Computed properties
     isMyPriority: state.context.priorityPlayer === currentPlayerId,
     canAttack: state.context.hasAttackToken && state.context.attackTokenOwner === currentPlayerId,
     canBlock: state.context.combatDeclared && state.context.attackTokenOwner !== currentPlayerId,
     isDefender: state.context.attackTokenOwner !== currentPlayerId,
     hasSpellsOnStack: state.context.spellStack.length > 0,
-    
+
     // Actions
     playUnit,
     playSpell,
@@ -203,7 +204,7 @@ export function useGameStateMachine(matchId: string, players: string[], currentP
     declareBlockers,
     pass,
     startRound,
-    
+
     // Debug
     _service: service,
   };
