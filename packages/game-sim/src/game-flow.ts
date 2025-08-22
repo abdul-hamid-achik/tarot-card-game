@@ -261,22 +261,20 @@ export const gameMachine = createMachine<GameContext, GameEvent>({
 
         resolveCombatStack: {
           entry: 'resolveSpellStack',
-          on: {
-            '': [
-              {
-                target: 'attackDeclared',
-                cond: 'combatContinues',
-              },
-              {
-                target: 'resolveCombat',
-              },
-            ],
-          },
+          always: [
+            {
+              target: 'attackDeclared',
+              cond: 'combatContinues',
+            },
+            {
+              target: 'resolveCombat',
+            },
+          ],
         },
 
         resolveCombat: {
           entry: [{ type: 'executeCombat' }, { type: 'givePriorityToDefender' }, { type: 'resetPasses' }],
-          always: '#lorGame.actionPhase',
+          always: '#tarotGame.actionPhase',
         },
       },
     },

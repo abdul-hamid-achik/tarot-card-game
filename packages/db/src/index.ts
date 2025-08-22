@@ -1,5 +1,5 @@
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/neon-http';
+import { neon } from '@neondatabase/serverless';
 import { eq } from 'drizzle-orm';
 import * as schema from './schema';
 import { Card, Deck, CardSchema, DeckSchema } from './schema';
@@ -12,12 +12,12 @@ const logDb = (action: string, data: any, success: boolean = true) => {
 };
 
 // Database connection
-let client: postgres.Sql | null = null;
+let sqlClient: ReturnType<typeof neon> | null = null;
 let drizzleDb: ReturnType<typeof drizzle> | null = null;
 
 // Initialize database connection
 function getClient() {
-    if (!client) {
+    if (!sqlClient) {
         const connectionString = process.env.DATABASE_URL;
         if (!connectionString) {
             logDb('CONNECTION_ERROR', { error: 'DATABASE_URL not set' }, false);
@@ -30,12 +30,8 @@ function getClient() {
         });
 
         try {
-            client = postgres(connectionString, {
-                max: 10,
-                idle_timeout: 20,
-                connect_timeout: 10,
-            });
-            logDb('CONNECTION_SUCCESS', { message: 'Database client initialized' });
+            sqlClient = neon(connectionString);
+            logDb('CONNECTION_SUCCESS', { message: 'Neon HTTP client initialized' });
         } catch (error) {
             logDb('CONNECTION_ERROR', {
                 error: error instanceof Error ? error.message : 'Unknown error'
@@ -43,14 +39,14 @@ function getClient() {
             throw error;
         }
     }
-    return client;
+    return sqlClient;
 }
 
 export function getDb() {
     if (!drizzleDb) {
         logDb('DRIZZLE_INIT', { message: 'Initializing Drizzle database instance' });
         const client = getClient();
-        drizzleDb = drizzle(client, { schema });
+        drizzleDb = drizzle({ client, schema });
         logDb('DRIZZLE_SUCCESS', { message: 'Drizzle database instance ready' });
     }
     return drizzleDb;
@@ -169,7 +165,13 @@ export class Database {
             throw new Error('Database not available - DATABASE_URL not set');
         }
         const db = getDb();
-        const result = await db.select().from(schema.decks);
+        const result = await db
+            .select({
+                id: schema.playerDecks.id,
+                ownerId: schema.playerDecks.userId,
+                format: schema.playerDecks.format,
+            })
+            .from(schema.playerDecks);
         return result.map(deck => DeckSchema.parse(deck));
     }
 
@@ -178,7 +180,15 @@ export class Database {
             throw new Error('Database not available - DATABASE_URL not set');
         }
         const db = getDb();
-        const result = await db.select().from(schema.decks).where(eq(schema.decks.id, id)).limit(1);
+        const result = await db
+            .select({
+                id: schema.playerDecks.id,
+                ownerId: schema.playerDecks.userId,
+                format: schema.playerDecks.format,
+            })
+            .from(schema.playerDecks)
+            .where(eq(schema.playerDecks.id, id))
+            .limit(1);
         if (result.length === 0) return null;
         return DeckSchema.parse(result[0]);
     }
@@ -191,13 +201,22 @@ export class Database {
         const deckId = deck.id || `deck_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const deckData = { ...deck, id: deckId };
 
-        const result = await db.insert(schema.decks).values({
-            id: deckData.id,
-            ownerId: deckData.ownerId,
-            format: deckData.format,
-        }).returning();
+        const inserted = await db
+            .insert(schema.playerDecks)
+            .values({
+                id: deckData.id,
+                userId: deckData.ownerId,
+                name: deckData.id,
+                format: deckData.format,
+                cards: [],
+            })
+            .returning({
+                id: schema.playerDecks.id,
+                ownerId: schema.playerDecks.userId,
+                format: schema.playerDecks.format,
+            });
 
-        return DeckSchema.parse(result[0]);
+        return DeckSchema.parse(inserted[0]);
     }
 
     async deleteCard(id: string): Promise<boolean> {
@@ -205,7 +224,10 @@ export class Database {
             throw new Error('Database not available - DATABASE_URL not set');
         }
         const db = getDb();
-        const result = await db.delete(schema.cards).where(eq(schema.cards.id, id));
+        const result = await db
+            .delete(schema.cards)
+            .where(eq(schema.cards.id, id))
+            .returning({ id: schema.cards.id });
         return result.length > 0;
     }
 
@@ -214,7 +236,10 @@ export class Database {
             throw new Error('Database not available - DATABASE_URL not set');
         }
         const db = getDb();
-        const result = await db.delete(schema.decks).where(eq(schema.decks.id, id));
+        const result = await db
+            .delete(schema.playerDecks)
+            .where(eq(schema.playerDecks.id, id))
+            .returning({ id: schema.playerDecks.id });
         return result.length > 0;
     }
 
@@ -296,7 +321,7 @@ export class Database {
             await db.delete(schema.cards);
 
             logDb('RESET_DELETE_DECKS', { message: 'Deleting all decks' });
-            await db.delete(schema.decks);
+            await db.delete(schema.playerDecks);
 
             const duration = Date.now() - startTime;
             logDb('RESET_SUCCESS', { duration });

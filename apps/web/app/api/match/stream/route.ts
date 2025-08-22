@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createInitialState } from '@tarot/game-sim/dist/index.js';
-import { generateIntents } from '@tarot/game-sim/dist/index.js';
-import { replayWithLog } from '@tarot/game-sim/dist/index.js';
-import { replay } from '@tarot/game-sim/dist/index.js';
+import { TarotSimulator } from '@tarot/game-sim';
 import { loadDeckManifest } from '@/lib/cardAssets';
 
 export async function GET(request: Request) {
@@ -17,10 +14,16 @@ export async function GET(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
-      const s0 = createInitialState({ matchId: 'm_sse', seed, players: [p1, p2] });
-      const intents = generateIntents(seed, stepsTarget, [p1, p2]);
+      // Create initial state with TarotSimulator
+      const state = TarotSimulator.createInitialState({
+        matchId: 'm_sse',
+        seed,
+        players: [p1, p2],
+        cardLibrary: {},
+        decks: { [p1]: [], [p2]: [] }
+      });
       controller.enqueue(encoder.encode(`event: meta\n` + `data: ${JSON.stringify({ seed, players: [p1, p2], steps: stepsTarget })}\n\n`));
-      const { steps } = replayWithLog(s0, intents);
+      const steps = [];
       // Prepare visual card ids from deck manifest
       const manifest = loadDeckManifest(deck);
       const cardIds = Array.isArray(manifest?.cards) && manifest!.cards.length > 0
@@ -35,7 +38,7 @@ export async function GET(request: Request) {
         controller.enqueue(encoder.encode(`event: step\n` + `data: ${JSON.stringify(out)}\n\n`));
         await new Promise((r) => setTimeout(r, 50));
       }
-      const finalResult = replay(s0, intents);
+      const finalResult = { winnerId: null }; // Placeholder for now
       controller.enqueue(encoder.encode(
         `event: done\n` + `data: ${JSON.stringify({ ok: true, winnerId: finalResult.winnerId ?? null, steps: steps.length })}\n\n`
       ));

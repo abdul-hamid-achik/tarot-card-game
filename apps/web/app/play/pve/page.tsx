@@ -12,6 +12,7 @@ import { gameLogger } from '@tarot/game-logger';
 import { EnemyGenerator, GeneratedEnemy } from '@/lib/ai/EnemyGenerator';
 import { EnemyAI } from '@/lib/ai/EnemyAI';
 import { audioManager } from '@/lib/audio/AudioManager';
+import { loadRunProgress, saveRunProgress, clearRunProgress } from '@/lib/pveProgress';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import {
@@ -43,11 +44,35 @@ export default function PvEPage() {
   const [isClient, setIsClient] = useState(false);
   const [runState, setRunState] = useState<RunState>(createInitialRunState());
 
-  // Generate random seed only on client side
+  // Load saved progress or generate new run
   useEffect(() => {
     setIsClient(true);
-    const randomSeed = Math.random().toString(36).substring(7);
-    setRunState(createInitialRunState(randomSeed));
+    
+    // Try to load saved progress
+    const savedProgress = loadRunProgress();
+    if (savedProgress) {
+      setRunState(savedProgress.runState);
+      gameLogger.logAction('pve_progress_loaded', {
+        currentNodeId: savedProgress.currentNodeId,
+        totalVictories: savedProgress.totalVictories,
+        currentStreak: savedProgress.currentStreak
+      }, true, 'Loaded saved PvE progress');
+    } else {
+      // Create new run with random seed
+      const randomSeed = Math.random().toString(36).substring(7);
+      const newState = createInitialRunState(randomSeed);
+      setRunState(newState);
+      
+      // Save initial state
+      saveRunProgress({
+        runState: newState,
+        currentNodeId: null,
+        completedNodes: [],
+        totalVictories: 0,
+        currentStreak: 0,
+        lastUpdated: new Date().toISOString()
+      });
+    }
   }, []);
   const [selectedNode, setSelectedNode] = useState<MapNode | null>(null);
   const [currentEnemy, setCurrentEnemy] = useState<GeneratedEnemy | null>(null);
@@ -78,7 +103,7 @@ export default function PvEPage() {
             audioManager.playRandom('cardReveal');
           } else {
             // No enemy, go directly to battle
-            router.push(`/play/match/pve-${node.id}?type=${node.type}`);
+            router.push(`/play/match/pve?nodeId=${node.id}&type=${node.type}`);
           }
         }
         break;

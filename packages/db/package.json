@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.0.1",
     "drizzle-orm": "^0.44.4",
     "postgres": "^3.4.3",
     "zod": "^3.22.4"

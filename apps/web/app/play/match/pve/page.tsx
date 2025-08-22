@@ -18,6 +18,12 @@ import { Swords, Trophy, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card } from '@/lib/store/gameStore';
 import { CoinFlip } from '@/components/game/CoinFlip';
+import { 
+  saveRunProgress, 
+  loadRunProgress, 
+  updateProgressAfterVictory, 
+  updateProgressAfterDefeat 
+} from '@/lib/pveProgress';
 
 // Generate sample cards for PVE matches with proper card IDs
 function generateDeck(count: number, prefix: string): Card[] {
@@ -273,13 +279,44 @@ function PvEInner() {
   };
 
   const handleVictory = () => {
-    // Award rewards
+    // Award rewards and save progress
     if (victoryRewards) {
-      // In a real implementation, this would update the player's collection
       gameLogger.logAction('victory_rewards_awarded', {
         rewards: victoryRewards,
         playerId: 'player1'
       }, true, 'Awarding victory rewards to player');
+      
+      // Save progress to localStorage
+      const nodeId = searchParams.get('nodeId');
+      if (nodeId) {
+        // Get existing progress or create new
+        const progress = loadRunProgress() || {
+          runState: {
+            health: 30,
+            maxHealth: 30,
+            gold: 100,
+            deck: [],
+            relics: [],
+            currentNodeId: null,
+            region: 1,
+            seed: 'default'
+          },
+          currentNodeId: null,
+          completedNodes: [],
+          totalVictories: 0,
+          currentStreak: 0,
+          lastUpdated: new Date().toISOString()
+        };
+        
+        // Update with victory
+        const updatedProgress = updateProgressAfterVictory(
+          progress,
+          nodeId,
+          victoryRewards
+        );
+        
+        saveRunProgress(updatedProgress);
+      }
     }
 
     setShowVictoryDialog(false);
@@ -287,6 +324,16 @@ function PvEInner() {
   };
 
   const handleDefeat = () => {
+    // Update progress after defeat
+    const nodeId = searchParams.get('nodeId');
+    if (nodeId) {
+      const progress = loadRunProgress();
+      if (progress) {
+        const updatedProgress = updateProgressAfterDefeat(progress);
+        saveRunProgress(updatedProgress);
+      }
+    }
+    
     setShowDefeatDialog(false);
     router.push('/play/pve');
   };

@@ -1,5 +1,5 @@
-import { createSeededRandom } from './rng.js';
-import type { MatchState, PlayerState, Unit, CardDefinition, CombatPair } from './types.js';
+import { createSeededRandom } from './rng';
+import type { MatchState, PlayerState, Unit, CardDefinition, CombatPair } from './types';
 
 /**
  * Tarot Game Simulator

@@ -18,13 +18,13 @@ export function UserProfile() {
         return (
             <div className="flex gap-2 items-center">
                 <Button variant="outline" size="sm" asChild className="bg-slate-800 border-slate-600 hover:bg-slate-700 text-white">
-                    <Link href="/handler/sign-in" className="flex items-center gap-2">
+                    <Link href="/sign-in" className="flex items-center gap-2">
                         <LogIn className="w-4 h-4" />
                         Sign In
                     </Link>
                 </Button>
                 <Button size="sm" asChild className="bg-purple-600 hover:bg-purple-700">
-                    <Link href="/handler/sign-up" className="flex items-center gap-2">
+                    <Link href="/sign-up" className="flex items-center gap-2">
                         <User className="w-4 h-4" />
                         Sign Up
                     </Link>

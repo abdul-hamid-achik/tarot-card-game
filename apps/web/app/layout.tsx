@@ -3,6 +3,7 @@ import { Cinzel } from 'next/font/google';
 import { SettingsMenu } from '@/components/game/SettingsMenu';
 import { Toaster } from '@/components/ui/toaster';
 import { AudioBootstrap } from '../components/ui/AudioBootstrap';
+import { Providers } from '../stack';
 
 const cinzel = Cinzel({ subsets: ['latin'], weight: ['400', '700'] });
 
@@ -13,7 +14,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${cinzel.className} dark`}>
       <body className="min-h-screen bg-slate-950 text-foreground antialiased">
         <AudioBootstrap />
-        {children}
+        <Providers>
+          {children}
+        </Providers>
         <SettingsMenu />
         <Toaster />
       </body>

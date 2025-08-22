@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { LaneGameSimulator } from '@tarot/game-sim/src/sim-lanes';
+import { TarotSimulator } from '@tarot/game-sim/src/tarot-simulator';
 import { CombatSystem } from '@tarot/game-sim/src/combat';
 import { AIController } from '@tarot/game-sim/src/ai-controller';
 import type { MatchState } from '@tarot/game-sim/src/types';
@@ -27,11 +27,10 @@ export async function POST(request: NextRequest) {
 
     switch (action.type) {
       case 'play_card':
-        updatedState = LaneGameSimulator.playCard(
+        updatedState = TarotSimulator.playCard(
           matchState,
           action.playerId,
-          action.cardId,
-          action.lane
+          action.cardId
         );
         break;
 
@@ -52,11 +51,14 @@ export async function POST(request: NextRequest) {
         break;
 
       case 'pass':
-        updatedState = LaneGameSimulator.pass(matchState, action.playerId);
+        updatedState = TarotSimulator.processAction(matchState, {
+          type: 'pass',
+          playerId: action.playerId
+        });
         break;
 
       case 'end_turn':
-        updatedState = LaneGameSimulator.endTurn(matchState);
+        updatedState = TarotSimulator.endTurn(matchState);
         break;
 
       default:
@@ -76,7 +78,7 @@ export async function POST(request: NextRequest) {
 
       // Process AI move
       if (aiMove.type !== 'pass') {
-        updatedState = LaneGameSimulator.processAction(updatedState, {
+        updatedState = TarotSimulator.processAction(updatedState, {
           ...aiMove.details,
           type: aiMove.type,
           playerId: 'player2'
@@ -109,7 +111,7 @@ export async function PUT(request: NextRequest) {
     const matchId = `match_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const seed = Math.random().toString(36).substr(2, 9);
 
-    const initialState = LaneGameSimulator.createInitialState({
+    const initialState = TarotSimulator.createInitialState({
       matchId,
       seed,
       players,
@@ -118,7 +120,7 @@ export async function PUT(request: NextRequest) {
     });
 
     // Start the first turn
-    const matchState = LaneGameSimulator.startTurn(initialState);
+    const matchState = TarotSimulator.startTurn(initialState);
 
     // Store the match
     activeMatches.set(matchId, matchState);

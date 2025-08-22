@@ -1,4 +1,4 @@
-import type { Unit, MatchState, Keyword } from './types.js';
+import type { Unit, MatchState, Keyword } from './types';
 
 export interface KeywordEffect {
   timing: 'pre-combat' | 'post-combat' | 'on-strike' | 'on-damage' | 'on-summon' | 'turn-start' | 'turn-end';
@@ -122,7 +122,7 @@ export class KeywordProcessor {
     for (const playerId of state.players) {
       const playerState = state.playerStates[playerId];
       
-      for (const unit of playerState.board) {
+      for (const unit of [...playerState.battlefield, ...playerState.bench]) {
         if (!unit) continue;
 
         for (const keyword of unit.keywords) {
@@ -182,7 +182,7 @@ export class KeywordProcessor {
     for (const playerId of state.players) {
       const playerState = newState.playerStates[playerId];
       
-      for (const unit of playerState.board) {
+      for (const unit of [...playerState.battlefield, ...playerState.bench]) {
         if (!unit) continue;
 
         // Decrement buff durations

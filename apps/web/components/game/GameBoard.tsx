@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, useDraggable, useDroppable } from '@dnd-kit/core';
+import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, useDraggable, useDroppable, useSensors, useSensor, PointerSensor } from '@dnd-kit/core';
 import { Card, useGameStore } from '@/lib/store/gameStore';
 import { TarotCard } from './TarotCard';
 import { CardOverlay } from './CardOverlay';
@@ -14,21 +14,22 @@ import { gameLogger } from '@tarot/game-logger';
 import { Sword, Shield, Heart, Sparkles, ChevronRight } from 'lucide-react';
 
 // Hand card component - no drag, just click
-function HandCard({ card, idx, onCardClick }: { 
-  card: Card; 
-  idx: number; 
-  onCardClick: (card: Card, zone: 'hand', event?: React.MouseEvent) => void;
+function HandCard({ card, idx, onCardClick }: {
+  card: Card;
+  idx: number;
+  onCardClick: (card: Card, zone: 'hand', index: number, event?: React.MouseEvent) => void;
 }) {
   const handleClick = (e: React.MouseEvent) => {
-    onCardClick(card, 'hand', e);
+    e.stopPropagation();
+    onCardClick(card, 'hand', idx, e);
   };
-  
+
   return (
     <motion.div
       key={card.id}
       initial={{ y: 20, opacity: 0 }}
-      animate={{ 
-        y: 0, 
+      animate={{
+        y: 0,
         opacity: 1,
         scale: 1
       }}
@@ -56,14 +57,15 @@ function BoardSlot({ card, unit, index, isPlayer, zone, onCardClick, playerId }:
   const actualCard = unit?.card || card;
   const slotId = `${playerId}-${zone}-${index}`;
 
-  // Only battlefield cards can be dragged (for reordering)
-  const canDrag = isPlayer && zone === 'battlefield' && actualCard;
+  // Both bench and battlefield cards can be dragged
+  // Bench cards can be dragged to battlefield, battlefield cards can be reordered
+  const canDrag = isPlayer && actualCard && (zone === 'battlefield' || zone === 'bench');
 
-  // Make slots droppable (only battlefield for reordering)
+  // Make slots droppable (battlefield for reordering/receiving, bench can't receive)
   const { setNodeRef, isOver } = useDroppable({
     id: slotId,
     data: { zone, index, playerId },
-    disabled: zone !== 'battlefield'
+    disabled: !isPlayer || (zone === 'bench' && actualCard) // Can't drop on occupied bench slots
   });
 
   // Make cards draggable (only in battlefield for reordering)
@@ -73,12 +75,12 @@ function BoardSlot({ card, unit, index, isPlayer, zone, onCardClick, playerId }:
     disabled: !canDrag
   });
 
-  // Different sizes for different zones
-  const slotSize = zone === 'battlefield' 
-    ? "w-[110px] h-[154px]"  // Bigger for battlefield (manifestation)
-    : "w-[80px] h-[112px]";   // Smaller for bench (reading row)
+  // Different sizes for different zones - made larger for better visibility
+  const slotSize = zone === 'battlefield'
+    ? "w-[130px] h-[182px]"  // Bigger for battlefield (manifestation)
+    : "w-[100px] h-[140px]";   // Smaller for bench (reading row)
 
-  const cardScale = zone === 'battlefield' ? 1.0 : 0.75;
+  const cardScale = zone === 'battlefield' ? 1.2 : 0.95;
 
   return (
     <div
@@ -92,6 +94,7 @@ function BoardSlot({ card, unit, index, isPlayer, zone, onCardClick, playerId }:
         isOver && "border-tarot-gold bg-tarot-gold/10 scale-105",
         isDragging && "opacity-50"
       )}
+      data-tutorial={isPlayer ? `${zone}-${index}` : undefined}
     >
       {actualCard && (
         <motion.div
@@ -180,8 +183,12 @@ function Nexus({ health, maxHealth, isPlayer, name }: NexusProps) {
   );
 }
 
-export function GameBoard() {
-  const { currentMatch, playCard, endTurn, updateMatch, startCombat } = useGameStore();
+interface GameBoardProps {
+  disableAI?: boolean; // Option to disable built-in AI (for when parent component handles it)
+}
+
+export function GameBoard({ disableAI = false }: GameBoardProps = {}) {
+  const { currentMatch, playCard, endTurn, updateMatch, startCombat, executeAITurn } = useGameStore();
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [showCardOverlay, setShowCardOverlay] = useState(false);
   const [actionMenuCard, setActionMenuCard] = useState<Card | null>(null);
@@ -192,6 +199,56 @@ export function GameBoard() {
   const [draggedCard, setDraggedCard] = useState<Card | null>(null);
   const [playerHandExpanded, setPlayerHandExpanded] = useState(false);
   const [enemyHandExpanded, setEnemyHandExpanded] = useState(false);
+
+  // Configure sensors with activation constraint (delay + tolerance)
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 5,
+      },
+    })
+  );
+
+  // Handle AI turns with useRef to prevent infinite loops
+  const aiTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastAITurn = useRef<string>('');
+
+  useEffect(() => {
+    if (!currentMatch || disableAI) return; // Skip if AI is disabled
+
+    // Check if it's AI's turn
+    const isAITurn = currentMatch.activePlayer === 'ai' || currentMatch.activePlayer === 'player2';
+    const turnKey = `${currentMatch.activePlayer}-${currentMatch.turn}`;
+
+    // Only execute if this is a new AI turn (not a repeat)
+    if (isAITurn && turnKey !== lastAITurn.current) {
+      lastAITurn.current = turnKey;
+
+      // Clear any existing timer
+      if (aiTimerRef.current) {
+        clearTimeout(aiTimerRef.current);
+      }
+
+      // Execute AI turn after a short delay for better UX
+      aiTimerRef.current = setTimeout(() => {
+        if (executeAITurn) {
+          executeAITurn();
+        } else {
+          // Fallback: just end turn if no AI implementation
+          console.log('AI taking turn...');
+          endTurn();
+        }
+      }, 1500);
+    }
+
+    return () => {
+      if (aiTimerRef.current) {
+        clearTimeout(aiTimerRef.current);
+        aiTimerRef.current = null;
+      }
+    };
+  }, [currentMatch?.activePlayer, currentMatch?.turn, executeAITurn, endTurn, disableAI]);
 
   if (!currentMatch) {
     return (
@@ -229,7 +286,7 @@ export function GameBoard() {
         setSelectedCard(actionMenuCard);
         setShowCardOverlay(true);
         break;
-        
+
       case 'play':
         // Play from hand to reading row (bench)
         const emptySlot = currentPlayer?.bench?.findIndex(slot => !slot);
@@ -238,7 +295,7 @@ export function GameBoard() {
           audioManager.playRandom('cardPlace');
         }
         break;
-        
+
       case 'attack':
       case 'block':
         // Move from bench to battlefield
@@ -253,7 +310,7 @@ export function GameBoard() {
               const updatedBattlefield = [...(currentPlayer.battlefield || [])];
               updatedBattlefield[emptyBattlefieldSlot] = benchUnit;
               updatedBench[actionMenuIndex] = null;
-              
+
               updateMatch({
                 ...currentMatch,
                 players: {
@@ -265,7 +322,7 @@ export function GameBoard() {
                   }
                 }
               });
-              
+
               if (action === 'attack' && hasAttackToken) {
                 // Initiate combat after moving to battlefield
                 setTimeout(() => startCombat(), 500);
@@ -274,7 +331,7 @@ export function GameBoard() {
           }
         }
         break;
-        
+
       case 'return':
         // Move from battlefield back to bench
         if (actionMenuZone === 'battlefield') {
@@ -288,7 +345,7 @@ export function GameBoard() {
               const updatedBattlefield = [...(currentPlayer.battlefield || [])];
               updatedBench[emptyBenchSlot] = battlefieldUnit;
               updatedBattlefield[actionMenuIndex] = null;
-              
+
               updateMatch({
                 ...currentMatch,
                 players: {
@@ -305,7 +362,7 @@ export function GameBoard() {
         }
         break;
     }
-    
+
     setShowActionMenu(false);
     setActionMenuCard(null);
   };
@@ -329,12 +386,7 @@ export function GameBoard() {
     const fromData = active.data.current;
     const toData = over.data.current;
 
-    // Only allow reordering within battlefield
-    if (!fromData || !toData || 
-        fromData.fromZone !== 'battlefield' || 
-        toData.zone !== 'battlefield' ||
-        fromData.playerId !== currentPlayerId ||
-        toData.playerId !== currentPlayerId) {
+    if (!fromData || !toData || fromData.playerId !== currentPlayerId) {
       setDraggedCard(null);
       return;
     }
@@ -345,39 +397,66 @@ export function GameBoard() {
       return;
     }
 
+    const fromZone = fromData.fromZone;
+    const toZone = toData.zone;
     const fromIndex = fromData.fromIndex;
     const toIndex = toData.index;
 
-    // Reorder battlefield cards
-    const updatedBattlefield = [...(player.battlefield || Array(6).fill(null))];
-    const temp = updatedBattlefield[fromIndex];
-    updatedBattlefield[fromIndex] = updatedBattlefield[toIndex];
-    updatedBattlefield[toIndex] = temp;
+    // Case 1: Moving from bench to battlefield
+    if (fromZone === 'bench' && toZone === 'battlefield') {
+      const updatedBench = [...(player.bench || Array(6).fill(null))];
+      const updatedBattlefield = [...(player.battlefield || Array(6).fill(null))];
 
-    // Update the match state
-    updateMatch({
-      ...currentMatch,
-      players: {
-        ...currentMatch.players,
-        [currentPlayerId]: {
-          ...player,
-          battlefield: updatedBattlefield
-        }
+      const unit = updatedBench[fromIndex];
+      if (unit && !updatedBattlefield[toIndex]) {
+        updatedBench[fromIndex] = null;
+        updatedBattlefield[toIndex] = unit;
+
+        updateMatch({
+          players: {
+            ...currentMatch.players,
+            [currentPlayerId]: {
+              ...player,
+              bench: updatedBench,
+              battlefield: updatedBattlefield
+            }
+          }
+        });
+
+        audioManager.playRandom('cardPlace');
       }
-    });
+    }
+    // Case 2: Reordering within same zone
+    else if (fromZone === toZone) {
+      const zone = fromZone === 'battlefield' ? 'battlefield' : 'bench';
+      const updatedZone = [...(player[zone] || Array(6).fill(null))];
 
-    audioManager.playRandom('cardPlace');
+      // Swap positions
+      const temp = updatedZone[fromIndex];
+      updatedZone[fromIndex] = updatedZone[toIndex];
+      updatedZone[toIndex] = temp;
+
+      updateMatch({
+        players: {
+          ...currentMatch.players,
+          [currentPlayerId]: {
+            ...player,
+            [zone]: updatedZone
+          }
+        }
+      });
+
+      audioManager.playRandom('cardPlace');
+    }
+
     setDraggedCard(null);
   };
 
   return (
-    <DndContext 
-      onDragStart={handleDragStart} 
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      activationConstraint={{
-        delay: 200,
-        tolerance: 5
-      }}
     >
       <div className="relative min-h-screen bg-gradient-to-b from-indigo-950 via-purple-900 to-black overflow-hidden">
         {/* Background Effects */}
@@ -389,7 +468,7 @@ export function GameBoard() {
         {/* Main Board Container */}
         <div className="relative h-screen flex">
 
-          {/* Left Side - Player Nexus Area */}
+          {/* Left Side - Player Nexus Area with Action Button */}
           <div className="w-32 flex flex-col justify-center items-center gap-4 p-4">
             <Nexus
               health={currentPlayer?.health || 30}
@@ -397,6 +476,95 @@ export function GameBoard() {
               isPlayer={true}
               name="You"
             />
+
+            {/* Smart Action Button */}
+            {(() => {
+              const canAttack = hasAttackToken && currentPlayer?.battlefield?.some(u => u);
+              const hasUnitsOnBench = currentPlayer?.bench?.some(u => u);
+              const isDefending = !isMyTurn && currentMatch.phase === 'combat_blocks';
+
+              // Determine button state and action
+              let buttonText = 'END TURN';
+              let buttonColor = 'bg-green-600 hover:bg-green-500';
+              let buttonIcon = null;
+              let buttonAction = endTurn;
+              let showButton = isMyTurn || isDefending;
+
+              if (isDefending) {
+                buttonText = 'BLOCK';
+                buttonColor = 'bg-blue-600 hover:bg-blue-500';
+                buttonIcon = <Shield className="w-4 h-4" />;
+                buttonAction = () => {
+                  updateMatch({
+                    phase: 'combat_damage' as any,
+                    combatState: {
+                      ...(currentMatch.combatState || {}),
+                      blockers: {}
+                    }
+                  });
+                };
+              } else if (currentMatch.phase === 'combat_damage' && isMyTurn) {
+                buttonText = 'RESOLVE';
+                buttonColor = 'bg-purple-600 hover:bg-purple-500 animate-pulse';
+                buttonIcon = <Sparkles className="w-4 h-4" />;
+                buttonAction = () => {
+                  startCombat();
+                  setTimeout(() => {
+                    updateMatch({
+                      phase: 'main' as any,
+                      combatState: undefined
+                    });
+                  }, 1000);
+                };
+              } else if (currentMatch.phase === 'combat_declaration' && isMyTurn) {
+                buttonText = 'COMMIT';
+                buttonColor = 'bg-orange-600 hover:bg-orange-500';
+                buttonIcon = <ChevronRight className="w-4 h-4" />;
+                buttonAction = () => {
+                  const attackers = currentPlayer?.battlefield
+                    ?.map((unit, idx) => unit ? idx : -1)
+                    .filter(idx => idx >= 0) || [];
+
+                  updateMatch({
+                    phase: 'combat_blocks' as any,
+                    combatState: {
+                      ...(currentMatch.combatState || {}),
+                      attackers
+                    }
+                  });
+                };
+              } else if (currentMatch.phase === 'main' && canAttack && isMyTurn) {
+                buttonText = 'ATTACK';
+                buttonColor = 'bg-red-600 hover:bg-red-500';
+                buttonIcon = <Sword className="w-4 h-4" />;
+                buttonAction = () => {
+                  updateMatch({
+                    phase: 'combat_declaration' as any,
+                    combatState: {
+                      attackers: [],
+                      blockers: {},
+                      damage: {},
+                      resolved: false
+                    }
+                  });
+                };
+              }
+
+              if (!showButton) return null;
+
+              return (
+                <button
+                  onClick={buttonAction}
+                  className={cn(
+                    "px-4 py-2 text-white font-bold rounded-lg shadow-lg transition-all flex items-center gap-2 text-sm",
+                    buttonColor
+                  )}
+                >
+                  {buttonIcon}
+                  {buttonText}
+                </button>
+              );
+            })()}
 
             {/* Player Mana */}
             <div className="bg-black/60 rounded-lg p-2 border border-blue-400/50">
@@ -406,7 +574,7 @@ export function GameBoard() {
                   {currentPlayer?.fate || 0}/{currentPlayer?.maxFate || 0}
                 </span>
               </div>
-              {currentPlayer?.spellMana > 0 && (
+              {currentPlayer?.spellMana && currentPlayer.spellMana > 0 && (
                 <div className="text-xs text-purple-400 mt-1">
                   +{currentPlayer.spellMana} spell
                 </div>
@@ -432,7 +600,7 @@ export function GameBoard() {
             <div className="mb-2">
 
               {/* Opponent Bench (Back Row) */}
-              <div className="flex justify-center gap-2 mb-1">
+              <div className="flex justify-center gap-3 mb-2">
                 {Array.from({ length: 6 }).map((_, idx) => (
                   <BoardSlot
                     key={`opp-bench-${idx}`}
@@ -448,7 +616,7 @@ export function GameBoard() {
               </div>
 
               {/* Opponent Battlefield (Combat Row) */}
-              <div className="flex justify-center gap-2">
+              <div className="flex justify-center gap-3">
                 {Array.from({ length: 6 }).map((_, idx) => (
                   <BoardSlot
                     key={`opp-battle-${idx}`}
@@ -480,7 +648,7 @@ export function GameBoard() {
             {/* Player Side */}
             <div className="mt-2">
               {/* Player Battlefield (Combat Row) */}
-              <div className="flex justify-center gap-2 mb-1">
+              <div className="flex justify-center gap-3 mb-2">
                 {Array.from({ length: 6 }).map((_, idx) => (
                   <BoardSlot
                     key={`player-battle-${idx}`}
@@ -496,7 +664,7 @@ export function GameBoard() {
               </div>
 
               {/* Player Bench (Back Row) */}
-              <div className="flex justify-center gap-2 mb-2">
+              <div className="flex justify-center gap-3 mb-2">
                 {Array.from({ length: 6 }).map((_, idx) => (
                   <BoardSlot
                     key={`player-bench-${idx}`}
@@ -547,37 +715,40 @@ export function GameBoard() {
           </div>
         </div>
 
-        {/* Enemy Hand - Top Left Corner */}
-        <div 
-          className="absolute top-4 left-4 z-40"
+        {/* Enemy Hand - Top Left Corner (shifted right and down to be fully visible) */}
+        <div
+          className="absolute top-16 left-8 z-30"
           onMouseEnter={() => setEnemyHandExpanded(true)}
           onMouseLeave={() => setEnemyHandExpanded(false)}
         >
           <div className={cn(
             "relative transition-all duration-300",
-            enemyHandExpanded ? "w-auto" : "w-24"
+            enemyHandExpanded ? "w-auto" : "w-32"
           )}>
             <div className={cn(
-              "flex",
-              enemyHandExpanded ? "gap-2" : "gap-0"
+              "flex relative",
+              enemyHandExpanded ? "gap-2" : ""
             )}>
               {opponentPlayer?.hand?.map((_, idx) => (
                 <motion.div
                   key={idx}
                   initial={{ y: -20, opacity: 0 }}
-                  animate={{ 
-                    y: 0, 
+                  animate={{
+                    y: 0,
                     opacity: 1,
-                    x: enemyHandExpanded ? 0 : idx * -35,
-                    rotate: enemyHandExpanded ? 0 : idx * -2 + 5
+                    x: enemyHandExpanded ? 0 : idx * 45,
+                    rotate: enemyHandExpanded ? 0 : idx * 2 - 5
                   }}
                   transition={{ delay: idx * 0.03, duration: 0.3 }}
                   className={cn(
-                    "relative w-16 h-20 bg-gradient-to-br from-purple-800 to-purple-900",
+                    "w-16 h-20 bg-gradient-to-br from-purple-800 to-purple-900",
                     "rounded-lg border border-purple-500/50 shadow-lg",
-                    !enemyHandExpanded && idx > 0 && "absolute"
+                    !enemyHandExpanded && idx > 0 && "absolute left-0"
                   )}
-                  style={{ zIndex: idx }}
+                  style={{
+                    zIndex: opponentPlayer.hand.length - idx,
+                    position: enemyHandExpanded ? 'relative' : idx === 0 ? 'relative' : 'absolute'
+                  }}
                 >
                   <div className="w-full h-full flex items-center justify-center text-purple-300 text-xl">
                     ✦
@@ -593,63 +764,73 @@ export function GameBoard() {
           </div>
         </div>
 
-        {/* Player Hand - Bottom Right Corner */}
-        <div 
-          className="absolute bottom-4 right-4 z-40"
-          onClick={() => setPlayerHandExpanded(!playerHandExpanded)}
-        >
+        {/* Player Hand - Bottom Right Corner (larger, facing up) */}
+        <div className="absolute bottom-6 right-6 z-30">
           <AnimatePresence>
             {playerHandExpanded && (
-              <motion.div
-                initial={{ opacity: 0, y: 100 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 100 }}
-                className="fixed inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/90 to-transparent backdrop-blur-sm z-50"
-              >
-                <div className="flex justify-center items-end gap-3 h-full pb-4">
-                  {currentPlayer?.hand?.map((card, idx) => (
-                    <HandCard
-                      key={card.id}
-                      card={card}
-                      idx={idx}
-                      onCardClick={handleCardClick}
-                    />
-                  ))}
-                </div>
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setPlayerHandExpanded(false);
-                  }}
-                  className="absolute top-4 right-4 text-white/60 hover:text-white"
+              <>
+                {/* Backdrop that closes hand when clicked */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-40"
+                  onClick={() => setPlayerHandExpanded(false)}
+                />
+                {/* Hand container - clicks inside won't close it */}
+                <motion.div
+                  initial={{ opacity: 0, y: 100 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 100 }}
+                  className="fixed inset-x-0 bottom-0 h-64 bg-gradient-to-t from-black/90 to-transparent backdrop-blur-sm z-50"
                 >
-                  ✕
-                </button>
-              </motion.div>
+                  <div className="flex justify-center items-end gap-4 h-full pb-6">
+                    {currentPlayer?.hand?.map((card, idx) => (
+                      <HandCard
+                        key={card.id}
+                        card={card}
+                        idx={idx}
+                        onCardClick={handleCardClick}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPlayerHandExpanded(false);
+                    }}
+                    className="absolute top-4 right-4 text-white/60 hover:text-white"
+                  >
+                    ✕
+                  </button>
+                </motion.div>
+              </>
             )}
           </AnimatePresence>
 
           {/* Stacked Hand Display */}
           {!playerHandExpanded && (
-            <div className="relative cursor-pointer hover:scale-105 transition-transform">
-              <div className="flex relative">
+            <div
+              className="relative cursor-pointer hover:scale-105 transition-transform"
+              onClick={() => setPlayerHandExpanded(true)}>
+              <div className="flex relative" data-tutorial="hand">
                 {currentPlayer?.hand?.slice(0, 5).map((card, idx) => (
                   <motion.div
                     key={card.id}
                     initial={{ x: 50, opacity: 0 }}
-                    animate={{ 
-                      x: idx * -40,
+                    animate={{
+                      x: idx * -56,
                       opacity: 1,
-                      rotate: idx * 2 - 4
+                      rotate: 0
                     }}
                     transition={{ delay: idx * 0.03 }}
                     className={cn(
-                      "relative w-20 h-28",
+                      "relative w-28 h-40",
                       idx > 0 && "absolute"
                     )}
                     style={{ zIndex: currentPlayer.hand.length - idx }}
                   >
-                    <TarotCard card={card} scale={0.5} isDraggable={false} />
+                    <TarotCard card={card} scale={0.8} isDraggable={false} />
                   </motion.div>
                 ))}
                 {currentPlayer?.hand?.length > 5 && (
@@ -658,25 +839,16 @@ export function GameBoard() {
                   </div>
                 )}
               </div>
-              <div className="text-center mt-2 text-xs text-tarot-gold">
+              <div className="text-center mt-2 text-sm text-tarot-gold">
                 {currentPlayer?.hand?.length || 0} cards
               </div>
             </div>
           )}
         </div>
 
-        {/* End Turn Button */}
-        {isMyTurn && (
-          <button
-            onClick={endTurn}
-            className="absolute bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-lg shadow-lg transition-all"
-          >
-            END TURN
-          </button>
-        )}
 
-        {/* Settings Button */}
-        <div className="absolute top-4 right-4">
+        {/* Settings Button - raise z and spacing to avoid overlap */}
+        <div className="absolute top-4 right-4 z-40">
           <GameMenu />
         </div>
 

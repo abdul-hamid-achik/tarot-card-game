@@ -1,7 +1,7 @@
-import type { MatchState, Unit, CardDefinition, PlayerState } from './types.js';
-import { TarotSimulator } from './tarot-simulator.js';
-import { CombatSystem } from './combat.js';
-import { KeywordProcessor } from './keywords.js';
+import type { MatchState, Unit, CardDefinition, PlayerState } from './types';
+import { TarotSimulator } from './tarot-simulator';
+import { CombatSystem } from './combat';
+import { KeywordProcessor } from './keywords';
 
 interface Move {
   type: 'play_card' | 'attack' | 'block' | 'pass' | 'end_turn';
@@ -124,15 +124,14 @@ export class AIController {
       if (!card || card.cost > totalMana) continue;
 
       if (card.type === 'unit') {
-        // Try each empty lane
-        for (let lane = 0; lane < 3; lane++) {
-          if (playerState.board[lane] === null) {
-            moves.push({
-              type: 'play_card',
-              score: 0,
-              details: { cardId, lane }
-            });
-          }
+        // Try to find an empty bench slot (6 slots total)
+        const emptySlot = (playerState.bench || []).findIndex(slot => slot === null);
+        if (emptySlot !== -1) {
+          moves.push({
+            type: 'play_card',
+            score: 0,
+            details: { cardId, slot: emptySlot }
+          });
         }
       } else {
         // Spell cards
@@ -152,7 +151,7 @@ export class AIController {
    */
   private generateAttackMoves(state: MatchState, playerState: PlayerState): Move[] {
     const moves: Move[] = [];
-    const availableAttackers = playerState.board
+    const availableAttackers = (playerState.bench || [])
       .filter(unit => unit && unit.canAttack && !unit.hasAttacked)
       .map(unit => unit!.id);
 
@@ -202,7 +201,7 @@ export class AIController {
     const moves: Move[] = [];
     if (!state.combatPairs) return moves;
 
-    const availableBlockers = playerState.board
+    const availableBlockers = (playerState.bench || [])
       .filter(unit => unit && !unit.isBlocking)
       .map(unit => unit!);
 
@@ -353,9 +352,9 @@ export class AIController {
     const opponentId = state.players.find(p => p !== playerId)!;
     const oppState = state.playerStates[opponentId];
 
-    // Board Control
-    const myUnits = myState.board.filter(u => u);
-    const oppUnits = oppState.board.filter(u => u);
+    // Board Control - count units on both bench and battlefield
+    const myUnits = [...(myState.bench || []), ...(myState.battlefield || [])].filter(u => u);
+    const oppUnits = [...(oppState.bench || []), ...(oppState.battlefield || [])].filter(u => u);
     const boardControl = (myUnits.length - oppUnits.length) * 10 +
       myUnits.reduce((sum, u) => sum + (u?.currentAttack || 0) + (u?.currentHealth || 0), 0) -
       oppUnits.reduce((sum, u) => sum + (u?.currentAttack || 0) + (u?.currentHealth || 0), 0);
@@ -423,8 +422,11 @@ export class AIController {
    */
   private findUnitById(state: MatchState, unitId: string): Unit | undefined {
     for (const playerId of state.players) {
-      const unit = state.playerStates[playerId].board.find(u => u?.id === unitId);
-      if (unit) return unit;
+      // Check both bench and battlefield
+      const benchUnit = state.playerStates[playerId].bench?.find(u => u?.id === unitId);
+      if (benchUnit) return benchUnit;
+      const battlefieldUnit = state.playerStates[playerId].battlefield?.find(u => u?.id === unitId);
+      if (battlefieldUnit) return battlefieldUnit;
     }
     return undefined;
   }

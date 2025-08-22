@@ -1,4 +1,4 @@
-import type { MatchState, Unit, CombatPair, Keyword, PlayerState } from './types.js';
+import type { MatchState, Unit, CombatPair, Keyword, PlayerState } from './types';
 
 export class CombatSystem {
   /**
@@ -13,7 +13,7 @@ export class CombatSystem {
     // Validate all attackers
     const attackingUnits: Unit[] = [];
     for (const unitId of attackerIds) {
-      const unit = playerState.board.find(u => u?.id === unitId);
+      const unit = [...playerState.battlefield, ...playerState.bench].find(u => u?.id === unitId);
       if (!unit) throw new Error(`Unit ${unitId} not found`);
       if (!unit.canAttack) throw new Error(`Unit ${unitId} cannot attack`);
       if (unit.hasAttacked) throw new Error(`Unit ${unitId} has already attacked`);
@@ -48,7 +48,7 @@ export class CombatSystem {
     const updatedPairs = [...state.combatPairs];
 
     for (const assignment of blockAssignments) {
-      const blocker = playerState.board.find(u => u?.id === assignment.blockerId);
+      const blocker = [...playerState.battlefield, ...playerState.bench].find(u => u?.id === assignment.blockerId);
       if (!blocker) throw new Error(`Blocker ${assignment.blockerId} not found`);
       
       const pairIndex = updatedPairs.findIndex(p => p.attackerId === assignment.attackerId);
@@ -186,7 +186,16 @@ export class CombatSystem {
   private static removeDeadUnits(state: MatchState, deadUnitIds: string[]): MatchState {
     for (const playerId of state.players) {
       const playerState = state.playerStates[playerId];
-      playerState.board = playerState.board.map(unit => {
+      // Remove from battlefield
+      playerState.battlefield = playerState.battlefield.map(unit => {
+        if (unit && deadUnitIds.includes(unit.id)) {
+          playerState.discard.push(unit.cardId);
+          return null;
+        }
+        return unit;
+      });
+      // Remove from bench
+      playerState.bench = playerState.bench.map(unit => {
         if (unit && deadUnitIds.includes(unit.id)) {
           // Move to discard
           playerState.discard.push(unit.cardId);
@@ -204,7 +213,19 @@ export class CombatSystem {
   private static clearCombatFlags(state: MatchState): MatchState {
     for (const playerId of state.players) {
       const playerState = state.playerStates[playerId];
-      playerState.board.forEach(unit => {
+      // Clear flags on battlefield units
+      playerState.battlefield.forEach(unit => {
+        if (unit) {
+          unit.isAttacking = false;
+          unit.isBlocking = false;
+          unit.blockedUnitId = undefined;
+          if (unit.isAttacking) {
+            unit.hasAttacked = true;
+          }
+        }
+      });
+      // Clear flags on bench units
+      playerState.bench.forEach(unit => {
         if (unit) {
           unit.isAttacking = false;
           unit.isBlocking = false;
@@ -223,7 +244,9 @@ export class CombatSystem {
    */
   private static findUnitById(state: MatchState, unitId: string): Unit | undefined {
     for (const playerId of state.players) {
-      const unit = state.playerStates[playerId].board.find(u => u?.id === unitId);
+      const battlefield = state.playerStates[playerId].battlefield;
+      const bench = state.playerStates[playerId].bench;
+      const unit = [...battlefield, ...bench].find(u => u?.id === unitId);
       if (unit) return unit;
     }
     return undefined;

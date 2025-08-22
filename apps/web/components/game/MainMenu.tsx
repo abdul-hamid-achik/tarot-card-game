@@ -13,13 +13,22 @@ import {
   Settings,
   Sparkles,
   Zap,
-  Shield
+  Shield,
+  GraduationCap
 } from 'lucide-react';
 
 export function MainMenu() {
   const router = useRouter();
 
   const menuItems = [
+    {
+      id: 'tutorial',
+      title: 'Tutorial',
+      description: 'Practice locally vs. AI and test mechanics',
+      icon: <GraduationCap className="w-8 h-8" />,
+      color: 'from-indigo-500 to-purple-500',
+      action: () => router.push('/tutorial')
+    },
     {
       id: 'pvp',
       title: 'PvP Duel',

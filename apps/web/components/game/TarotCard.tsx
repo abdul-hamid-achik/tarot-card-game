@@ -267,42 +267,49 @@ export function TarotCard({
       }}
     >
       {/* Always-on overlays (outside flip/rotation) */}
-      {/* Attack (top-left) and Health (top-right), fixed regardless of card orientation or type */}
-      <div className="absolute top-1 left-1 z-40 pointer-events-none select-none">
-        <div className="bg-red-900/95 px-1.5 py-0.5 rounded border border-red-700 text-white text-[11px] font-bold shadow-md">
-          ⚔ {card.attack ?? 0}
+      {/* Fate Cost (top-left) - Purple/Blue for mana */}
+      <div className="absolute top-0 left-0 z-40 pointer-events-none select-none">
+        <div className="bg-gradient-to-br from-blue-600 to-purple-700 rounded-br-lg rounded-tl-md px-2 py-1 border-2 border-blue-400 shadow-lg">
+          <span className="text-white text-sm font-bold drop-shadow-md">{card.cost ?? 0}</span>
         </div>
       </div>
-      <div className="absolute top-1 right-1 z-40 pointer-events-none select-none">
-        <div className={cn(
-          "px-1.5 py-0.5 rounded border text-white text-[11px] font-bold shadow-md relative",
-          healthChange && healthChange < 0
-            ? "bg-red-600/95 border-red-700 animate-pulse"
-            : "bg-blue-900/95 border-blue-700"
-        )}>
-          ❤ {card.health ?? 0}
-          {/* Health change indicator */}
-          {healthChange && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0, y: -10 }}
-              animate={{ opacity: 1, scale: 1.5, y: 0 }}
-              exit={{ opacity: 0, scale: 0, y: 10 }}
-              className={cn(
-                "absolute -top-6 -right-6 text-sm font-bold",
-                healthChange > 0 ? "text-green-400" : "text-red-400"
-              )}
-            >
-              {healthChange > 0 ? `+${healthChange}` : healthChange}
-            </motion.div>
-          )}
+      
+      {/* Attack (bottom-left) - Gold/Orange */}
+      {(card.type === 'unit' || card.type === 'major') && (
+        <div className="absolute bottom-0 left-0 z-40 pointer-events-none select-none">
+          <div className="bg-gradient-to-br from-yellow-500 to-orange-600 rounded-tr-lg rounded-bl-md px-2 py-1 border-2 border-yellow-400 shadow-lg">
+            <span className="text-white text-sm font-bold drop-shadow-md">⚔ {card.attack ?? 0}</span>
+          </div>
         </div>
-      </div>
-      {/* Mana/Cost bottom-left, fixed regardless of card orientation */}
-      <div className="absolute bottom-1 left-1 z-40 pointer-events-none select-none">
-        <div className="bg-blue-900/90 rounded-full w-7 h-7 flex items-center justify-center border-2 border-blue-400 shadow-lg">
-          <span className="text-[13px] font-bold text-white">{card.cost ?? 0}</span>
+      )}
+      
+      {/* Health (bottom-right) - Red */}
+      {(card.type === 'unit' || card.type === 'major') && (
+        <div className="absolute bottom-0 right-0 z-40 pointer-events-none select-none">
+          <div className={cn(
+            "rounded-tl-lg rounded-br-md px-2 py-1 border-2 shadow-lg relative",
+            healthChange && healthChange < 0
+              ? "bg-gradient-to-br from-red-700 to-red-900 border-red-500 animate-pulse"
+              : "bg-gradient-to-br from-red-600 to-red-800 border-red-400"
+          )}>
+            <span className="text-white text-sm font-bold drop-shadow-md">❤ {card.health ?? 0}</span>
+            {/* Health change indicator */}
+            {healthChange && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0, y: -10 }}
+                animate={{ opacity: 1, scale: 1.5, y: 0 }}
+                exit={{ opacity: 0, scale: 0, y: 10 }}
+                className={cn(
+                  "absolute -top-6 -right-6 text-lg font-bold",
+                  healthChange > 0 ? "text-green-400" : "text-red-400"
+                )}
+              >
+                {healthChange > 0 ? `+${healthChange}` : healthChange}
+              </motion.div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       <AnimatePresence mode="wait">
         <motion.div

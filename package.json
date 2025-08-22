@@ -37,6 +37,7 @@
     "prettier": "^3.2.5"
   },
   "dependencies": {
+    "@stackframe/stack": "2.4.8",
     "@xstate/react": "^6.0.0",
     "drizzle-orm": "^0.44.4",
     "xstate": "^5.20.2"

@@ -3,7 +3,7 @@ import { devtools, subscribeWithSelector } from 'zustand/middleware';
 import { gameLogger, withGameLogging } from '@tarot/game-logger';
 
 export type CardOrientation = 'upright' | 'reversed';
-export type GamePhase = 'draw' | 'main' | 'combat' | 'end';
+export type GamePhase = 'draw' | 'main' | 'combat' | 'combat_declaration' | 'combat_blocks' | 'combat_damage' | 'end';
 export type CardSuit = 'wands' | 'cups' | 'swords' | 'pentacles' | 'major';
 
 export interface Card {
@@ -96,6 +96,12 @@ export interface MatchState {
   attackToken?: string; // Who has attack token this round
   players: Record<string, Player>;
   combatPairs?: CombatPair[]; // Active combat pairings
+  combatState?: {
+    attackers?: number[]; // Indices of attacking units
+    blockers?: Record<number, number>; // Map of blocker index to attacker index
+    damage?: Record<string, number>; // Damage dealt to each unit
+    resolved?: boolean;
+  };
   spellStack?: Array<{
     id: string;
     cardId: string;
@@ -104,9 +110,9 @@ export interface MatchState {
   }>;
   priority?: string; // Who has priority to act
   reactionWindow?: {
-    open: boolean;
-    respondingPlayer: string;
-    source: string; // What triggered the reaction window
+    active: boolean;
+    respondingPlayer?: string;
+    source?: string; // What triggered the reaction window
   };
   turnTimer?: number;
   spreadCards?: {
@@ -120,6 +126,8 @@ export interface MatchState {
     data: any;
   };
   pendingAttackOrder?: string[]; // Legacy support
+  pendingBlockOrder?: string[];
+  lastPassBy?: string | null;
 }
 
 // Debug helpers for tracking board changes
@@ -155,6 +163,21 @@ function logBoardDiff(prevBoard: Array<Unit | null>, nextBoard: Array<Unit | nul
   }
 }
 
+// Helper for generic card removal logging where we don't have the full Unit
+function logBoardRemoval(playerId: string, lane: number, card: Card, reason: string): void {
+  try {
+    gameLogger.logAction('unit_removal', {
+      playerId,
+      lane,
+      unitId: card.id,
+      cardId: card.id,
+      reason,
+    }, true);
+  } catch (_) {
+    // no-op
+  }
+}
+
 interface GameStore {
   // Match State
   currentMatch: MatchState | null;
@@ -180,17 +203,24 @@ interface GameStore {
   // Game Actions
   playCard: (card: Card, lane?: number, playerId?: string) => void;
   declareAttackers: (attackerIds: string[], playerId?: string) => void;
-  declareBlockers: (blockAssignments: Array<{ blockerId: string; attackerId: string }>, playerId?: string) => void;
-  resolveCombat: () => void;
-  pass: (playerId?: string) => void; // Pass priority
+  setBlockOrder: (blockerIds: string[]) => void;
+  resolveDeclaredCombat: () => void;
+  startCombat: () => void;
   endTurn: () => void;
   endMatch: (result: 'victory' | 'defeat' | 'abandon') => void;
+  flipCard: (cardId: string, playerId?: string) => void;
+  useFateToFlip: (cardId: string, playerId?: string) => void;
+  peekDestiny: () => void;
+  forceDraw: () => void;
   initializeMatch: (matchData: Partial<MatchState>) => void;
+  startMatch: (matchData: Partial<MatchState>) => void;
   updateMatch: (updates: Partial<MatchState>) => void;
 
   // Connection
-
   setSearchingMatch: (searching: boolean) => void;
+  
+  // AI
+  executeAITurn: () => void;
 }
 
 export const useGameStore = create<GameStore>()(
@@ -282,7 +312,7 @@ export const useGameStore = create<GameStore>()(
 
         // Resource check: pay from fate (mana), and for spells, from spellMana if needed
         const isSpell = card.type === 'spell';
-        const availableMana = player.fate + (isSpell ? (player.spellMana || 0) : 0);
+        const availableMana = (player.fate ?? 0) + (isSpell ? (player.spellMana || 0) : 0);
         if (card.cost > availableMana) {
           gameLogger.logAction('play_card_denied', {
             cardName: card.name,
@@ -346,7 +376,7 @@ export const useGameStore = create<GameStore>()(
 
         // Pay cost using mana then spell mana (spells only)
         let remainingCost = card.cost;
-        let mana = player.fate;
+        let mana = player.fate ?? 0;
         let spellMana = player.spellMana || 0;
         if (remainingCost > 0) {
           const spendFromMana = Math.min(remainingCost, mana);
@@ -359,7 +389,7 @@ export const useGameStore = create<GameStore>()(
           remainingCost -= spendFromSpell;
         }
         const updatedFate = mana;
-        
+
         console.log('Playing card:', card.name, 'Cost:', card.cost, 'Fate before:', player.fate, 'Fate after:', updatedFate);
 
         // Log the card play with resource changes
@@ -367,12 +397,12 @@ export const useGameStore = create<GameStore>()(
         withGameLogging.cardPlay(gameLogger, card, playerId, targetSlot, player.fate || 0, updatedFate);
 
         // Log resource changes
-        if (player.fate !== updatedFate) {
+        if ((player.fate ?? 0) !== updatedFate) {
           gameLogger.logResourceChange({
             resource: 'fate',
-            before: player.fate,
+            before: player.fate || 0,
             after: updatedFate,
-            change: updatedFate - player.fate,
+            change: updatedFate - (player.fate || 0),
             reason: `Played ${card.name}`
           });
         }
@@ -426,7 +456,7 @@ export const useGameStore = create<GameStore>()(
         if (!state.currentMatch) return;
 
         const match = state.currentMatch;
-        const attackerId = match.attackTokenOwner || match.activePlayer;
+        const attackerId = match.attackTokenOwner || match.activePlayer || 'player1';
         const playerIds = Object.keys(match.players);
         const defenderId = playerIds.find(id => id !== attackerId) || attackerId;
         const attacker = match.players[attackerId];
@@ -485,8 +515,8 @@ export const useGameStore = create<GameStore>()(
 
           const updatedAtkBoard = [...atkBoard];
           const updatedDefBoard = [...defBoard];
-          let newAttackerHealth = atk.health;
-          let newDefenderHealth = def.health;
+          let newAttackerHealth = atk.health ?? 0;
+          let newDefenderHealth = def.health ?? 0;
           const attackerDiscard = [...(atk.discard || [])];
           const defenderDiscard = [...(def.discard || [])];
 
@@ -624,7 +654,7 @@ export const useGameStore = create<GameStore>()(
         // If defender is AI, auto-assign simple blocks and resolve after brief delay
         const defender = match.players[defenderId];
         if (defender?.isAI) {
-          const defUnits = defender.board.map((s) => s.card).filter(Boolean) as Card[];
+          const defUnits = (defender.board || []).map((s: any) => s.card).filter(Boolean) as Card[];
           const autoBlocks = defUnits.slice(0, attackerIds.length).map(c => c.id);
           set({
             currentMatch: {
@@ -654,7 +684,7 @@ export const useGameStore = create<GameStore>()(
         if (!state.currentMatch) return;
 
         const match = state.currentMatch;
-        const attackerId = match.attackTokenOwner || match.activePlayer;
+        const attackerId = match.attackTokenOwner || match.activePlayer || 'player1';
         const playerIds = Object.keys(match.players);
         const defenderId = playerIds.find(id => id !== attackerId) || attackerId;
         const atk = match.players[attackerId];
@@ -666,8 +696,8 @@ export const useGameStore = create<GameStore>()(
 
         const updatedAtkBoard = [...atkBoard];
         const updatedDefBoard = [...defBoard];
-        let newAttackerHealth = atk.health;
-        let newDefenderHealth = def.health;
+        let newAttackerHealth = atk.health ?? 0;
+        let newDefenderHealth = def.health ?? 0;
         const attackerDiscard = [...(atk.discard || [])];
         const defenderDiscard = [...(def.discard || [])];
 
@@ -801,13 +831,13 @@ export const useGameStore = create<GameStore>()(
 
         const match = state.currentMatch;
         const playerIds = Object.keys(match.players);
-        const current = match.activePlayer;
+        const current = match.activePlayer || 'player1';
         const opponent = playerIds.find(id => id !== current) || current;
 
         // Handle phase transitions
         if (match.phase === 'draw') {
           // Move from draw phase to main phase
-          gameLogger.logPhaseTransition(match.phase, 'main');
+          gameLogger.logPhaseTransition(match.phase, 'main', 'Draw phase completed');
           withGameLogging.phaseChange(gameLogger, match.phase, 'main', 'Draw phase completed');
           set({
             currentMatch: {
@@ -828,7 +858,7 @@ export const useGameStore = create<GameStore>()(
           // Update resources and draw cards for new turn
           for (const pid of playerIds) {
             const p = updatedPlayers[pid];
-            const carry = Math.max(0, p.fate);
+            const carry = Math.max(0, p.fate || 0);
             const newSpell = Math.min(3, (p.spellMana || 0) + carry);
             const newMax = Math.min(10, (p.maxFate || 0) + 1);
             let newHand = [...p.hand];
@@ -883,9 +913,9 @@ export const useGameStore = create<GameStore>()(
 
         if (bothPassed) {
           // Check if we should go to combat phase or end the round
-          const attackTokenOwner = match.attackTokenOwner || current;
+          const attackTokenOwner = match.attackTokenOwner || current || 'player1';
           const hasAttackers = Object.values(match.players[attackTokenOwner]?.board || {}).some((slot: any) => slot?.card);
-          const hasBlockers = Object.values(match.players[opponent]?.board || {}).some((slot: any) => slot?.card);
+          const hasBlockers = Object.values(match.players[opponent || 'player2']?.board || {}).some((slot: any) => slot?.card);
 
           gameLogger.logAction('end_round_check', {
             attackTokenOwner,
@@ -894,16 +924,21 @@ export const useGameStore = create<GameStore>()(
             currentPlayer: current
           });
 
-          // If attack token owner has units and opponent has units, go to combat phase
+          // If attack token owner has units and opponent has units, go to combat declaration phase
           if (hasAttackers && hasBlockers && attackTokenOwner === current && match.phase === 'main') {
-            withGameLogging.phaseChange(gameLogger, match.phase, 'combat', 'Both players passed, units present');
+            withGameLogging.phaseChange(gameLogger, match.phase, 'combat_declaration', 'Both players passed, units present');
             set({
               currentMatch: {
                 ...match,
-                phase: 'combat',
+                phase: 'combat_declaration',
                 activePlayer: attackTokenOwner,
                 lastPassBy: null,
                 reactionWindow: { active: false },
+                combatState: {
+                  attackers: [],
+                  blockers: {},
+                  resolved: false
+                }
               }
             });
             return;
@@ -920,38 +955,35 @@ export const useGameStore = create<GameStore>()(
           });
           for (const pid of playerIds) {
             const p = updatedPlayers[pid];
-            const carry = Math.max(0, p.fate);
+            const carry = Math.max(0, p.fate || 0);
             const newSpell = Math.min(3, (p.spellMana || 0) + carry);
             const newMax = Math.min(10, (p.maxFate || 0) + 1);
             let newHand = [...p.hand];
             let newDeck = [...p.deck];
 
             // Log resource changes
-            if (p.maxFate !== newMax) {
+            if ((p.maxFate || 0) !== newMax) {
               gameLogger.logResourceChange({
-                playerId: pid,
                 resource: 'maxFate',
-                before: p.maxFate,
+                before: p.maxFate || 0,
                 after: newMax,
                 change: 1,
                 reason: 'Turn progression'
               });
             }
 
-            if (p.fate !== newMax) {
+            if ((p.fate || 0) !== newMax) {
               gameLogger.logResourceChange({
-                playerId: pid,
                 resource: 'fate',
-                before: p.fate,
+                before: p.fate || 0,
                 after: newMax,
-                change: newMax - p.fate,
+                change: newMax - (p.fate || 0),
                 reason: 'Turn refill'
               });
             }
 
             if ((p.spellMana || 0) !== newSpell) {
               gameLogger.logResourceChange({
-                playerId: pid,
                 resource: 'spellMana',
                 before: p.spellMana || 0,
                 after: newSpell,
@@ -1036,7 +1068,7 @@ export const useGameStore = create<GameStore>()(
         set({ currentMatch: null });
       },
 
-      flipCard: (cardId, playerId = 'player1') => {
+      flipCard: (cardId: string, playerId = 'player1') => {
         const state = get();
         if (!state.currentMatch) return;
 
@@ -1120,12 +1152,12 @@ export const useGameStore = create<GameStore>()(
         });
       },
 
-      useFateToFlip: (cardId, playerId = 'player1') => {
+      useFateToFlip: (cardId: string, playerId = 'player1') => {
         const state = get();
         if (!state.currentMatch) return;
 
         const player = state.currentMatch.players[playerId];
-        if (!player || player.fate < 1) {
+        if (!player || (player.fate ?? 0) < 1) {
           gameLogger.logAction('flip_card_failed', {
             cardId,
             playerId,
@@ -1143,7 +1175,7 @@ export const useGameStore = create<GameStore>()(
               ...state.currentMatch.players,
               [playerId]: {
                 ...player,
-                fate: player.fate - 1
+                fate: (player.fate || 0) - 1
               }
             }
           }
@@ -1179,6 +1211,51 @@ export const useGameStore = create<GameStore>()(
         set({ currentMatch: matchState });
       },
 
+      startMatch: (matchData) => {
+        const state = get();
+        const matchId = matchData.matchId || `match-${Date.now()}`;
+        const players = matchData.players || state.currentMatch?.players || {};
+        // Ensure player resource defaults
+        const normalizedPlayers: Record<string, Player> = Object.fromEntries(
+          Object.entries(players).map(([pid, p]) => [
+            pid,
+            {
+              ...p,
+              fate: p.fate ?? 1,
+              maxFate: p.maxFate ?? 1,
+              spellMana: p.spellMana ?? 0,
+              hand: Array.isArray(p.hand) ? p.hand : [],
+              deck: Array.isArray(p.deck) ? p.deck : [],
+              discard: Array.isArray(p.discard) ? p.discard : [],
+              board: Array.isArray((p as any).board) ? (p as any).board : Array.from({ length: 6 }, () => ({ card: null })),
+              bench: Array.isArray(p.bench) ? p.bench : Array(6).fill(null),
+            } as Player,
+          ])
+        );
+
+        const activePlayer = matchData.activePlayer || 'player1';
+        const attackTokenOwner = matchData.attackTokenOwner || activePlayer;
+        const startPhase: GamePhase = matchData.phase || 'main';
+
+        const matchState: MatchState = {
+          matchId,
+          type: matchData.type || 'pvp',
+          turn: matchData.turn || 1,
+          phase: startPhase,
+          activePlayer,
+          attackTokenOwner,
+          players: normalizedPlayers,
+          pendingAttackOrder: [],
+          pendingBlockOrder: [],
+          lastPassBy: null,
+          reactionWindow: { active: false },
+        };
+
+        gameLogger.clearBuffer();
+        gameLogger.logMatchStart(matchState);
+        set({ currentMatch: matchState });
+      },
+
       updateMatch: (updates) => {
         const state = get();
         if (!state.currentMatch) return;
@@ -1193,6 +1270,109 @@ export const useGameStore = create<GameStore>()(
 
 
       setSearchingMatch: (searching) => set({ isSearchingMatch: searching }),
+      
+      executeAITurn: () => {
+        const state = get();
+        if (!state.currentMatch) return;
+        
+        const match = state.currentMatch;
+        const aiPlayerId = match.activePlayer;
+        
+        // Simple AI logic - just end turn after a delay
+        // In a real implementation, this would analyze the board and make decisions
+        gameLogger.logAction('ai_thinking', { playerId: aiPlayerId }, true, 'AI is thinking...');
+        
+        // Check if AI has cards to play
+        const aiPlayer = match.players[aiPlayerId || 'ai'];
+        if (!aiPlayer) {
+          console.log('AI player not found');
+          return;
+        }
+        
+        // Simple AI: Play first affordable card from hand
+        const playableCards = aiPlayer.hand.filter(card => 
+          card.cost <= (aiPlayer.fate || 0) + (card.type === 'spell' ? (aiPlayer.spellMana || 0) : 0)
+        );
+        
+        if (playableCards.length > 0 && aiPlayer.bench?.some(slot => !slot)) {
+          // Play a random playable card
+          const cardToPlay = playableCards[0];
+          const emptySlot = aiPlayer.bench?.findIndex(slot => !slot);
+          
+          if (emptySlot !== undefined && emptySlot >= 0) {
+            gameLogger.logAction('ai_play_card', { 
+              cardName: cardToPlay.name, 
+              slot: emptySlot 
+            }, true, `AI plays ${cardToPlay.name}`);
+            
+            // Use the playCard method
+            const playCard = get().playCard;
+            playCard(cardToPlay, emptySlot, aiPlayerId);
+            
+            // Don't automatically end turn after playing - priority will pass naturally
+            // In LoR, playing a card passes priority to opponent, not ends turn
+            return;
+          }
+        }
+        
+        // If AI has units on bench and attack token, consider attacking
+        if (match.attackTokenOwner === aiPlayerId && aiPlayer.bench?.some(u => u)) {
+          // Move units from bench to battlefield
+          const benchUnits = aiPlayer.bench?.filter(u => u) || [];
+          if (benchUnits.length > 0) {
+            gameLogger.logAction('ai_attack', { 
+              unitCount: benchUnits.length 
+            }, true, 'AI initiates attack');
+            
+            // Simple attack logic - move all bench units to battlefield
+            const updatedBattlefield = [...(aiPlayer.battlefield || Array(6).fill(null))];
+            const updatedBench = [...(aiPlayer.bench || Array(6).fill(null))];
+            
+            benchUnits.forEach((unit) => {
+              if (unit) {
+                const emptyBattlefieldSlot = updatedBattlefield.findIndex(slot => !slot);
+                if (emptyBattlefieldSlot >= 0) {
+                  updatedBattlefield[emptyBattlefieldSlot] = unit;
+                  const benchIdx = updatedBench.findIndex(b => b?.id === unit.id);
+                  if (benchIdx >= 0) {
+                    updatedBench[benchIdx] = null;
+                  }
+                }
+              }
+            });
+            
+            // Update match state and trigger combat
+            set({
+              currentMatch: {
+                ...match,
+                phase: 'combat' as GamePhase,
+                players: {
+                  ...match.players,
+                  [aiPlayerId || 'ai']: {
+                    ...aiPlayer,
+                    bench: updatedBench,
+                    battlefield: updatedBattlefield
+                  }
+                }
+              }
+            });
+            
+            // Start combat after a delay
+            setTimeout(() => {
+              const startCombat = get().startCombat;
+              startCombat();
+            }, 1500);
+            return;
+          }
+        }
+        
+        // Default: just pass priority (not end turn)
+        gameLogger.logAction('ai_pass', { playerId: aiPlayerId }, true, 'AI passes priority');
+        setTimeout(() => {
+          const endTurn = get().endTurn;
+          endTurn();
+        }, 1000);
+      },
     }))
   )
 );
